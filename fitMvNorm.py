@@ -22,6 +22,8 @@ class fitMvNorm:
     # HYPER PARAMS for prior covariance: nu, PSI
     PR_cov_a  = 3
     PR_cov_B  = None
+    PR_cov_nu    = 3
+    PR_cov_PSI   = None
 
     # HYPER PARAMS mean: nu, PSI
     PR_mu_mu = None
@@ -63,6 +65,10 @@ class fitMvNorm:
         ###  
         oo.PR_cov_B = _N.tile(_N.eye(k)*0.5, M).T.reshape(M, k, k)  #  we only look at the diagonal component
         oo.PR_cov_a = _N.ones(M, dtype=_N.int)
+
+        oo.PR_cov_PSI = _N.tile(_N.eye(k)*0.5, M).T.reshape(M, k, k)
+        oo.PR_cov_nu  = _N.ones(M, dtype=_N.int)
+
         oo.PR_mu_mu = _N.zeros((M, k))
 
         oo.PR_mu_sg = _N.tile(_N.eye(k)*0.5, M).T.reshape(M, k, k)
@@ -134,51 +140,6 @@ class fitMvNorm:
             x          = _N.empty((n2-n1, k))
             x[:, 0]    = _x[inds, 0]
             x[:, 1:]   = _x[inds, 1:]
-
-            """
-            print "seperate hash"
-            bgCh  = _N.max(_x[:, 1:], axis=1)
-            inds  = _N.array([i[0] for i in sorted(enumerate(bgCh), key=lambda x:x[1])])
-            #  hash are lowest 70%
-            #  signal are highest 30%
-
-            pH        = int(bgCh.shape[0]*pctH)
-            if MS is None:
-                MH        = int(M*pctH)
-                MS        = M - MH
-            else:
-                MH        = M - MS
-
-            scrH, labH = scv.kmeans2(_x[inds[0:pH]], MH)
-            scrB, labB = scv.kmeans2(_x[inds[pH:]], MS)  #  big clear
-
-            _plt.scatter(_x[inds[0:pH], 0], _x[inds[0:pH], 1], color="black", s=2)
-
-            cc = 0
-            clsz = _N.empty(MS, dtype=_N.int)
-
-            for c in xrange(MS):
-                thisCl = _N.where(labB == c)[0] + pH
-                clsz[c] = len(thisCl)
-                scrB2, labB2 = scv.kmeans2(_x[inds[thisCl]], 2)
-                #  thisCl 
-                
-                #  look at 
-                for cb in xrange(2):
-                    dU = _N.mean(_x[inds[thisCl][thisClS]], axis=)
-                    print _N.cov()
-                    thisClS = _N.where(labB2 == cb)[0]
-                    #print thisClS
-                    #_plt.scatter(_x[inds[thisCl][thisClS], 0], _x[inds[thisCl][thisClS], 1], color=oo.myclrs[cc], s=2)
-                    cc += 1
-
-
-
-            lab        = _N.array(labH.tolist() + (labB + MH).tolist())
-            x          = _N.empty((n2-n1, k))
-            x[:, 0]    = _x[inds, 0]
-            x[:, 1:]   = _x[inds, 1:]
-            """
         else:
             x = _x
             scr, lab = scv.kmeans2(x, M)
@@ -191,8 +152,8 @@ class fitMvNorm:
             kinds = _N.where(lab == im)[0]  #  inds
 
             if len(kinds) > 0:
-                oo.scov[0, im] = _N.cov(x[kinds], rowvar=0)
                 oo.smu[0, im]  = _N.mean(x[kinds], axis=0)
+                oo.scov[0, im] = _N.cov(x[kinds], rowvar=0)
             else:
                 oo.smu[0, im]  = _N.mean(x[SI*im:SI*(im+1)], axis=0)
                 oo.scov[0, im] = covAll*0.125
@@ -223,7 +184,9 @@ class fitMvNorm:
         skpM   = _N.arange(0, N)*M
 
         for it in xrange(oo.ITERS-1):
+            print it
             iscov = _N.linalg.inv(oo.scov[it])
+
             norms = 1/_N.sqrt(2*_N.pi*_N.linalg.det(oo.scov[it]))
             norms = norms.reshape(M, 1)
 
@@ -256,13 +219,13 @@ class fitMvNorm:
 
             da = _N.random.dirichlet(dirArgs)
             oo.sm[it+1, :, 0] = _N.random.dirichlet(dirArgs)
-            
             for im in xrange(M):
                 minds = _N.where(oo.gz[it+1, :, im] == 1)[0]
 
                 if len(minds) > 0:
                     clstx    = x[minds]
-                    mc       = _N.sum(clstx, axis=0)
+                    mc       = _N.mean(clstx, axis=0)    #  inv wishart case
+                    #mc       = _N.sum(clstx, axis=0)     #  dirichlet case
                     Nm       = clstx.shape[0]
 
                     # hyp
@@ -270,6 +233,19 @@ class fitMvNorm:
                     ##  mean of posterior distribution of cluster means
                     #  sigma^2 and mu are the current Gibbs-sampled values
 
+                    po_mu_sg = _N.linalg.inv(oo.iPR_mu_sg[im] + Nm*iscov[im])
+                    ##  mean of posterior distribution of cluster means
+                    po_mu_mu  = _N.dot(po_mu_sg, _N.dot(oo.iPR_mu_sg[im], oo.PR_mu_mu[im]) + Nm*_N.dot(iscov[im], mc))
+                    oo.smu[it+1, im] = mvn(po_mu_mu, po_mu_sg)
+
+                    ##  dof of posterior distribution of cluster covariance
+                    po_sg_dof = oo.PR_cov_nu[im] + Nm
+                    ##  dof of posterior distribution of cluster covariance
+                    po_sg_PSI = oo.PR_cov_PSI[im] + _N.dot((clstx - oo.smu[it+1, im]).T, (clstx-oo.smu[it+1, im]))
+
+                    oo.scov[it+1, im] = s_u.sample_invwishart(po_sg_PSI, po_sg_dof)
+
+                    """
                     for ik in xrange(oo.pmdim):
                         po_mu_sg = 1. / (1 / oo.PR_mu_sg[im, ik, ik] + Nm / oo.scov[it, im, ik, ik])
                         po_mu_mu  = (oo.PR_mu_mu[im, ik] / oo.PR_mu_sg[im, ik, ik] + mc[ik] / oo.scov[it, im, ik, ik]) * po_mu_sg
@@ -280,13 +256,14 @@ class fitMvNorm:
                         po_sg_a = oo.PR_cov_a[im] + 0.5*Nm
                         po_sg_B = oo.PR_cov_B[im, ik, ik] + 0.5*_N.sum((clstx[:, ik] - oo.smu[it+1, im, ik])**2)
                         oo.scov[it+1, im, ik, ik] = _ss.invgamma.rvs(po_sg_a, scale=po_sg_B)
+                    """
                 else:  #  no marks assigned to this cluster 
                     oo.scov[it+1, im] = oo.scov[it, im]
                     oo.smu[it+1, im]  = oo.smu[it, im]
 
         #  When I say prior for mu, I mean I have hyper parameters mu_mu and mu_sg.
         #  hyperparameters are not sampled
-        hITERS = oo.ITERS/2
+        hITERS = int(oo.ITERS*0.75)
         oo.us[:]  = _N.mean(oo.smu[hITERS:], axis=0)
         oo.covs[:] = _N.mean(oo.scov[hITERS:], axis=0)
         oo.ms[:]  = _N.mean(oo.sm[hITERS:], axis=0).reshape(oo.M, 1)
