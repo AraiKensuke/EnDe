@@ -7,6 +7,7 @@ import scipy.stats as _ss
 import fitMvNorm as fMN   
 import time as _tm
 import kdeutil as _ku
+import scipy.integrate as _si
 
 #  Decode unsorted spike train
 
@@ -87,8 +88,11 @@ class simDecode():
         oo.xA = lm.xA;        oo.mA = lm.mA
         oo.mdim  = lm.k#kde.mdim
         oo.mvpos  = lm.mvpos
-        if lm.mvpos_t is not None:
-            oo.mvpos_t = lm.mvpos_t
+        try:
+            if lm.mvpos_t is not None:
+                oo.mvpos_t = lm.mvpos_t
+        except AttributeError:
+            oo.mvpos_t = None
 
         ####  spatial grid for evaluating firing rates
         oo.xp   = _N.linspace(-oo.xA, oo.xA, oo.Nx)  #  space points
@@ -97,7 +101,7 @@ class simDecode():
         oo.dxp   = oo.xp[1] - oo.xp[0]
         oo.xb    = _N.empty(oo.Nx+1)
         oo.xb[0:oo.Nx] = oo.xp - 0.5*oo.dxp
-        oo.xb[oo.Nx] = oo.xp[-1]+ 0.5*oo.dxp
+        oo.xb[oo.Nx] = oo.xp[-1]+ 0.5*oo.dxp\
         ####
 
         shp  = [oo.Nx]    #  shape of kde
@@ -112,8 +116,10 @@ class simDecode():
 
         oo.pX_Nm = _N.zeros((oo.pos.shape[0], oo.Nx))
         oo.Lklhd = _N.zeros((oo.nTets, oo.pos.shape[0], oo.Nx))
-        
+
+        oo.decmth = "kde"
         if not oo.kde:
+            oo.decmth = "mxn"
             oo.mvNrm= []
             for nt in xrange(oo.nTets):
                 oo.mvNrm.append(fMN.fitMvNorm(oo.ITERS, oo.M, oo.mdim + 1))
@@ -183,6 +189,7 @@ class simDecode():
         oo.pX_Nm[t0] /= A
 
         oo.intgrd= _N.empty(oo.Nx)
+        oo.intgrd2d= _N.empty((oo.Nx, oo.Nx))
         oo.intgrl = _N.empty(oo.Nx)
         oo.xTrs  = _N.empty((oo.Nx, oo.Nx))      #  Gaussian
 
@@ -261,7 +268,9 @@ class simDecode():
         pNkmk = _N.empty((oo.Nx, oo.nTets))
 
 
+        tStart = _tm.time()
         for t in xrange(t0+1,t1): # start at 1 because initial condition
+            #tt1 = _tm.time()
             for nt in xrange(oo.nTets):
                 oo.Lklhd[nt, t] = pNkmk0[:, nt]
 
@@ -278,15 +287,28 @@ class simDecode():
                         else:
                             oo.Lklhd[nt, t] *= oo.mvNrm[nt].evalAtFxdMks(fxdMks)*oo.lmd0[nt] * oo.iocc
 
+            ttt1 =0
+            ttt2 =0
+            ttt3 =0
+
+            #tt2 = _tm.time()
+
             #  transition convolved with previous posterior
 
-            for ixk in xrange(oo.Nx):
-                _N.multiply(oo.xTrs[ixk], oo.pX_Nm[t-1], out=oo.intgrd)
-                oo.intgrl[ixk] = _N.trapz(oo.intgrd, dx=oo.dxp)
+            _N.multiply(oo.xTrs, oo.pX_Nm[t-1], out=oo.intgrd2d)   
+            oo.intgrl = _N.trapz(oo.intgrd2d, dx=oo.dxp, axis=1)
+            #for ixk in xrange(oo.Nx):   #  above trapz over 2D array
+            #    oo.intgrl[ixk] = _N.trapz(oo.intgrd2d[ixk], dx=oo.dxp)
 
+            #tt3 = _tm.time()
             oo.pX_Nm[t] = oo.intgrl * _N.product(oo.Lklhd[:, t], axis=0)
             A = _N.trapz(oo.pX_Nm[t], dx=oo.dxp)
             oo.pX_Nm[t] /= A
+            #tt4 = _tm.time()
+            #print "%(1).3e   %(2).3e   %(3).3e" % {"1" : (tt2-tt1), "2" : (tt3-tt2), "3" : (tt4-tt3)}
+            #print "%(1).3e   %(2).3e" % {"1" : ttt1, "2" : ttt2}
+        tEnd = _tm.time()
+        print "decode   %(1).3e" % {"1" : (tEnd-tStart)}
     
     def setLmd0(self, t0, t1, nspks):
         """

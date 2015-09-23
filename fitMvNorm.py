@@ -281,7 +281,6 @@ class fitMvNorm:
             allLabs = []
 
             _x[:, 0] *= 5
-
             for itr in xrange(nICs):
                 mns, labs = scv.kmeans2(_x[lowPs], oo.M-MF)
                 dist = []
