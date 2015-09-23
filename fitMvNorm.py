@@ -36,6 +36,7 @@ class fitMvNorm:
 
     #  how many clusters do I think there are
     M        = 10
+    M      = 15
 
     ITERS = 1
 
@@ -53,10 +54,15 @@ class fitMvNorm:
     bPosInd = False
 
     def __init__(self, ITERS, M, k):
+        """
+        
+        """
         oo = self
 
+        oo.M    = M
+        oo.k    = k
         oo.ITERS = ITERS
-
+        
         #  sampled variables
         oo.scov = _N.zeros((oo.ITERS, M, k, k))
         oo.smu  = _N.empty((oo.ITERS, M, k))
@@ -81,14 +87,25 @@ class fitMvNorm:
         oo.covs = _N.zeros((M, k, k))
         oo.ms   = _N.zeros((M, 1))
 
-        oo.M    = M
-        
     #  M initial guess # of clusters
     #  k
     #  pos, mk    position and mark at spike time
-    def init0(self, M, k, pos, mk, n1, n2, sepHash=False, pctH=0.7, MS=None):
+    def init0(self, pos, mk, n1, n2, sepHash=False, pctH=0.7, MS=None, sepHashMthd=0, doTouchUp=False, MF=None):
+        """
+        M       total number of clusters
+
+        MS      number of clusters assigned to signal
+        MF      number of clusters used for initial fit
+        M - MF  If doing touchup, number of clusters to assign to this
+        """
         print "init0"
         oo = self
+
+        k  = oo.k
+        MF = oo.M if MF is None else MF
+
+        print "MF  %d" % MF
+
         _x   = _N.empty((n2-n1, k))
         _x[:, 0]    = pos
         _x[:, 1:]   = mk
@@ -97,78 +114,230 @@ class fitMvNorm:
         #  Gibbs sampling 
         ################  init cluster centers
         if sepHash:  #  treat hash spikes seperately
-            bgCh  = _N.max(_x[:, 1:], axis=1)
-            inds  = _N.array([i[0] for i in sorted(enumerate(bgCh), key=lambda x:x[1])])
-            #  hash are lowest 70%
-            #  signal are highest 30%
+            print "sepHashMthd  %d" % sepHashMthd
+            if sepHashMthd == 0:
+                ##########################
+                bgCh  = _N.max(_x[:, 1:], axis=1)
+                inds  = _N.array([i[0] for i in sorted(enumerate(bgCh), key=lambda x:x[1])])
+                #  hash are lowest 70%
+                #  signal are highest 30%
 
-            pH        = int(bgCh.shape[0]*pctH)
-            if MS is None:
-                MH        = int(M*pctH)
-                MS        = M - MH
+                pH        = int(bgCh.shape[0]*pctH)
+                if MS is None:
+                    MH        = int(M*pctH)
+                    MS        = MF - MH
+                else:
+                    MH        = MF - MS
+
+                sigInds       = inds[pH:]
+                smkpos        = _x[sigInds]
+                scrH, labH = scv.kmeans2(_x[inds[0:pH]], MH)
+
+
+                ITERS  = 30
+                mnDsts = _N.zeros(ITERS)
+
+                allCtrs = []
+                allLabs = []
+
+                for it in xrange(ITERS):
+                    ctrs, labs = scv.kmeans2(smkpos, MS)  #  big clear
+                    dist = []
+                    tot  = 0
+                    for m in xrange(MS):
+                        inClus = _N.where(labs == m)[0]
+
+                        if len(inClus) > 3:
+                            dist.append(_N.mean(_N.sqrt(_N.sum((smkpos[inClus] - ctrs[m])**2, axis=1)))*len(inClus))
+                            tot += len(inClus)
+                    mnDsts[it] = _N.sum(dist)/ tot
+
+                    allCtrs.append(ctrs)
+                    allLabs.append(labs)
+
+                bestIn = _N.where(mnDsts == _N.min(mnDsts))[0]
+            else:  #  sepHashMthd == 1
+                ##########################
+                BINS    = 20
+                bins    = _N.linspace(-6, 6, BINS+1)
+
+                cumcnts = _N.zeros(BINS)
+
+                blksz   = 30
+
+                #####################   separate hash / nonhash indices
+                nonhash = []
+                for ch in xrange(1, 5):
+                    done    = False
+                    inds  = _N.array([i[0] for i in sorted(enumerate(_x[:, ch]), key=lambda x:x[1], reverse=True)])
+
+                    blk = -1
+                    cumcnts[:] = 0
+
+                    while not done:
+                        blk += 1
+                        cnts, bns = _N.histogram(_x[inds[blk*blksz:(blk+1)*blksz], 0], bins=bins)
+                        cumcnts += cnts
+                        if len(_N.where(cumcnts < 2)[0]) <= 3:
+                            done = True
+                            nonhash.extend(inds[0:(blk+1)*blksz])
+
+                unonhash = _N.unique(nonhash)
+                hashsp   = _N.setdiff1d(inds, unonhash)  #  inds is contiguous but reordered all
+
+                ##  place-specific firing of 
+                _x[:, 0] *= 5
+
+                MH        = MF - MS
+
+                sigInds       = unonhash
+                smkpos        = _x[sigInds]
+
+                ITERS  = 20
+                mnDsts = _N.zeros(ITERS)
+                mxDsts = _N.zeros(ITERS)
+
+                allCtrs = []
+                allLabs = []
+
+                for it in xrange(ITERS):
+                    ctrs, labs = scv.kmeans2(smkpos, MS)  #  big clear
+                    dist = []
+                    tot  = 0
+                    for m in xrange(MS):
+                        inClus = _N.where(labs == m)[0]
+
+                        if len(inClus) > 3:
+                            dist.append(_N.mean(_N.sqrt(_N.sum((smkpos[inClus] - ctrs[m])**2, axis=1)))*len(inClus))
+                            tot += len(inClus)
+                    mnDsts[it] = _N.sum(dist)/ tot
+                    mxDsts[it] = _N.max(dist)
+
+                    allCtrs.append(ctrs)
+                    allLabs.append(labs)
+
+                bestIn = _N.where(mxDsts == _N.min(mxDsts))[0][0]  #  pick first one
+                scrH, labH = scv.kmeans2(_x[hashsp], MH)
+                _x[:, 0] /= 5
+
+            ##################
+            lab        = _N.array(labH.tolist() + (allLabs[bestIn] + MH).tolist())
+            x          = _N.empty((n2-n1, k))
+            if sepHashMthd == 0:
+                x[:, 0]    = _x[inds, 0]
+                x[:, 1:]   = _x[inds, 1:]
             else:
-                MH        = M - MS
+                x[0:len(hashsp)] = _x[hashsp]
+                x[len(hashsp):]  = _x[sigInds]
+        else:  #  don't separate hash from signal marks. simple kmeans2
+            x = _x
+            scr, lab = scv.kmeans2(x, MF)
 
-            sigInds       = inds[pH:]
-            smkpos        = _x[sigInds]
-            scrH, labH = scv.kmeans2(_x[inds[0:pH]], MH)
+        #  now assign the cluster we've found to Gaussian mixtures
+        SI = N / MF
+        covAll = _N.cov(x.T)
+        dcovMag= _N.diagonal(covAll)*0.005
 
-            ITERS  = 30
-            mnDsts = _N.zeros(ITERS)
+        for im in xrange(MF):
+            kinds = _N.where(lab == im)[0]  #  inds
+
+
+            if len(kinds) > 6:   # problem when cov is not positive def.
+                oo.smu[0, im]  = _N.mean(x[kinds], axis=0)
+                oo.scov[0, im] = _N.cov(x[kinds], rowvar=0)
+                oo.sm[0, im]   = float(len(kinds)+1) / (N+MF)
+            else:
+                oo.smu[0, im]  = _N.mean(x[sigInds], axis=0)
+                oo.scov[0, im] = covAll*0.125
+                oo.sm[0, im]   = float(len(kinds)+1) / (N+MF)
+
+        if doTouchUp:  #  compare model fit data used to fit data.  
+            tmpITERS = oo.ITERS
+            oo.ITERS = 100
+
+            oo.fit(MF, pos, mk, n1, n2)   #  leave some clusters available
+            oo.ITERS = tmpITERS
+
+            v = _N.empty((n2-n1, k))
+            iCov = _N.linalg.inv(oo.covs[0:MF])
+            v_iCov = _N.empty((n2-n1, k))   
+            deticov = _N.linalg.det(oo.covs[0:MF])
+
+            probs  = _N.zeros(n2-n1)
+
+            nICs   = 100
+            for im in xrange(MF):
+                _N.subtract(_x, oo.us[im], out=v)
+                _N.dot(v, iCov[im], out=v_iCov)
+                v_iCov_v = _N.einsum("nk,nk->n", v_iCov, v)
+                probs += oo.ms[im]*deticov[im]*_N.exp(-0.5*v_iCov_v)
+
+            lowPs = _N.where(_N.log10(probs/_N.max(probs)) < -_N.log10(len(_x)))[0]
+
+            mnDsts = _N.zeros(nICs)
+            mxDsts = _N.zeros(nICs)
 
             allCtrs = []
             allLabs = []
 
-            for it in xrange(ITERS):
-                ctrs, labs = scv.kmeans2(smkpos, MS)  #  big clear
+            _x[:, 0] *= 5
+
+            for itr in xrange(nICs):
+                mns, labs = scv.kmeans2(_x[lowPs], oo.M-MF)
                 dist = []
                 tot  = 0
-                for m in xrange(MS):
+
+                for m in xrange(oo.M-MF):
+                    cls = _N.where(labs == m)[0]
                     inClus = _N.where(labs == m)[0]
 
                     if len(inClus) > 3:
-                        dist.append(_N.mean(_N.sqrt(_N.sum((smkpos[inClus] - ctrs[m])**2, axis=1)))*len(inClus))
-                        tot += len(inClus)
-                mnDsts[it] = _N.sum(dist)/ tot
+                        dist.append(_N.mean(_N.sqrt(_N.sum((_x[inClus] - mns[m])**2, axis=1)))*len(inClus))
+                    tot += len(inClus)
+                mnDsts[itr] = _N.sum(dist)/ tot
+                mxDsts[itr] = _N.max(dist)
 
-                allCtrs.append(ctrs)
+                allCtrs.append(mns)
                 allLabs.append(labs)
 
-            bestIn = _N.where(mnDsts == _N.min(mnDsts))[0]
+            bestIn = _N.where(mxDsts == _N.min(mxDsts))[0][0]  #  pick first one
 
-            lab        = _N.array(labH.tolist() + (allLabs[bestIn] + MH).tolist())
-            x          = _N.empty((n2-n1, k))
-            x[:, 0]    = _x[inds, 0]
-            x[:, 1:]   = _x[inds, 1:]
-        else:
-            x = _x
-            scr, lab = scv.kmeans2(x, M)
+            _x[:, 0] /= 5
 
-        SI = N / M
-        covAll = _N.cov(x.T)
-        dcovMag= _N.diagonal(covAll)*0.005
+            lab = allLabs[bestIn]
+            fig = _plt.figure()
+            for m in xrange(oo.M-MF):
+                cls = _N.where(labs == m)[0]
+                _plt.scatter(_x[lowPs[cls], 0], _x[lowPs[cls], 1], s=4, color=oo.myclrs[m+1])
 
-        for im in xrange(M):
-            kinds = _N.where(lab == im)[0]  #  inds
+            ### 
+            oo.sm[0, 0:MF] *= float(len(lowPs)) / (n2-n1)  #  scale back the existing ones
+            for im in xrange(oo.M-MF):
+                kinds = _N.where(lab == im)[0]  #  inds
 
-            if len(kinds) > 0:
-                oo.smu[0, im]  = _N.mean(x[kinds], axis=0)
-                oo.scov[0, im] = _N.cov(x[kinds], rowvar=0)
-            else:
-                oo.smu[0, im]  = _N.mean(x[SI*im:SI*(im+1)], axis=0)
-                oo.scov[0, im] = covAll*0.125
+                if len(kinds) > 6:   # problem when cov is not positive def.
+                    oo.smu[0, MF+im]  = _N.mean(_x[lowPs[kinds]], axis=0)
+                    oo.scov[0, MF+im] = _N.cov(_x[lowPs[kinds]], rowvar=0)
+                else:
+                    oo.smu[0, MF+im]  = _N.mean(_x[lowPs], axis=0)
+                    oo.scov[0, MF+im] = covAll*0.125
+                oo.sm[0, MF+im] *= float(len(kinds)+1) / (n2-n1)  #  scale back the existing ones
+            oo.sm[0] /= _N.sum(oo.sm[0])
 
     #  I need to know initial values smu, scov, sm.  Generate gz 
-    def fit(self, M, k, pos, mk, n1, n2):
+    def fit(self, M, pos, mk, n1, n2):
+        """
+        """
         oo = self
+        k      = oo.k
         mnd    = oo.mnd
         x   = _N.empty((n2-n1, k))
         x[:, 0]    = pos
         x[:, 1:]   = mk
         N   = n2-n1
-        oo.gz   = _N.zeros((oo.ITERS, N, M), dtype=_N.int)
-        M   = oo.M
         oo.pmdim = k
+        oo.gz   = _N.zeros((oo.ITERS, N, M), dtype=_N.int)
+        oo.PR_m_alp[:] = 1. / M
 
         covAll = _N.cov(x.T)
         dcovMag= _N.diagonal(covAll)*0.125
@@ -183,11 +352,14 @@ class fitMvNorm:
         rsum = _N.empty((1, N))
         skpM   = _N.arange(0, N)*M
 
+        oo.sm[0:M]   = 1./M
+
         for it in xrange(oo.ITERS-1):
             print it
-            iscov = _N.linalg.inv(oo.scov[it])
+            iscov = _N.linalg.inv(oo.scov[it, 0:M])
+            #print iscov
 
-            norms = 1/_N.sqrt(2*_N.pi*_N.linalg.det(oo.scov[it]))
+            norms = 1/_N.sqrt(2*_N.pi*_N.linalg.det(oo.scov[it, 0:M]))
             norms = norms.reshape(M, 1)
 
             for im in xrange(M):
@@ -199,9 +371,10 @@ class fitMvNorm:
             expArg0 = expArg - lrgstArgs
 
             expTrm = _N.exp(expArg0)
-            rats = oo.sm[it]*expTrm*norms  #  shape is M x oo.N
-            _N.sum(rats, axis=0, out=rsum[0, :])
 
+            rats = oo.sm[it, 0:M]*expTrm*norms  #  shape is M x oo.N
+
+            _N.sum(rats, axis=0, out=rsum[0, :])   
             rats /= rsum   #  each column of "rats" sums to 1
 
             for im in xrange(M):
@@ -215,14 +388,13 @@ class fitMvNorm:
             oo.gz[it+1, icl, irw] = 1   #  we must clean out gz
 
             #  _N.sum(oo.gz...) sz M   its vec of num. of obs of each state 'm'
-            _N.add(oo.PR_m_alp, _N.sum(oo.gz[it+1], axis=0), out=dirArgs)
+            _N.add(oo.PR_m_alp[0:M], _N.sum(oo.gz[it+1], axis=0), out=dirArgs)
 
-            da = _N.random.dirichlet(dirArgs)
-            oo.sm[it+1, :, 0] = _N.random.dirichlet(dirArgs)
+            oo.sm[it+1, 0:M, 0] = _N.random.dirichlet(dirArgs)
             for im in xrange(M):
                 minds = _N.where(oo.gz[it+1, :, im] == 1)[0]
 
-                if len(minds) > 0:
+                if len(minds) > oo.pmdim:
                     clstx    = x[minds]
                     mc       = _N.mean(clstx, axis=0)    #  inv wishart case
                     #mc       = _N.sum(clstx, axis=0)     #  dirichlet case

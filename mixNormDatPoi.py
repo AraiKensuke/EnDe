@@ -54,6 +54,8 @@ class mixNormDatPoi:
     Bm     = 0.1
     bx     = 0.1
 
+    vAmp   = 1.
+
     def create(self, setname, pos=None):
         #  time series to model ratio of the states
         oo  = self
@@ -78,7 +80,7 @@ class mixNormDatPoi:
         mr  = _N.random.rand(N)
 
         if oo.bWtrack:
-            oo.pos = _U.generateMvt(N)
+            oo.pos = _U.generateMvt(N, vAmp=oo.vAmp)
 
         else:
             oo._pos   = _N.empty(N)
@@ -158,7 +160,7 @@ class mixNormDatPoi:
                 oo.alp[m, mpf] = _N.log(_N.interp(ts, _ts, _N.abs(oo._alp[m, mpf])) + 8 + 40*_N.random.rand())
 
         ######  now create spikes
-        oo.marks    = _N.empty(oo.N, dtype=list)
+        oo.marks    = _N.empty((oo.N, 1), dtype=list)
 
         for m in xrange(M):#  For each cluster
             fr          = _N.zeros(oo.N)
@@ -175,10 +177,10 @@ class mixNormDatPoi:
             for n in xrange(len(thrX)):   # iterate over time
                 tm = thrX[n]
                 mk    = mvn(oo.um[m, tm], oo.Cov[m], size=1)[0]
-                if oo.marks[tm] is None:
-                    oo.marks[tm] = [mk]
+                if oo.marks[tm, 0] is None:
+                    oo.marks[tm, 0] = [mk]
                 else:
-                    oo.marks[tm].append(mk)
+                    oo.marks[tm, 0].append(mk)
 
         #kde = _kde.kde(setname)
         #oo.marks = None

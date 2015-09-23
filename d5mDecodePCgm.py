@@ -6,6 +6,7 @@ import scipy.stats as _ss
 #import fitMvNormE as fMN   
 import fitMvNorm as fMN   
 import time as _tm
+import kdeutil as _ku
 
 #  Decode unsorted spike train
 
@@ -57,6 +58,7 @@ class simDecode():
 
     #  xp   position grid.  need this in decode
     xp    = None
+    xpr   = None   # reshaped xp
     dxp   = None
 
     #  current posterior model parameters
@@ -66,11 +68,16 @@ class simDecode():
 
     #  initting fitMvNorm
     sepHash  = False
+    sepHashMthd=0
     pctH     = None
     MS       = None
+    kde      = False
 
-    def init(self, usekde=False):
+    Bx       = None;     bx     = None;     Bm    = None
+
+    def init(self, kde=False, bx=None, Bx=None, Bm=None):
         oo = self
+        oo.kde = kde
         with open("marks.dump", "rb") as f:
             lm = pickle.load(f)
         oo.marks = lm.marks
@@ -79,9 +86,13 @@ class simDecode():
         oo.Nx = lm.Nx;        oo.Nm = lm.Nm
         oo.xA = lm.xA;        oo.mA = lm.mA
         oo.mdim  = lm.k#kde.mdim
+        oo.mvpos  = lm.mvpos
+        if lm.mvpos_t is not None:
+            oo.mvpos_t = lm.mvpos_t
 
         ####  spatial grid for evaluating firing rates
         oo.xp   = _N.linspace(-oo.xA, oo.xA, oo.Nx)  #  space points
+        oo.xpr  = oo.xp.reshape((oo.Nx, 1))
         #  bin space for occupation histogram.  same # intvs as space points
         oo.dxp   = oo.xp[1] - oo.xp[0]
         oo.xb    = _N.empty(oo.Nx+1)
@@ -97,21 +108,27 @@ class simDecode():
         oo.dt = lm.dt
 
         oo.pos  = lm.pos
-        oo.mvpos  = lm.mvpos
-        #oo.Fp, oo.q2p = 0.995, 0.001#estimate_posFstd(oo.pos)
-        oo.Fp, oo.q2p = 1, 0.005 #estimate_posFstd(oo.pos)
+        oo.Fp, oo.q2p = 1, 0.005
 
         oo.pX_Nm = _N.zeros((oo.pos.shape[0], oo.Nx))
         oo.Lklhd = _N.zeros((oo.nTets, oo.pos.shape[0], oo.Nx))
-        oo.mvNrm= []
-        for nt in xrange(oo.nTets):
-            oo.mvNrm.append(fMN.fitMvNorm(oo.ITERS, oo.M, oo.mdim + 1))
-            oo.mvNrm[nt].ITERS = oo.ITERS
+        
+        if not oo.kde:
+            oo.mvNrm= []
+            for nt in xrange(oo.nTets):
+                oo.mvNrm.append(fMN.fitMvNorm(oo.ITERS, oo.M, oo.mdim + 1))
+                oo.mvNrm[nt].ITERS = oo.ITERS
 
-    def encode(self, t0, t1, initPriors=False):
-        tt1 = _tm.time()
+    def encode(self, t0, t1, initPriors=False, doTouchUp=False, MF=None):
         oo = self
+        tt1 = _tm.time()
         oo.N = t1-t0
+
+
+        if oo.mvpos_t is not None:   #  mvpos
+            mt = _N.array(oo.mvpos_t)
+            iis = _N.where((mt >= t0) & (mt <= t1))[0]
+            oo.mvpos = _N.array(oo.pos[mt[iis]])
 
         dat = _N.empty(oo.N, dtype=list)
         stpos  = []   #  pos  @ time of spikes
@@ -131,19 +148,29 @@ class simDecode():
 
             print "nspikes tet %(tet)d %(s)d  from %(t0)d   %(t1)d" % {"t0" : t0, "t1" : t1, "s" : nspks[nt], "tet" : nt}
 
-        tt2 = _tm.time()
-        if initPriors:
+        oo.all_pos = oo.mvpos
+
+        if oo.kde:
+            oo.tr_pos   = []
+            oo.tr_marks = []
+
             for nt in xrange(oo.nTets):
-                oo.mvNrm[nt].init0(oo.M, oo.mdim+1, stpos[nt], marks[nt], 0, nspks[nt], sepHash=oo.sepHash, pctH=oo.pctH, MS=oo.MS)
-        tt3 = _tm.time()
-        for nt in xrange(oo.nTets):
-            oo.mvNrm[nt].fit(oo.mvNrm[nt].M, oo.mdim+1, stpos[nt], marks[nt], 0, nspks[nt])
-            oo.mvNrm[nt].set_priors_and_initial_values()
+                oo.tr_pos.append(_N.array(stpos[nt]))
+                oo.tr_marks.append(_N.array(marks[nt]))
+        else:
+            tt2 = _tm.time()
+            if initPriors:
+                for nt in xrange(oo.nTets):
+                    oo.mvNrm[nt].init0(stpos[nt], marks[nt], 0, nspks[nt], sepHash=oo.sepHash, pctH=oo.pctH, MS=oo.MS, sepHashMthd=oo.sepHashMthd, doTouchUp=doTouchUp, MF=MF)
+            tt3 = _tm.time()
+            for nt in xrange(oo.nTets):
+                oo.mvNrm[nt].fit(oo.mvNrm[nt].M, stpos[nt], marks[nt], 0, nspks[nt])
+                oo.mvNrm[nt].set_priors_and_initial_values()
+            tt4 = _tm.time()
+            print (tt2-tt1)
+            print (tt3-tt2)
+            print (tt4-tt3)
         oo.setLmd0(t0, t1, nspks)
-        tt4 = _tm.time()
-        print (tt2-tt1)
-        print (tt3-tt2)
-        print (tt4-tt3)
 
     def decode(self, t0, t1):
         oo = self
@@ -171,7 +198,6 @@ class simDecode():
                     oo.xTrs[i, j]  = _N.exp(-((x1-oo.Fp*x0)**2)/(2*oo.q2p)) 
                     j += 1
                 i += 1
-
         else:
             #  second index of xTrs is old position, first index is "to"
             for j in xrange(oo.Nx):
@@ -233,9 +259,11 @@ class simDecode():
         fxdMks[:, 0] = oo.xp
 
         pNkmk = _N.empty((oo.Nx, oo.nTets))
+
+
         for t in xrange(t0+1,t1): # start at 1 because initial condition
             for nt in xrange(oo.nTets):
-                oo.Lklhd[nt, t-t0] = pNkmk0[:, nt]
+                oo.Lklhd[nt, t] = pNkmk0[:, nt]
 
                 #  build likelihood
                 if oo.marks[t, nt] is not None:
@@ -243,7 +271,12 @@ class simDecode():
 
                     for ns in xrange(nSpks):
                         fxdMks[:, 1:] = oo.marks[t, nt][ns]
-                        oo.Lklhd[nt, t-t0] = oo.mvNrm[nt].evalAtFxdMks(fxdMks)*oo.lmd0[nt] * oo.iocc
+                        if oo.kde:
+                            #(atMark, fld_x, tr_pos, tr_mks, all_pos, mdim, Bx, cBm, bx)
+                            #_ku.kerFr(fxdMks[0, 1:], fxdMks[:, 0], oo.tr_pos, oo.tr_mks, oo.mvpos, oo.mdim, oo.Bx, oo.cBm, oo.bx)
+                            oo.Lklhd[nt, t] *= _ku.kerFr(fxdMks[0, 1:], oo.xpr, oo.tr_pos[nt], oo.tr_marks[nt], oo.all_pos, oo.mdim, oo.Bx, oo.Bm, oo.bx)* oo.iocc
+                        else:
+                            oo.Lklhd[nt, t] *= oo.mvNrm[nt].evalAtFxdMks(fxdMks)*oo.lmd0[nt] * oo.iocc
 
             #  transition convolved with previous posterior
 
@@ -251,7 +284,7 @@ class simDecode():
                 _N.multiply(oo.xTrs[ixk], oo.pX_Nm[t-1], out=oo.intgrd)
                 oo.intgrl[ixk] = _N.trapz(oo.intgrd, dx=oo.dxp)
 
-            oo.pX_Nm[t] = oo.intgrl * _N.product(oo.Lklhd[:, t-t0], axis=0)
+            oo.pX_Nm[t] = oo.intgrl * _N.product(oo.Lklhd[:, t], axis=0)
             A = _N.trapz(oo.pX_Nm[t], dx=oo.dxp)
             oo.pX_Nm[t] /= A
     
@@ -263,17 +296,28 @@ class simDecode():
         #####  
         oo.lmd0 = _N.empty(oo.nTets)
         oo.Lam_xk = _N.ones((oo.Nx, oo.nTets))
-        for nt in xrange(oo.nTets):
-            cmps   = _N.zeros((oo.mvNrm[nt].M, oo.Nx))
-            for m in xrange(oo.mvNrm[nt].M):
-                var = oo.mvNrm[nt].covs[m, 0, 0]
-                ivar = 1./var
-                cmps[m] = (1/_N.sqrt(2*_N.pi*var)) * _N.exp(-0.5*ivar*(oo.xp - oo.mvNrm[nt].us[m, 0])**2)
+        
+        if oo.kde:
+            oo.marks
+            ibx2 = 1./ (oo.bx*oo.bx)
+            for nt in xrange(oo.nTets):
+                oo.Lam_xk[:, nt] = _ku.Lambda(oo.xpr, oo.tr_pos[nt], oo.all_pos, oo.Bx, oo.bx)
 
-            y  = _N.sum(oo.mvNrm[nt].ms*cmps, axis=0)
-            occ, tmp = _N.histogram(oo.mvpos, bins=oo.xb)
-
+            occ    = _N.sum(_N.exp(-0.5*ibx2*(oo.xpr - oo.all_pos)**2), axis=1)  #  this piece doesn't need to be evaluated for every new spike
             Tot_occ  = _N.sum(occ)
+            oo.iocc = 1./(occ + Tot_occ*0.01)
+        else:  #####  fit mix gaussian
+            for nt in xrange(oo.nTets):
+                cmps   = _N.zeros((oo.mvNrm[nt].M, oo.Nx))
+                for m in xrange(oo.mvNrm[nt].M):
+                    var = oo.mvNrm[nt].covs[m, 0, 0]
+                    ivar = 1./var
+                    cmps[m] = (1/_N.sqrt(2*_N.pi*var)) * _N.exp(-0.5*ivar*(oo.xp - oo.mvNrm[nt].us[m, 0])**2)
+
+                y  = _N.sum(oo.mvNrm[nt].ms*cmps, axis=0)
+                occ, tmp = _N.histogram(oo.mvpos, bins=oo.xb)
+
+                Tot_occ  = _N.sum(occ)
 
             oo.iocc = 1. / (occ + Tot_occ*0.01)
             MargLam = y * oo.iocc
