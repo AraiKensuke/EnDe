@@ -4,6 +4,7 @@ import pickle
 import matplotlib.pyplot as _plt
 import scipy.cluster.vq as scv
 import scipy.stats as _ss
+import fitutil as _fu
 
 mvn    = _N.random.multivariate_normal
 class fitMvNorm:
@@ -131,31 +132,10 @@ class fitMvNorm:
 
                 sigInds       = inds[pH:]
                 smkpos        = _x[sigInds]
-                scrH, labH = scv.kmeans2(_x[inds[0:pH]], MH)
+                #scrH, labH = scv.kmeans2(_x[inds[0:pH]], MH)
+                labH = _fu.bestcluster(50, _x[inds[0:pH]], MH)
 
-
-                ITERS  = 30
-                mnDsts = _N.zeros(ITERS)
-
-                allCtrs = []
-                allLabs = []
-
-                for it in xrange(ITERS):
-                    ctrs, labs = scv.kmeans2(smkpos, MS)  #  big clear
-                    dist = []
-                    tot  = 0
-                    for m in xrange(MS):
-                        inClus = _N.where(labs == m)[0]
-
-                        if len(inClus) > 3:
-                            dist.append(_N.mean(_N.sqrt(_N.sum((smkpos[inClus] - ctrs[m])**2, axis=1)))*len(inClus))
-                            tot += len(inClus)
-                    mnDsts[it] = _N.sum(dist)/ tot
-
-                    allCtrs.append(ctrs)
-                    allLabs.append(labs)
-
-                bestIn = _N.where(mnDsts == _N.min(mnDsts))[0]
+                labS = _fu.bestcluster(50, smkpos, MS)
             else:  #  sepHashMthd == 1
                 ##########################
                 BINS    = 20
@@ -182,7 +162,7 @@ class fitMvNorm:
                             done = True
                             nonhash.extend(inds[0:(blk+1)*blksz])
 
-                unonhash = _N.unique(nonhash)
+                unonhash = _N.unique(nonhash)  #  not hash spikes
                 hashsp   = _N.setdiff1d(inds, unonhash)  #  inds is contiguous but reordered all
 
                 ##  place-specific firing of 
@@ -193,35 +173,14 @@ class fitMvNorm:
                 sigInds       = unonhash
                 smkpos        = _x[sigInds]
 
-                ITERS  = 20
-                mnDsts = _N.zeros(ITERS)
-                mxDsts = _N.zeros(ITERS)
-
-                allCtrs = []
-                allLabs = []
-
-                for it in xrange(ITERS):
-                    ctrs, labs = scv.kmeans2(smkpos, MS)  #  big clear
-                    dist = []
-                    tot  = 0
-                    for m in xrange(MS):
-                        inClus = _N.where(labs == m)[0]
-
-                        if len(inClus) > 3:
-                            dist.append(_N.mean(_N.sqrt(_N.sum((smkpos[inClus] - ctrs[m])**2, axis=1)))*len(inClus))
-                            tot += len(inClus)
-                    mnDsts[it] = _N.sum(dist)/ tot
-                    mxDsts[it] = _N.max(dist)
-
-                    allCtrs.append(ctrs)
-                    allLabs.append(labs)
-
-                bestIn = _N.where(mxDsts == _N.min(mxDsts))[0][0]  #  pick first one
-                scrH, labH = scv.kmeans2(_x[hashsp], MH)
+                labS = _fu.bestcluster(50, smkpos, MS)
+                #_fu.colorclusters(smkpos, labS, MS)
+                labH = _fu.bestcluster(50, _x[hashsp], MH)
+                #scrH, labH = scv.kmeans2(_x[hashsp], MH)
                 _x[:, 0] /= 5
 
             ##################
-            lab        = _N.array(labH.tolist() + (allLabs[bestIn] + MH).tolist())
+            lab        = _N.array(labH.tolist() + (labS + MH).tolist())
             x          = _N.empty((n2-n1, k))
             if sepHashMthd == 0:
                 x[:, 0]    = _x[inds, 0]
@@ -240,7 +199,6 @@ class fitMvNorm:
 
         for im in xrange(MF):
             kinds = _N.where(lab == im)[0]  #  inds
-
 
             if len(kinds) > 6:   # problem when cov is not positive def.
                 oo.smu[0, im]  = _N.mean(x[kinds], axis=0)
@@ -274,45 +232,20 @@ class fitMvNorm:
 
             lowPs = _N.where(_N.log10(probs/_N.max(probs)) < -_N.log10(len(_x)))[0]
 
-            mnDsts = _N.zeros(nICs)
-            mxDsts = _N.zeros(nICs)
-
-            allCtrs = []
-            allLabs = []
-
             _x[:, 0] *= 5
-            for itr in xrange(nICs):
-                mns, labs = scv.kmeans2(_x[lowPs], oo.M-MF)
-                dist = []
-                tot  = 0
 
-                for m in xrange(oo.M-MF):
-                    cls = _N.where(labs == m)[0]
-                    inClus = _N.where(labs == m)[0]
-
-                    if len(inClus) > 3:
-                        dist.append(_N.mean(_N.sqrt(_N.sum((_x[inClus] - mns[m])**2, axis=1)))*len(inClus))
-                    tot += len(inClus)
-                mnDsts[itr] = _N.sum(dist)/ tot
-                mxDsts[itr] = _N.max(dist)
-
-                allCtrs.append(mns)
-                allLabs.append(labs)
-
-            bestIn = _N.where(mxDsts == _N.min(mxDsts))[0][0]  #  pick first one
-
+            labRare = _fu.bestcluster(50, _x[lowPs], oo.M-MF)
             _x[:, 0] /= 5
 
-            lab = allLabs[bestIn]
             fig = _plt.figure()
             for m in xrange(oo.M-MF):
-                cls = _N.where(labs == m)[0]
-                _plt.scatter(_x[lowPs[cls], 0], _x[lowPs[cls], 1], s=4, color=oo.myclrs[m+1])
-
+                cls = _N.where(labRare == m)[0]
+                #_plt.scatter(_x[lowPs[cls], 0], _x[lowPs[cls], 1], s=4, color=oo.myclrs[m+1])
+                
             ### 
             oo.sm[0, 0:MF] *= float(len(lowPs)) / (n2-n1)  #  scale back the existing ones
             for im in xrange(oo.M-MF):
-                kinds = _N.where(lab == im)[0]  #  inds
+                kinds = _N.where(labRare == im)[0]  #  inds
 
                 if len(kinds) > 6:   # problem when cov is not positive def.
                     oo.smu[0, MF+im]  = _N.mean(_x[lowPs[kinds]], axis=0)

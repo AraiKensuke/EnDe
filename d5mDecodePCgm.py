@@ -163,7 +163,7 @@ class simDecode():
             for nt in xrange(oo.nTets):
                 oo.tr_pos.append(_N.array(stpos[nt]))
                 oo.tr_marks.append(_N.array(marks[nt]))
-        else:
+        else:   ##  Use mixture Gaussian
             tt2 = _tm.time()
             if initPriors:
                 for nt in xrange(oo.nTets):
