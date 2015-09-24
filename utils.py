@@ -37,7 +37,7 @@ def generateMvt(N, vAmp=1):
 
     return pos
 
-def compareLklhds(dec, t0, t1, tet=0, seconds=False, scale=1.):
+def compareLklhds(dec, t0, t1, tet=0, scale=1.):
     it0 = int(t0*scale)
     it1 = int(t1*scale)
 

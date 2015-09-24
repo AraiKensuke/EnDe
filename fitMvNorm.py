@@ -91,7 +91,7 @@ class fitMvNorm:
     #  M initial guess # of clusters
     #  k
     #  pos, mk    position and mark at spike time
-    def init0(self, pos, mk, n1, n2, sepHash=False, pctH=0.7, MS=None, sepHashMthd=0, doTouchUp=False, MF=None):
+    def init0(self, pos, mk, n1, n2, sepHash=False, pctH=0.7, MS=None, sepHashMthd=0, doTouchUp=False, MF=None, kmeansinit=True):
         """
         M       total number of clusters
 
@@ -174,7 +174,7 @@ class fitMvNorm:
                 smkpos        = _x[sigInds]
 
                 labS = _fu.bestcluster(50, smkpos, MS)
-                #_fu.colorclusters(smkpos, labS, MS)
+                _fu.colorclusters(smkpos, labS, MS)
                 labH = _fu.bestcluster(50, _x[hashsp], MH)
                 #scrH, labH = scv.kmeans2(_x[hashsp], MH)
                 _x[:, 0] /= 5
@@ -190,7 +190,11 @@ class fitMvNorm:
                 x[len(hashsp):]  = _x[sigInds]
         else:  #  don't separate hash from signal marks. simple kmeans2
             x = _x
-            scr, lab = scv.kmeans2(x, MF)
+            if not kmeansinit:  #  just random initial conditions
+                print "random initial conditions"
+                lab = _N.array(_N.random.rand(N)*MF, dtype=_N.int)
+            else:
+                scr, lab = scv.kmeans2(x, MF)
 
         #  now assign the cluster we've found to Gaussian mixtures
         SI = N / MF
@@ -230,7 +234,7 @@ class fitMvNorm:
                 v_iCov_v = _N.einsum("nk,nk->n", v_iCov, v)
                 probs += oo.ms[im]*deticov[im]*_N.exp(-0.5*v_iCov_v)
 
-            lowPs = _N.where(_N.log10(probs/_N.max(probs)) < -_N.log10(len(_x)))[0]
+            lowPs = _N.where(_N.log10(probs/_N.max(probs)) < -_N.log10(len(_x)*0.5))[0]
 
             _x[:, 0] *= 5
 

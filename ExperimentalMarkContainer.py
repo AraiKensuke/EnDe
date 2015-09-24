@@ -2,6 +2,7 @@ import EnDedirs as _edd
 import pickle
 
 class ExperimentalMarkContainer:
+    tetlist  = None
     pos      = None
     marks    = None
 

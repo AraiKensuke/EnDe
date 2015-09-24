@@ -125,7 +125,7 @@ class simDecode():
                 oo.mvNrm.append(fMN.fitMvNorm(oo.ITERS, oo.M, oo.mdim + 1))
                 oo.mvNrm[nt].ITERS = oo.ITERS
 
-    def encode(self, t0, t1, initPriors=False, doTouchUp=False, MF=None):
+    def encode(self, t0, t1, initPriors=False, doTouchUp=False, MF=None, kmeansinit=True):
         oo = self
         tt1 = _tm.time()
         oo.N = t1-t0
@@ -167,7 +167,7 @@ class simDecode():
             tt2 = _tm.time()
             if initPriors:
                 for nt in xrange(oo.nTets):
-                    oo.mvNrm[nt].init0(stpos[nt], marks[nt], 0, nspks[nt], sepHash=oo.sepHash, pctH=oo.pctH, MS=oo.MS, sepHashMthd=oo.sepHashMthd, doTouchUp=doTouchUp, MF=MF)
+                    oo.mvNrm[nt].init0(stpos[nt], marks[nt], 0, nspks[nt], sepHash=oo.sepHash, pctH=oo.pctH, MS=oo.MS, sepHashMthd=oo.sepHashMthd, doTouchUp=doTouchUp, MF=MF, kmeansinit=kmeansinit)
             tt3 = _tm.time()
             for nt in xrange(oo.nTets):
                 oo.mvNrm[nt].fit(oo.mvNrm[nt].M, stpos[nt], marks[nt], 0, nspks[nt])

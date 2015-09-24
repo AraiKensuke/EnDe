@@ -292,7 +292,7 @@ pos     =  _N.empty(t1-t0)
 svecT_ms = _N.linspace(t0, t1, t1-t0, endpoint=False)    #  
 svecL0_ms = _N.interp(svecT_ms, svecT*1000, svecL0)
 
-#tetlist = ["01", "02", "03", "04", "05", "07", "08", "10", "11", "12", "13", "14", "17", "18", "19", "20", "21", "22", "23", "24", "25", "27", "28", "29"]
+tetlist = ["01", "02", "03", "04", "05", "07", "08", "10", "11", "12", "13", "14", "17", "18", "19", "20", "21", "22", "23", "24", "25", "27", "28", "29"]
 tetlist = ["05",]
 marks   =  _N.empty((t1-t0, len(tetlist)), dtype=list)
 
@@ -355,6 +355,7 @@ emc.mvpos = x
 emc.mvpos_t = xt
 emc.mvpost = x
 emc.marks = marks
+emc.tetlist = tetlist
 
 emc.xA    = 6
 emc.mA    = 8
