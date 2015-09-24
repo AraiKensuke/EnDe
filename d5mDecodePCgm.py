@@ -1,4 +1,4 @@
-import pickle
+import cPickle as pickle
 import numpy as _N
 import matplotlib.pyplot as _plt
 import kde as _kde
@@ -13,40 +13,6 @@ import scipy.integrate as _si
 
 #  In our case with no history dependence
 #  p(X_t | dN_t, m_t) 
-
-def reshapedInd(inds, dims, Nd):
-    ind1D = 0
-    for dm in xrange(Nd):
-        ind1D += inds[dm]*_N.product(dims[dm+1:])
-    return ind1D
-
-def estimate_posFstd(x):   #  AR coefficients for position data
-    N    = len(x)
-    F0AA = _N.dot(x[0:-1], x[0:-1])
-    F0BB = _N.dot(x[0:-1], x[1:])
-
-    q2 = 0.1
-
-    a_q2         = 1e-1;          B_q2         = 1e-4
-
-    ITER = 150
-    Fs   = _N.empty(ITER)
-    F0   = 0.999
-    q2s   = _N.empty(ITER)
-    for it in xrange(ITER):
-        F0std= _N.sqrt(q2/F0AA)
-        F0a, F0b  = (-1 - F0BB/F0AA) / F0std, (1 - F0BB/F0AA) / F0std
-        F0=F0BB/F0AA+F0std*_ss.truncnorm.rvs(F0a, F0b)
-    
-        #   sample q2
-        a = a_q2 + 0.5*N  #  N + 1 - 1
-        rsd_stp = x[1:] - F0*x[0:-1]
-        BB = B_q2 + 0.5 * _N.dot(rsd_stp, rsd_stp)
-        q2 = _ss.invgamma.rvs(a, scale=BB)
-        Fs[it] = F0
-        q2s[it] = q2
-
-    return _N.mean(Fs[ITER/2:]), _N.mean(q2s[ITER/2:])
 
 class simDecode():
     nTets   = 1
@@ -76,12 +42,31 @@ class simDecode():
 
     Bx       = None;     bx     = None;     Bm    = None
 
+    tetfile  = "marks.pkl"
+    usetets  = None
+    utets_str= ""
+
     def init(self, kde=False, bx=None, Bx=None, Bm=None):
         oo = self
         oo.kde = kde
-        with open("marks.dump", "rb") as f:
+        with open(oo.tetfile, "rb") as f:
             lm = pickle.load(f)
-        oo.marks = lm.marks
+
+        if oo.usetets is None:
+            oo.tetlist = lm.tetlist
+            oo.marks = lm.marks
+            oo.utets_str = "all"
+        else:
+            stetlist= set(oo.usetets)
+
+            mis     = [i for i, item in enumerate(lm.tetlist) if item in stetlist]
+            oo.marks   =  lm.marks[:, mis]
+
+            print mis
+            for l in xrange(len(mis)):
+                sc = "" if (l == len(mis)-1) else ","
+                oo.utets_str += "%(l)s%(c)s" % {"l" : lm.tetlist[mis[l]], "c" : sc}
+        
         oo.nTets = oo.marks.shape[1]
 
         oo.Nx = lm.Nx;        oo.Nm = lm.Nm

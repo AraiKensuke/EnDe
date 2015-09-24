@@ -15,6 +15,7 @@ class ExperimentalMarkContainer:
 
     def save(self):
         oo   = self
-        dmp = open(_edd.resFN("marks.dump", dir="bond0402", create=True), "wb")
-        pickle.dump(oo, dmp)
+        
+        dmp = open(_edd.resFN("alltetmarks.pkl", dir="bond0402", create=True), "wb")
+        pickle.dump(oo, dmp, -1)
         dmp.close()
