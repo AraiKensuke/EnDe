@@ -47,24 +47,24 @@ def compareLklhds(dec, t0, t1, tet=0, scale=1.):
     for t in xrange(it0, it1):
         if dec.marks[t, tet] is not None:
             if onPg == 0:
-                fig = _plt.figure(figsize=(11, 8))        
-            fig.add_subplot(4, 5, onPg + 1)
-            _plt.plot(dec.xp, dec.Lklhd[0, t])
-            _plt.axvline(x=dec.pos[t])
+                fig = _plt.figure(figsize=(13, 8))        
+            fig.add_subplot(4, 6, onPg + 1)
+            _plt.plot(dec.xp, dec.Lklhd[0, t], color="black")
+            _plt.axvline(x=dec.pos[t], color="red", lw=2)
             _plt.yticks([])
             _plt.xticks([-6, -3, 0, 3, 6])
             _plt.title("t = %.3f" % (float(t) / scale))
-            fig.add_subplot(4, 5, onPg + 2)
+            fig.add_subplot(4, 6, onPg + 2)
             _plt.plot(dec.xp, dec.pX_Nm[t])        
-            _plt.axvline(x=dec.pos[t])
+            _plt.axvline(x=dec.pos[t], color="red", lw=2)
             _plt.yticks([])
             _plt.xticks([-6, -3, 0, 3, 6])
             _plt.title("t = %.3f" % (float(t) / scale))
             onPg += 2
 
-        if onPg >= 20:
+        if onPg >= 24:
             fig.subplots_adjust(wspace=0.35, hspace=0.35, left=0.08, right=0.92, top=0.92, bottom=0.08)
-            _plt.savefig("compareLklhds_pg=%d" % pg)
+            _plt.savefig("cLklhd_%(mth)s,pg=%(pg)d" % {"pg" : pg, "mth" : dec.decmth})
             _plt.close()
             pg += 1
             onPg = 0

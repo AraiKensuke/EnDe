@@ -55,6 +55,7 @@ class mixNormDatPoi:
     bx     = 0.1
 
     vAmp   = 1.
+    tetlist= ["01"]
 
     def create(self, setname, pos=None):
         #  time series to model ratio of the states
@@ -186,8 +187,8 @@ class mixNormDatPoi:
         #oo.marks = None
         #kde.est(oo.pos, oo.marks, oo.k, oo.xA, oo.mA, oo.Nx, oo.Nm, oo.Bx, oo.Bm, oo.bx, t0=t0, t1=t1, filename="kde.dump")
 
-        dmp = open(_edd.resFN("marks.dump", dir=setname, create=True), "wb")
-        pickle.dump(oo, dmp)
+        dmp = open(_edd.resFN("marks.pkl", dir=setname, create=True), "wb")
+        pickle.dump(oo, dmp, -1)
         dmp.close()
 
     def pxAtMarks(self):

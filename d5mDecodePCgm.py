@@ -97,7 +97,7 @@ class simDecode():
         oo.dt = lm.dt
 
         oo.pos  = lm.pos
-        oo.Fp, oo.q2p = 1, 0.005
+        oo.Fp, oo.q2p = 1, 0.01
 
         oo.pX_Nm = _N.zeros((oo.pos.shape[0], oo.Nx))
         oo.Lklhd = _N.zeros((oo.nTets, oo.pos.shape[0], oo.Nx))
@@ -303,10 +303,9 @@ class simDecode():
         #####  
         oo.lmd0 = _N.empty(oo.nTets)
         oo.Lam_xk = _N.ones((oo.Nx, oo.nTets))
-        
+
+        ibx2 = 1./ (oo.bx*oo.bx)        
         if oo.kde:
-            oo.marks
-            ibx2 = 1./ (oo.bx*oo.bx)
             for nt in xrange(oo.nTets):
                 oo.Lam_xk[:, nt] = _ku.Lambda(oo.xpr, oo.tr_pos[nt], oo.all_pos, oo.Bx, oo.bx)
 
@@ -322,11 +321,14 @@ class simDecode():
                     cmps[m] = (1/_N.sqrt(2*_N.pi*var)) * _N.exp(-0.5*ivar*(oo.xp - oo.mvNrm[nt].us[m, 0])**2)
 
                 y  = _N.sum(oo.mvNrm[nt].ms*cmps, axis=0)
-                occ, tmp = _N.histogram(oo.mvpos, bins=oo.xb)
 
-                Tot_occ  = _N.sum(occ)
+            #            occ, tmp = _N.histogram(oo.mvpos, bins=oo.xb)
+            #Tot_occ  = _N.sum(occ)
+            #oo.iocc = 1. / (occ + Tot_occ*0.01)
+            occ    = _N.sum(_N.exp(-0.5*ibx2*(oo.xpr - oo.all_pos)**2), axis=1)  #  this piece doesn't need to be evaluated for every new spike
+            Tot_occ  = _N.sum(occ)
+            oo.iocc = 1./(occ + Tot_occ*0.01)
 
-            oo.iocc = 1. / (occ + Tot_occ*0.01)
             MargLam = y * oo.iocc
             oo.lmd0[nt]    = (nspks[nt] / ((t1-t0)*0.001)) / _N.trapz(MargLam, dx=oo.dxp)
             oo.Lam_xk[:, nt] = oo.lmd0[nt] * MargLam
