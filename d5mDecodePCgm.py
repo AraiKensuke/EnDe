@@ -97,7 +97,7 @@ class simDecode():
         oo.dt = lm.dt
 
         oo.pos  = lm.pos
-        oo.Fp, oo.q2p = 1, 0.01
+        oo.Fp, oo.q2p = 1, 0.005
 
         oo.pX_Nm = _N.zeros((oo.pos.shape[0], oo.Nx))
         oo.Lklhd = _N.zeros((oo.nTets, oo.pos.shape[0], oo.Nx))
@@ -206,13 +206,13 @@ class simDecode():
                         elif x1 < 0:#  x1 = -1, x0=5  (x1-(6-5))**2
                             oo.xTrs[i, j]  += _N.exp(-(x1-(oo.xA-x0))**2/(2*oo.q2p))   # 
 
-                    if (x0 > 5):  #  turning around like x0 = -5.3  --> 0.7
-                        x0r = x0-oo.xA
-                        ib4M1  = _N.where((x[0:-1] < x0r) & ( x[1:] > x0r))[0]
+                    # if (x0 > 5):  #  turning around like x0 = -5.3  --> 0.7
+                    #     x0r = x0-oo.xA
+                    #     ib4M1  = _N.where((x[0:-1] < x0r) & ( x[1:] > x0r))[0]
                         
-                        for i in xrange(0, ib4M1[0]+1):
-                            x1  = x[i]
-                            oo.xTrs[i, j]  += _N.exp(-(x1-x0r)**2/(2*oo.q2p)) 
+                    #     for i in xrange(0, ib4M1[0]+1):
+                    #         x1  = x[i]
+                    #         oo.xTrs[i, j]  += _N.exp(-(x1-x0r)**2/(2*oo.q2p)) 
 
 
                 elif x0 < 0:  #  left turns
@@ -223,13 +223,13 @@ class simDecode():
                         elif x1 < 0:#  x1 = -1, x0=5  (x1-(6-5))**2
                             oo.xTrs[i, j]  += _N.exp(-(x1-(x0-(-oo.xA)))**2/(2*oo.q2p))   # 
 
-                    if (x0 < -5):  #  turning around like x0 = -5.3  --> 0.7
-                        x0r = oo.xA + x0
-                        ib4P1  = _N.where((x[0:-1] < x0r) & ( x[1:] > x0r))[0]
+                    # if (x0 < -5):  #  turning around like x0 = -5.3  --> 0.7
+                    #     x0r = oo.xA + x0
+                    #     ib4P1  = _N.where((x[0:-1] < x0r) & ( x[1:] > x0r))[0]
 
-                        for i in xrange(ib4P1[0]+1, oo.Nx):
-                            x1  = x[i]
-                            oo.xTrs[i, j]  += _N.exp(-(x1-x0r)**2/(2*oo.q2p)) 
+                    #     for i in xrange(ib4P1[0]+1, oo.Nx):
+                    #         x1  = x[i]
+                    #         oo.xTrs[i, j]  += _N.exp(-(x1-x0r)**2/(2*oo.q2p)) 
 
                 #oo.xTrs[:, j] += _N.mean(oo.xTrs[:, j])*0.01
                 A = _N.trapz(oo.xTrs[:, j])*((2.*oo.xA)/oo.Nx)
@@ -251,7 +251,6 @@ class simDecode():
         fxdMks[:, 0] = oo.xp
 
         pNkmk = _N.empty((oo.Nx, oo.nTets))
-
 
         tStart = _tm.time()
         for t in xrange(t0+1,t1): # start at 1 because initial condition
@@ -305,13 +304,13 @@ class simDecode():
         oo.Lam_xk = _N.ones((oo.Nx, oo.nTets))
 
         ibx2 = 1./ (oo.bx*oo.bx)        
+        occ    = _N.sum(_N.exp(-0.5*ibx2*(oo.xpr - oo.all_pos)**2), axis=1)  #  this piece doesn't need to be evaluated for every new spike
+        Tot_occ  = _N.sum(occ)
+        oo.iocc = 1./(occ + Tot_occ*0.01)
+
         if oo.kde:
             for nt in xrange(oo.nTets):
                 oo.Lam_xk[:, nt] = _ku.Lambda(oo.xpr, oo.tr_pos[nt], oo.all_pos, oo.Bx, oo.bx)
-
-            occ    = _N.sum(_N.exp(-0.5*ibx2*(oo.xpr - oo.all_pos)**2), axis=1)  #  this piece doesn't need to be evaluated for every new spike
-            Tot_occ  = _N.sum(occ)
-            oo.iocc = 1./(occ + Tot_occ*0.01)
         else:  #####  fit mix gaussian
             for nt in xrange(oo.nTets):
                 cmps   = _N.zeros((oo.mvNrm[nt].M, oo.Nx))
@@ -321,17 +320,9 @@ class simDecode():
                     cmps[m] = (1/_N.sqrt(2*_N.pi*var)) * _N.exp(-0.5*ivar*(oo.xp - oo.mvNrm[nt].us[m, 0])**2)
 
                 y  = _N.sum(oo.mvNrm[nt].ms*cmps, axis=0)
-
-            #            occ, tmp = _N.histogram(oo.mvpos, bins=oo.xb)
-            #Tot_occ  = _N.sum(occ)
-            #oo.iocc = 1. / (occ + Tot_occ*0.01)
-            occ    = _N.sum(_N.exp(-0.5*ibx2*(oo.xpr - oo.all_pos)**2), axis=1)  #  this piece doesn't need to be evaluated for every new spike
-            Tot_occ  = _N.sum(occ)
-            oo.iocc = 1./(occ + Tot_occ*0.01)
-
-            MargLam = y * oo.iocc
-            oo.lmd0[nt]    = (nspks[nt] / ((t1-t0)*0.001)) / _N.trapz(MargLam, dx=oo.dxp)
-            oo.Lam_xk[:, nt] = oo.lmd0[nt] * MargLam
+                MargLam = y * oo.iocc
+                oo.lmd0[nt]    = (nspks[nt] / ((t1-t0)*0.001)) / _N.trapz(MargLam, dx=oo.dxp)
+                oo.Lam_xk[:, nt] = oo.lmd0[nt]# * MargLam
 
     """
     def getMarks(self, t0, t1):

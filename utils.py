@@ -37,7 +37,7 @@ def generateMvt(N, vAmp=1):
 
     return pos
 
-def compareLklhds(dec, t0, t1, tet=0, scale=1.):
+def cLklhds(dec, t0, t1, tet=0, scale=1.):
     it0 = int(t0*scale)
     it1 = int(t1*scale)
 
@@ -71,7 +71,7 @@ def compareLklhds(dec, t0, t1, tet=0, scale=1.):
 
     if onPg > 0:
         fig.subplots_adjust(wspace=0.15, hspace=0.15, left=0.08, right=0.92, top=0.92, bottom=0.08)
-        _plt.savefig("compareLklhds_pg=%d" % pg)
+        _plt.savefig("cLklhd_%(mth)s,pg=%(pg)d" % {"pg" : pg, "mth" : dec.decmth})
         _plt.close()
 
 
