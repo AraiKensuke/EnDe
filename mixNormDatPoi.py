@@ -191,7 +191,7 @@ class mixNormDatPoi:
         pickle.dump(oo, dmp, -1)
         dmp.close()
 
-    def pxAtMarks(self):
+    def likelihoodsAtMark(self):
         oo = self
         fxdMks = _N.empty((oo.Nx, oo.k))   #  mk dirm
         xp   = _N.linspace(-oo.xA, oo.xA, oo.Nx)  #  space points

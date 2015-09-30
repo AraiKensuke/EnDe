@@ -324,7 +324,7 @@ class simDecode():
                 oo.lmd0[nt]    = (nspks[nt] / ((t1-t0)*0.001)) / _N.trapz(MargLam, dx=oo.dxp)
                 oo.Lam_xk[:, nt] = oo.lmd0[nt]# * MargLam
 
-    """
+
     def getMarks(self, t0, t1):
         oo = self
         L = len(oo.marks)
@@ -352,4 +352,4 @@ class simDecode():
                 fxdMks[:, 1:] = oo.marks[t][0]
                 pNkmk[t-t0] *= oo.mvNrm.evalAtFxdMks(fxdMks)*oo.lmd0 * oo.iocc
         return pNkmk
-    """
+
