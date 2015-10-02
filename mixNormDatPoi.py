@@ -191,29 +191,23 @@ class mixNormDatPoi:
         pickle.dump(oo, dmp, -1)
         dmp.close()
 
-    def likelihoodsAtMark(self):
-        oo = self
-        fxdMks = _N.empty((oo.Nx, oo.k))   #  mk dirm
-        xp   = _N.linspace(-oo.xA, oo.xA, oo.Nx)  #  space points
-        fr   = _N.zeros(oo.Nx)
+    def evalAtFxdMks(self, fxdMks, t):
+        oo     = self
+        iSgs= _N.linalg.inv(oo.covs)
 
-        oo.lmd = _N.zeros((oo.Nx, oo.Nm))
-        oo.kde = _N.zeros((oo.Nx, oo.Nm))
+        Nx     = fxdMks.shape[0]
 
-        xR  = _N.linspace(-oo.xA, oo.xA, oo.Nx)
-        mR  = _N.linspace(0, oo.mA, oo.Nm)
+        cmps= _N.empty((oo.M, Nx))
+        for m in xrange(oo.M):
+            cmps[m] = weight*_N.exp(-0.5*_N.sum(_N.multiply(fxdMks-oo.us[m], _N.dot(iSgs[m], (fxdMks - oo.us[m]).T).T), axis=1))
+            bnans = _N.isnan(cmps[m])
+            if len(_N.where(bnans is True)[0]) > 0:
+                print _N.linalg.det(oo.covs[m])
+                print 1/_N.sqrt(_N.linalg.det(oo.covs[m]))
+                print -0.5*_N.sum(_N.multiply(fxdMks-oo.us[m], _N.dot(iSgs[m], (fxdMks - oo.us[m]).T).T), axis=1)
+                print oo.us[m]
+                print iSgs[m]
+                print oo.covs[m]
 
-        for mk in _N.linspace(-3, 3, 31):
-            fr[:] = 0
-            for m in xrange(oo.M):
-                for mpf in xrange(oo.Npf):
-                    wdx     = 2*oo.stdP[m, mpf, 0]**2
-                    wdm     = 2*oo.Cov[m, mpf, 0]**2
-                    qdx = (xp - oo.uP[m, mpf, 0])**2 / wdx
-                    qdm = (mk - oo.um[m, mpf, 0])**2 / wdm
-
-                    fr[:]   += _N.exp(oo.alp[m, mpf, 0] - qdx - qdm)
-
-            _plt.plot(xp, fr)
-            _plt.savefig("pxAtMarks%.3f.png" % mk)
-            _plt.close()
+    #def dump(self):
+        

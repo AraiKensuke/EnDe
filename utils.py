@@ -74,6 +74,43 @@ def cLklhds(dec, t0, t1, tet=0, scale=1.):
         _plt.savefig("cLklhd_%(mth)s,pg=%(pg)d" % {"pg" : pg, "mth" : dec.decmth})
         _plt.close()
 
+def mLklhds(mND, t0, t1, tet=0, scale=1.):
+    it0 = int(t0*scale)
+    it1 = int(t1*scale)
+
+    pg   = 0
+    onPg = 0
+    
+    for t in xrange(it0, it1):
+        if dec.marks[t, tet] is not None:
+            if onPg == 0:
+                fig = _plt.figure(figsize=(13, 8))        
+            fig.add_subplot(4, 6, onPg + 1)
+            _plt.plot(dec.xp, dec.Lklhd[0, t], color="black")
+            _plt.axvline(x=dec.pos[t], color="red", lw=2)
+            _plt.yticks([])
+            _plt.xticks([-6, -3, 0, 3, 6])
+            _plt.title("t = %.3f" % (float(t) / scale))
+            fig.add_subplot(4, 6, onPg + 2)
+            _plt.plot(dec.xp, dec.pX_Nm[t])        
+            _plt.axvline(x=dec.pos[t], color="red", lw=2)
+            _plt.yticks([])
+            _plt.xticks([-6, -3, 0, 3, 6])
+            _plt.title("t = %.3f" % (float(t) / scale))
+            onPg += 2
+
+        if onPg >= 24:
+            fig.subplots_adjust(wspace=0.35, hspace=0.35, left=0.08, right=0.92, top=0.92, bottom=0.08)
+            _plt.savefig("cLklhd_%(mth)s,pg=%(pg)d" % {"pg" : pg, "mth" : dec.decmth})
+            _plt.close()
+            pg += 1
+            onPg = 0
+
+    if onPg > 0:
+        fig.subplots_adjust(wspace=0.15, hspace=0.15, left=0.08, right=0.92, top=0.92, bottom=0.08)
+        _plt.savefig("cLklhd_%(mth)s,pg=%(pg)d" % {"pg" : pg, "mth" : dec.decmth})
+        _plt.close()
+
 
 
 # def kerLklhd(atMark, lklhd_x, tr_pos, tr_mks, atMark, mdim, Bx, cBm, bx, t0=None, t1=None):
