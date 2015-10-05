@@ -9,36 +9,37 @@ def generateMvt(N, vAmp=1, constV=False):
     pos = _N.empty(N)
 
     dirc = -1 if _N.random.rand() < 0.5 else 1
-
     done = False
-    if constV:
-        v = vAmp
+    v    = 0
 
-        
-    else:
-        v    = 0
-        for n in xrange(N):
-            v = 0.9995*v + 0.00007*_N.random.randn()
+    for n in xrange(N):
+        if constV:
+            x += vAmp*dirc            
+        else:
+            v = 0.9995*v + 0.00007*_N.random.randn() 
             x += vAmp*_N.abs(v)*dirc
 
-            if (x > 6) and (dirc > 0):
-                done = True
-            elif (x < -6) and (dirc < 0):
-                done = True
-            if done:
+        if (x > 6) and (dirc > 0):
+            done = True
+        elif (x < -6) and (dirc < 0):
+            done = True
+        if done:
+            if not constV:
                 dirc = -1 if _N.random.rand() < 0.5 else 1
-                if dirc < 0:
-                    if x <= -6:  #  -6.1 -> -0.1
-                        x = x + 6
-                    else:  #  6.1 -> -0.1
-                        x = -1*(x - 6)
-                if dirc > 0:
-                    if x <= -6:  #  -6.1 -> 0.1
-                        x = -1*(x + 6)
-                    else:  #  6.1 -> 0.1
-                        x = x - 6
-            pos[n] = x
-            done = False
+            else:
+                dirc = -1 if (dirc == 1) else 1
+            if dirc < 0:
+                if x <= -6:  #  -6.1 -> -0.1
+                    x = x + 6
+                else:  #  6.1 -> -0.1
+                    x = -1*(x - 6)
+            if dirc > 0:
+                if x <= -6:  #  -6.1 -> 0.1
+                    x = -1*(x + 6)
+                else:  #  6.1 -> 0.1
+                    x = x - 6
+        pos[n] = x
+        done = False
 
     return pos
 
