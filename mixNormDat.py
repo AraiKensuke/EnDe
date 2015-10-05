@@ -10,7 +10,8 @@ class mixNormDat:
 
     u      = None
     Cv     = None
-    x      = None
+
+    x      = None   #  position + marks
     clstr  = None   #  which cluster?
 
     m      = None   #  cluster weight
@@ -46,7 +47,7 @@ class mixNormDat:
                     oo.Cov[im, ik2, ik1] = oo.Cov[im, ik1, ik2]
 
         crat= _N.zeros(M+1)
-        cstab = 0.*_N.random.rand(M)   #  how stable is cluster coeff
+        cstab = 0.*_N.random.rand(M)   #  how stable is mixture coeff
         _mstab = 0.*oo.md*_N.random.rand(M)   #  how stable is mark?
         mstab = _N.tile(_mstab, k).reshape(M, k)
 

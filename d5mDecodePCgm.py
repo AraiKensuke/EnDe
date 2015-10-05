@@ -115,11 +115,13 @@ class simDecode():
         tt1 = _tm.time()
         oo.N = t1-t0
 
-
         if oo.mvpos_t is not None:   #  mvpos
             mt = _N.array(oo.mvpos_t)
             iis = _N.where((mt >= t0) & (mt <= t1))[0]
             oo.mvpos = _N.array(oo.pos[mt[iis]])
+            oo.all_pos = oo.mvpos
+        else:
+            oo.all_pos = oo.mvpos[t0:t1]
 
         dat = _N.empty(oo.N, dtype=list)
         stpos  = []   #  pos  @ time of spikes
@@ -139,7 +141,7 @@ class simDecode():
 
             print "nspikes tet %(tet)d %(s)d  from %(t0)d   %(t1)d" % {"t0" : t0, "t1" : t1, "s" : nspks[nt], "tet" : nt}
 
-        oo.all_pos = oo.mvpos
+
 
         if oo.kde:
             oo.tr_pos   = []
@@ -304,12 +306,15 @@ class simDecode():
         oo.Lam_xk = _N.ones((oo.Nx, oo.nTets))
 
         ibx2 = 1./ (oo.bx*oo.bx)        
+        #occ    = _N.sum(_N.exp(-0.5*ibx2*(oo.xpr - oo.all_pos[t0:t1])**2), axis=1)  #  this piece doesn't need to be evaluated for every new spike
         occ    = _N.sum(_N.exp(-0.5*ibx2*(oo.xpr - oo.all_pos)**2), axis=1)  #  this piece doesn't need to be evaluated for every new spike
         Tot_occ  = _N.sum(occ)
-        oo.iocc = 1./(occ + Tot_occ*0.01)
+        #oo.iocc = 1./(occ + Tot_occ*0.01)
+        oo.iocc = 1./occ
 
         if oo.kde:
             for nt in xrange(oo.nTets):
+                #oo.Lam_xk[:, nt] = _ku.Lambda(oo.xpr, oo.tr_pos[nt], oo.all_pos[t0:t1], oo.Bx, oo.bx)
                 oo.Lam_xk[:, nt] = _ku.Lambda(oo.xpr, oo.tr_pos[nt], oo.all_pos, oo.Bx, oo.bx)
         else:  #####  fit mix gaussian
             for nt in xrange(oo.nTets):
@@ -322,7 +327,7 @@ class simDecode():
                 y  = _N.sum(oo.mvNrm[nt].ms*cmps, axis=0)
                 MargLam = y * oo.iocc
                 oo.lmd0[nt]    = (nspks[nt] / ((t1-t0)*0.001)) / _N.trapz(MargLam, dx=oo.dxp)
-                oo.Lam_xk[:, nt] = oo.lmd0[nt]# * MargLam
+                oo.Lam_xk[:, nt] = oo.lmd0[nt] * MargLam
 
 
     """

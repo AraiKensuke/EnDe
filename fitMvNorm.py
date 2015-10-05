@@ -209,7 +209,8 @@ class fitMvNorm:
                 oo.scov[0, im] = _N.cov(x[kinds], rowvar=0)
                 oo.sm[0, im]   = float(len(kinds)+1) / (N+MF)
             else:
-                oo.smu[0, im]  = _N.mean(x[sigInds], axis=0)
+                #oo.smu[0, im]  = _N.mean(x[sigInds], axis=0)
+                oo.smu[0, im]  = _N.mean(x, axis=0)
                 oo.scov[0, im] = covAll*0.125
                 oo.sm[0, im]   = float(len(kinds)+1) / (N+MF)
 

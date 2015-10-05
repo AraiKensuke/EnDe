@@ -1,3 +1,7 @@
+import numpy as _N
+import matplotlib.pyplot as _plt
+import pickle
+
 class trueLikelihoods:
     #  From 
     #  Cov
@@ -6,44 +10,58 @@ class trueLikelihoods:
     #  uP
     
     twpi = _N.sqrt(2*_N.pi)
+    mND  = None
+    Nx   = None
+    xA   = None
 
-    def lklhd(fxdMks, t):
-        Lam = LAM(t)
-        iSgs= _N.linalg.inv(mND.Cov)
+    def __init__(self, mndfile):
+        oo = self
+        with open(mndfile, "rb") as f:
+            oo.mND = pickle.load(f)
 
-        cmps= _N.empty((mND.M, Nx))
-        rhs = _N.empty(mND.k)
+    def lklhd(self, fxdMks, t):
+        oo = self
+        Lam = oo.LAM(t)
+        iSgs= _N.linalg.inv(oo.mND.Cov)
+
+        cmps= _N.empty((oo.mND.M, oo.Nx))
+        rhs = _N.empty(oo.mND.k)
 
         #  prob at each value of xA
-        for m in xrange(mND.M):
-            lnp = (xA - mND.uP[m, 0, t])**2 / (2*mND.stdP[m, 0, t]**2)
-            _N.dot(iSgs[m], (fxdMks - mND.um[m, t]).T, out=rhs)
-            _N.dot(fxdMks-mND.um[m, t], rhs)
-            cmps[m] = mND.alp[m, 0, t] * _N.exp(-0.5*_N.dot(fxdMks-mND.um[m, t], rhs) - 0.5 * lnp)
+        for m in xrange(oo.mND.M):
+            lnp = (oo.xA - oo.mND.uP[m, 0, t])**2 / (2*oo.mND.stdP[m, 0, t]**2)
+            _N.dot(iSgs[m], (fxdMks - oo.mND.um[m, t]).T, out=rhs)
+            _N.dot(fxdMks-oo.mND.um[m, t], rhs)
+            cmps[m] = oo.mND.alp[m, 0, t] * _N.exp(-0.5*_N.dot(fxdMks-oo.mND.um[m, t], rhs) - 0.5 * lnp)
 
         zs = _N.sum(cmps, axis=0)
 
-        return zs*0.001*LAM
+        return zs*0.001*Lam
 
-    def LAM(t):
+    def LAM(self, t):
+        oo = self
         #  For our case, 
-        cmps= _N.empty((mND.M, 51))
-        iCov = _N.linalg.inv(mND.Cov)
+        cmps= _N.empty((oo.mND.M, 51))
+        iCov = _N.linalg.inv(oo.mND.Cov)
 
 
-        for m in xrange(mND.M):
-            lnp = (xA - mND.uP[m, 0, t])**2 / (2*mND.stdP[m, 0, t]**2)
-            cmps[m] = mND.alp[m, 0, t]*_N.sqrt(twpi*_N.linalg.det(mND.Cov[m])) * _N.exp(-0.5*lnp)
+        for m in xrange(oo.mND.M):
+            lnp = (oo.xA - oo.mND.uP[m, 0, t])**2 / (2*oo.mND.stdP[m, 0, t]**2)
+            cmps[m] = oo.mND.alp[m, 0, t]*_N.sqrt(oo.twpi*_N.linalg.det(oo.mND.Cov[m])) * _N.exp(-0.5*lnp)
 
         zs = _N.sum(cmps, axis=0)
         return zs
 
-    def theseMarks(mND, trainT, marks):
-        nons    = _N.equal(mND.marks, None)
-        mInds  = _N.where(nons == False)[0]
+    def theseMarks(self, t0, t1):
+        oo = self
+        
+        nons    = _N.equal(oo.mND.marks[t0:t1], None)
+        mInds  = _N.where(nons == False)[0] + t0
 
-        mND.marks[mInds]
-        mND.pos[mInds]
+        print mInds
+
+        oo.mND.marks[mInds]
+        oo.mND.pos[mInds]
 
         marks = []
         pos   = []
@@ -51,16 +69,16 @@ class trueLikelihoods:
 
         iii  = -1
 
-        #  mND.marks      --  array
-        #  mND.marks[0]   --  list
-        #  mND.marks]
+        #  oo.mND.marks      --  array
+        #  oo.mND.marks[0]   --  list
+        #  oo.mND.marks]
 
-        for mkl in mND.marks[mInds]:
+        for mkl in oo.mND.marks[mInds]:
             iii += 1
 
             for i in xrange(len(mkl[0])):
                 marks.append(mkl[0][i])
-                pos.append(mND.pos[mInds[iii]])
+                pos.append(oo.mND.pos[mInds[iii]])
                 ts.append(mInds[iii])
 
         marks = _N.array(marks)
@@ -69,22 +87,49 @@ class trueLikelihoods:
 
 
 
-        Nx     = 51
-        xA     = _N.linspace(-6, 6, Nx)
-        #xA     = xA.reshape(51, 1)
+        oo.Nx     = 51
+        oo.xA     = _N.linspace(-6, 6, oo.Nx)
 
         N      = len(mInds)
 
-        #  mND.alp   (M x Npf x T)
-        #  mND.um    (M x T x k)
-        #  mND.uP    (M x Npf x T)
-        #  mND.Cov   (M x k x k)
-        #  mND.stdP  (M x Npf x T)
+        #  oo.mND.alp   (M x Npf x T)
+        #  oo.mND.um    (M x T x k)
+        #  oo.mND.uP    (M x Npf x T)
+        #  oo.mND.Cov   (M x k x k)
+        #  oo.mND.stdP  (M x Npf x T)
 
-        for n in xrange(10):
-            L = evalAtFxdMks(marks[n], ts[n])
-            fig = _plt.figure()
-            _plt.plot(L)
+
+        scale = 1000.
+        it0 = int(t0)
+        it1 = int(t1)
+
+        pg   = 0
+        onPg = 0
+
+        for n in xrange(len(ts)):
+            t = ts[n]
+            if onPg == 0:
+                fig = _plt.figure(figsize=(13, 8))        
+            fig.add_subplot(4, 6, onPg + 1)
+            _plt.plot(oo.xA, oo.lklhd(marks[n], ts[n]), color="black")
+            _plt.axvline(x=pos[n], color="red", lw=2)
+            _plt.yticks([])
+            _plt.xticks([-6, -3, 0, 3, 6])
+            _plt.title("t = %.3f" % (float(t) / scale))
+            onPg += 1
+
+            if onPg >= 24:
+                fig.subplots_adjust(wspace=0.35, hspace=0.35, left=0.08, right=0.92, top=0.92, bottom=0.08)
+                _plt.savefig("tLklhd_pg=%(pg)d" % {"pg" : pg})
+                _plt.close()
+                pg += 1
+                onPg = 0
+
+        if onPg > 0:
+            fig.subplots_adjust(wspace=0.15, hspace=0.15, left=0.08, right=0.92, top=0.92, bottom=0.08)
+            _plt.savefig("tLklhd_pg=%(pg)d" % {"pg" : pg})
+            _plt.close()
+
 
 
 
