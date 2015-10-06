@@ -14,6 +14,10 @@ class trueLikelihoods:
     Nx   = None
     xA   = None
 
+    jm   = None   #  just the marks, no Nones
+    jp   = None
+    mt   = None
+
     def __init__(self, mndfile):
         oo = self
         with open(mndfile, "rb") as f:
@@ -81,9 +85,9 @@ class trueLikelihoods:
                 pos.append(oo.mND.pos[mInds[iii]])
                 ts.append(mInds[iii])
 
-        marks = _N.array(marks)
-        pos   = _N.array(pos)
-        ts    = _N.array(ts)
+        oo.jm   = _N.array(marks)
+        oo.jp   = _N.array(pos)
+        oo.ts   = _N.array(ts)
 
 
 
@@ -111,8 +115,8 @@ class trueLikelihoods:
             if onPg == 0:
                 fig = _plt.figure(figsize=(13, 8))        
             fig.add_subplot(4, 6, onPg + 1)
-            _plt.plot(oo.xA, oo.lklhd(marks[n], ts[n]), color="black")
-            _plt.axvline(x=pos[n], color="red", lw=2)
+            _plt.plot(oo.xA, oo.lklhd(oo.jm[n], oo.ts[n]), color="black")
+            _plt.axvline(x=oo.jp[n], color="red", lw=2)
             _plt.yticks([])
             _plt.xticks([-6, -3, 0, 3, 6])
             _plt.title("t = %.3f" % (float(t) / scale))

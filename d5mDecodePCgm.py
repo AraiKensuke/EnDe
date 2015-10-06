@@ -46,6 +46,9 @@ class simDecode():
     usetets  = None
     utets_str= ""
 
+    tt0      = None
+    tt1      = None
+
     def init(self, kde=False, bx=None, Bx=None, Bm=None):
         oo = self
         oo.kde = kde
@@ -112,6 +115,8 @@ class simDecode():
 
     def encode(self, t0, t1, initPriors=False, doTouchUp=False, MF=None, kmeansinit=True):
         oo = self
+        oo.tt0 = t0
+        oo.tt1 = t1
         tt1 = _tm.time()
         oo.N = t1-t0
 
@@ -143,14 +148,14 @@ class simDecode():
 
 
 
-        if oo.kde:
-            oo.tr_pos   = []
-            oo.tr_marks = []
+        oo.tr_pos   = []
+        oo.tr_marks = []
+        
+        for nt in xrange(oo.nTets):
+            oo.tr_pos.append(_N.array(stpos[nt]))
+            oo.tr_marks.append(_N.array(marks[nt]))
 
-            for nt in xrange(oo.nTets):
-                oo.tr_pos.append(_N.array(stpos[nt]))
-                oo.tr_marks.append(_N.array(marks[nt]))
-        else:   ##  Use mixture Gaussian
+        if not oo.kde:
             tt2 = _tm.time()
             if initPriors:
                 for nt in xrange(oo.nTets):
