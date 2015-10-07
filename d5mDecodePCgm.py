@@ -22,6 +22,7 @@ class simDecode():
     kde   = None
     lmd   = None
     lmd0  = None
+    mltMk = 1    #  multiply mark values to 
 
     #  xp   position grid.  need this in decode
     xp    = None
@@ -69,7 +70,18 @@ class simDecode():
             for l in xrange(len(mis)):
                 sc = "" if (l == len(mis)-1) else ","
                 oo.utets_str += "%(l)s%(c)s" % {"l" : lm.tetlist[mis[l]], "c" : sc}
-        
+
+        if oo.mltMk != 1:
+            nons = _N.equal(oo.marks, None)
+            for nt in xrange(oo.nTets):
+                spks = _N.where(nons[:, nt] == False)[0]
+
+                for l in xrange(len(spks)):
+                    mklst = oo.marks[spks[l], nt][0]
+
+                    for ll in xrange(len(mklst)):
+                        mklst[ll] *= oo.mltMk
+             
         oo.nTets = oo.marks.shape[1]
 
         oo.Nx = lm.Nx;        oo.Nm = lm.Nm

@@ -174,10 +174,13 @@ class fitMvNorm:
                 smkpos        = _x[sigInds]
 
                 labS = _fu.bestcluster(50, smkpos, MS)
-                _fu.colorclusters(smkpos, labS, MS)
+                #_fu.colorclusters(smkpos, labS, MS)
                 labH = _fu.bestcluster(50, _x[hashsp], MH)
-                #scrH, labH = scv.kmeans2(_x[hashsp], MH)
+                fig = _plt.figure()
+                _plt.hist(_x[hashsp, 0], bins=_N.linspace(-30, 30, 101))
                 _x[:, 0] /= 5
+                #scrH, labH = scv.kmeans2(_x[hashsp], MH)
+
 
             ##################
             lab        = _N.array(labH.tolist() + (labS + MH).tolist())
@@ -216,7 +219,7 @@ class fitMvNorm:
 
         if doTouchUp:  #  compare model fit data used to fit data.  
             tmpITERS = oo.ITERS
-            oo.ITERS = 100
+            oo.ITERS = 200
 
             oo.fit(MF, pos, mk, n1, n2)   #  leave some clusters available
             oo.ITERS = tmpITERS

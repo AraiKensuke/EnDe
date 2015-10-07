@@ -33,7 +33,7 @@ class trueLikelihoods:
 
         #  prob at each value of xA
         for m in xrange(oo.mND.M):
-            lnp = (oo.xA - oo.mND.uP[m, 0, t])**2 / (2*oo.mND.stdP[m, 0, t]**2)
+            lnp = (oo.xA - oo.mND.uP[m, 0, t])**2 / (oo.mND.stdP[m, 0, t]**2)
             _N.dot(iSgs[m], (fxdMks - oo.mND.um[m, t]).T, out=rhs)
             _N.dot(fxdMks-oo.mND.um[m, t], rhs)
             cmps[m] = oo.mND.alp[m, 0, t] * _N.exp(-0.5*_N.dot(fxdMks-oo.mND.um[m, t], rhs) - 0.5 * lnp)

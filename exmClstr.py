@@ -29,10 +29,12 @@ def show_posmarks(dec, setname):
                 _plt.plot([ux, ux], [uy-ex_y, uy+ex_y], color="red", lw=2)
 
             _plt.xlim(-6, 6)
-        _plt.savefig(resFN("look_tet%s" % dec.usetets[nt], dir=setname))
+
+        fn= "look" if (dec.usetets is None) else "look_tet%s" % dec.usetets[nt]
+        _plt.savefig(resFN(fn, dir=setname))
         _plt.close()
 
-def showMarginalMarkDistributions(dec, setname, mklim=[-6, 8]):
+def showMarginalMarkDistributions(dec, setname, mklim=[-6, 8], dk=0.1):
     for tet in xrange(dec.nTets):
         ###    marginalize tetrode marks
         mrgidx = _N.array([1, 2, 3, 4])
@@ -44,14 +46,14 @@ def showMarginalMarkDistributions(dec, setname, mklim=[-6, 8]):
             mn, mcov = mvn.marginalPDF(dec.mvNrm[tet].us[m], dec.mvNrm[tet].covs[m], mrgidx)
             p  += dec.mvNrm[tet].ms[m]/_N.sqrt(2*_N.pi*mcov[0,0]) *_N.exp(-0.5*(xp - mn[0])**2 / mcov[0, 0])
 
-        x =_plt.hist(dec.tr_pos[0], bins=_N.linspace(-6, 6, 121), normed=True, color="black")
+        x =_plt.hist(dec.tr_pos[tet], bins=_N.linspace(-6, 6, 121), normed=True, color="black")
         _plt.plot(xp, (p/_N.sum(p))*10, color="red", lw=2)
 
 
         ###    marginalize position + 3 tetrode marks
         allinds = _N.arange(5)
 
-        bins   = _N.linspace(mklim[0], mklim[1], (mklim[1]-mklim[0])*10+1)
+        bins   = _N.linspace(mklim[0], mklim[1], (mklim[1]-mklim[0])*(1./dk)+1)
         for shk in xrange(1, 5):
             fig.add_subplot(3, 2, shk+2)
             mrgidx = _N.setdiff1d(allinds, _N.array([shk]))
@@ -62,7 +64,8 @@ def showMarginalMarkDistributions(dec, setname, mklim=[-6, 8]):
                 mn, mcov = mvn.marginalPDF(dec.mvNrm[tet].us[m], dec.mvNrm[tet].covs[m], mrgidx)
                 p  += dec.mvNrm[tet].ms[m]/_N.sqrt(2*_N.pi*mcov[0,0]) *_N.exp(-0.5*(bins - mn[0])**2 / mcov[0, 0])
             x =_plt.hist(dec.tr_marks[tet][:, shk-1], bins=bins, normed=True, color="black")
-            _plt.plot(bins, (p/_N.sum(p))*10, color="red", lw=2)
+            _plt.plot(bins, (p/_N.sum(p))*(1./dk), color="red", lw=2)
 
-        _plt.savefig(resFN("margDists%s" % dec.usetets[tet], dir=setname))
+        fn= "margDists" if (dec.usetets is None) else "margDists%s" % dec.usetets[tet]
+        _plt.savefig(resFN(fn, dir=setname))
         _plt.close()
