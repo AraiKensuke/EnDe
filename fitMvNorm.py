@@ -174,10 +174,12 @@ class fitMvNorm:
                 smkpos        = _x[sigInds]
 
                 labS = _fu.bestcluster(50, smkpos, MS)
-                #_fu.colorclusters(smkpos, labS, MS)
                 labH = _fu.bestcluster(50, _x[hashsp], MH)
-                fig = _plt.figure()
-                _plt.hist(_x[hashsp, 0], bins=_N.linspace(-30, 30, 101))
+                #bins = _N.linspace(-30, 30, 101)
+                #labH = _fu.positionalClusters(_x[hashsp, 0], bins, MH)
+                #histdat = _plt.hist(_x[hashsp, 0], bins=bins)
+                #_N.savetxt("hist", histdat[0], fmt="%.4f")
+                #_N.savetxt("hash", _x[hashsp], fmt="%.4f %.4f %.4f %.4f %.4f")
                 _x[:, 0] /= 5
                 #scrH, labH = scv.kmeans2(_x[hashsp], MH)
 
@@ -331,6 +333,9 @@ class fitMvNorm:
             _N.add(oo.PR_m_alp[0:M], _N.sum(oo.gz[it+1], axis=0), out=dirArgs)
 
             oo.sm[it+1, 0:M, 0] = _N.random.dirichlet(dirArgs)
+
+            po_mu_sgs = _N.linalg.inv(oo.iPR_mu_sg + Nms*iscov)
+
             for im in xrange(M):
                 minds = _N.where(oo.gz[it+1, :, im] == 1)[0]
 
@@ -356,19 +361,6 @@ class fitMvNorm:
                     po_sg_PSI = oo.PR_cov_PSI[im] + _N.dot((clstx - oo.smu[it+1, im]).T, (clstx-oo.smu[it+1, im]))
 
                     oo.scov[it+1, im] = s_u.sample_invwishart(po_sg_PSI, po_sg_dof)
-
-                    """
-                    for ik in xrange(oo.pmdim):
-                        po_mu_sg = 1. / (1 / oo.PR_mu_sg[im, ik, ik] + Nm / oo.scov[it, im, ik, ik])
-                        po_mu_mu  = (oo.PR_mu_mu[im, ik] / oo.PR_mu_sg[im, ik, ik] + mc[ik] / oo.scov[it, im, ik, ik]) * po_mu_sg
-
-                        oo.smu[it+1, im, ik] = po_mu_mu + _N.sqrt(po_mu_sg)*_N.random.randn()
-
-                        ##  dof of posterior distribution of cluster covariance
-                        po_sg_a = oo.PR_cov_a[im] + 0.5*Nm
-                        po_sg_B = oo.PR_cov_B[im, ik, ik] + 0.5*_N.sum((clstx[:, ik] - oo.smu[it+1, im, ik])**2)
-                        oo.scov[it+1, im, ik, ik] = _ss.invgamma.rvs(po_sg_a, scale=po_sg_B)
-                    """
                 else:  #  no marks assigned to this cluster 
                     oo.scov[it+1, im] = oo.scov[it, im]
                     oo.smu[it+1, im]  = oo.smu[it, im]

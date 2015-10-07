@@ -112,7 +112,7 @@ class simDecode():
         oo.dt = lm.dt
 
         oo.pos  = lm.pos
-        oo.Fp, oo.q2p = 1, 0.005
+        oo.Fp, oo.q2p = 1, 0.003
 
         oo.pX_Nm = _N.zeros((oo.pos.shape[0], oo.Nx))
         oo.Lklhd = _N.zeros((oo.nTets, oo.pos.shape[0], oo.Nx))

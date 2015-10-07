@@ -65,6 +65,41 @@ def bestcluster(ITERS, smkpos, MS):
 
     return allLabs[bestlabs[0]]
 
+def positionalClusters(hsh, bins, MH):
+    #histdat = _plt.hist(hsh, bins=bins)
+    histdat = _N.histogram(hsh, bins=bins)
+    hst     = histdat[0]
+
+    inds  = _N.array([i[0] for i in sorted(enumerate(hst), key=lambda x:x[1], reverse=True)])
+
+    kpths = _N.empty(MH+1, dtype=_N.int)
+    kpths[0] = inds[0]
+    bDone = False
+
+    i    = 0
+    added= 1
+    while not bDone:
+        i += 1
+        if _N.min(_N.abs(inds[i] - kpths[0:added])) > 2:
+            kpths[added] = inds[i]
+            added += 1
+
+        bDone = True if (added == MH+1) else False
+
+    skpths = _N.sort(kpths)
+    skpths[0] = 0
+    skpths[-1] = bins.shape[0]-1
+
+    #  put labels on these
+
+    labsH  = _N.empty(hsh.shape[0], dtype=_N.int)
+
+    for i in xrange(hsh.shape[0]):
+        n = _N.where((bins[skpths[0:-1]] <= hsh[i]) & (bins[skpths[1:]] >= hsh[i]))[0]
+        labsH[i] = n
+
+    return labsH
+
 
 def colorclusters(smkpos, labs, MS):
     fig = _plt.figure(figsize=(12, 8))
