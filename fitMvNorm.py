@@ -296,6 +296,7 @@ class fitMvNorm:
 
         oo.sm[0:M]   = 1./M
 
+        po_mu_mu = _N.empty((M, k))
         for it in xrange(oo.ITERS-1):
             print it
             iscov = _N.linalg.inv(oo.scov[it, 0:M])
@@ -334,33 +335,41 @@ class fitMvNorm:
 
             oo.sm[it+1, 0:M, 0] = _N.random.dirichlet(dirArgs)
 
-            po_mu_sgs = _N.linalg.inv(oo.iPR_mu_sg + Nms*iscov)
+            #po_mu_sgs = _N.linalg.inv(oo.iPR_mu_sg + Nms*iscov)
 
+            # minds[1] is col# which is set to 1 for each N rows
+            minds = _N.where(oo.gz[it+1] == 1) 
+            Nms = _N.empty((M, 1, 1))
             for im in xrange(M):
-                minds = _N.where(oo.gz[it+1, :, im] == 1)[0]
+                inds     = _N.where(minds[1] == im)
+                clstx    = x[inds]
+                mc       = _N.mean(clstx, axis=0)    #  inv wishart case
+                #mc       = _N.sum(clstx, axis=0)     #  dirichlet case
+                Nms[im, 0, 0]  = clstx.shape[0]
 
-                if len(minds) > oo.pmdim:
-                    clstx    = x[minds]
-                    mc       = _N.mean(clstx, axis=0)    #  inv wishart case
-                    #mc       = _N.sum(clstx, axis=0)     #  dirichlet case
-                    Nm       = clstx.shape[0]
+                ##  mean of posterior distribution of cluster means
+                #  sigma^2 and mu are the current Gibbs-sampled values
 
-                    # hyp
-                    ########  POSITION
-                    ##  mean of posterior distribution of cluster means
-                    #  sigma^2 and mu are the current Gibbs-sampled values
+            #  po_mu_sg 
+            po_mu_sg  = _N.linalg.inv(oo.iPR_mu_sg[0:M] + Nms*iscov)
+            ##  mean of posterior distribution of cluster means
+            for im in xrange(M):
+                #_N.dot(po_mu_sg[im], _N.dot(oo.iPR_mu_sg[im], oo.PR_mu_mu[im]) + Nms[:, :, 0]*_N.dot(iscov[im], mc), out=po_mu_mu[im])
+                _N.dot(po_mu_sg[im], _N.dot(oo.iPR_mu_sg[im], oo.PR_mu_mu[im]) + Nms[im, 0, 0]*_N.dot(iscov[im], mc), out=po_mu_mu[im])
 
-                    po_mu_sg = _N.linalg.inv(oo.iPR_mu_sg[im] + Nm*iscov[im])
-                    ##  mean of posterior distribution of cluster means
-                    po_mu_mu  = _N.dot(po_mu_sg, _N.dot(oo.iPR_mu_sg[im], oo.PR_mu_mu[im]) + Nm*_N.dot(iscov[im], mc))
-                    oo.smu[it+1, im] = mvn(po_mu_mu, po_mu_sg)
+            mvn1   = _N.random.randn(M, k)  #  slightly faster
+            C       = _N.linalg.cholesky(po_mu_sg)    ###  REPLACE svd with Cholesky
+            zrmn   = _N.einsum("njk,nk->nj", C, mvn1)
 
-                    ##  dof of posterior distribution of cluster covariance
-                    po_sg_dof = oo.PR_cov_nu[im] + Nm
-                    ##  dof of posterior distribution of cluster covariance
+            oo.smu[it+1, 0:M] = po_mu_mu + zrmn
+
+            ##  dof of posterior distribution of cluster covariance
+            po_sg_dof = oo.PR_cov_nu[0:M] + Nms[:, 0, 0]
+            for im in xrange(M):
+                ##  dof of posterior distribution of cluster covariance
+                if Nms[im, 0, 0] >= k:
                     po_sg_PSI = oo.PR_cov_PSI[im] + _N.dot((clstx - oo.smu[it+1, im]).T, (clstx-oo.smu[it+1, im]))
-
-                    oo.scov[it+1, im] = s_u.sample_invwishart(po_sg_PSI, po_sg_dof)
+                    oo.scov[it+1, im] = s_u.sample_invwishart(po_sg_PSI, po_sg_dof[im])
                 else:  #  no marks assigned to this cluster 
                     oo.scov[it+1, im] = oo.scov[it, im]
                     oo.smu[it+1, im]  = oo.smu[it, im]
