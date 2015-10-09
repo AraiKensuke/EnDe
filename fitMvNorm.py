@@ -54,6 +54,9 @@ class fitMvNorm:
 
     bPosInd = False
 
+    iSgs  = None
+    i2pidcovs = None
+
     def __init__(self, ITERS, M, k):
         """
         
@@ -223,6 +226,7 @@ class fitMvNorm:
             tmpITERS = oo.ITERS
             oo.ITERS = 200
 
+            print "******************  before fit in doTouchUp"
             oo.fit(MF, pos, mk, n1, n2)   #  leave some clusters available
             oo.ITERS = tmpITERS
 
@@ -241,7 +245,6 @@ class fitMvNorm:
                 probs += oo.ms[im]*deticov[im]*_N.exp(-0.5*v_iCov_v)
 
             lowPs = _N.where(_N.log10(probs/_N.max(probs)) < -_N.log10(len(_x)*0.5))[0]
-
             _x[:, 0] *= 5
 
             labRare = _fu.bestcluster(50, _x[lowPs], oo.M-MF)
@@ -266,7 +269,124 @@ class fitMvNorm:
                 oo.sm[0, MF+im] *= float(len(kinds)+1) / (n2-n1)  #  scale back the existing ones
             oo.sm[0] /= _N.sum(oo.sm[0])
 
-    #  I need to know initial values smu, scov, sm.  Generate gz 
+
+
+    # def fit(self, M, pos, mk, n1, n2):
+    #     """
+    #     """
+    #     oo = self
+    #     k      = oo.k
+    #     mnd    = oo.mnd
+    #     x   = _N.empty((n2-n1, k))
+    #     x[:, 0]    = pos
+    #     x[:, 1:]   = mk
+    #     N   = n2-n1
+    #     oo.pmdim = k
+    #     oo.gz   = _N.zeros((oo.ITERS, N, M), dtype=_N.int)
+    #     oo.PR_m_alp[:] = 1. / M
+
+    #     covAll = _N.cov(x.T)
+    #     dcovMag= _N.diagonal(covAll)*0.125
+
+    #     #  termporary containers
+    #     expTrm = _N.empty((M, N))
+    #     expArg = _N.empty((M, N))
+    #     crats = _N.zeros((M+1, N))
+    #     rands = _N.random.rand(N, 1)
+    #     dirArgs = _N.empty(M, dtype=_N.int)
+
+    #     rsum = _N.empty((1, N))
+    #     skpM   = _N.arange(0, N)*M
+
+    #     oo.sm[0:M]   = 1./M
+
+    #     po_mu_mu = _N.empty((M, k))
+    #     for it in xrange(oo.ITERS-1):
+    #         print it
+    #         iscov = _N.linalg.inv(oo.scov[it, 0:M])
+    #         #print iscov
+
+    #         norms = 1/_N.sqrt(2*_N.pi*_N.linalg.det(oo.scov[it, 0:M]))
+    #         norms = norms.reshape(M, 1)
+
+    #         for im in xrange(M):
+    #             expArg[im] = -0.5*_N.sum(_N.multiply((x-oo.smu[it, im]), _N.dot(x-oo.smu[it, im], iscov[im])), axis=1)   #  expArg[im] is size N
+
+    #         rexpArg = expArg.T.reshape(M*N)
+    #         lrgInM = expArg.argmax(axis=0)
+    #         lrgstArgs = rexpArg[skpM+lrgInM]
+    #         expArg0 = expArg - lrgstArgs
+
+    #         expTrm = _N.exp(expArg0)
+
+    #         rats = oo.sm[it, 0:M]*expTrm*norms  #  shape is M x oo.N
+
+    #         _N.sum(rats, axis=0, out=rsum[0, :])   
+    #         rats /= rsum   #  each column of "rats" sums to 1
+
+    #         for im in xrange(M):
+    #             crats[im+1] = rats[im] + crats[im]
+
+    #         rands = _N.random.rand(N)
+    #         rrands = _N.tile(rands, M).reshape(M, N)
+    #         ###  THIS once broke because we had an empty cluster
+    #         irw, icl = _N.where((rrands >= crats[:-1]) & (rrands <= crats[1:]))
+
+    #         oo.gz[it+1, icl, irw] = 1   #  we must clean out gz
+
+    #         #  _N.sum(oo.gz...) sz M   its vec of num. of obs of each state 'm'
+    #         _N.add(oo.PR_m_alp[0:M], _N.sum(oo.gz[it+1], axis=0), out=dirArgs)
+
+    #         oo.sm[it+1, 0:M, 0] = _N.random.dirichlet(dirArgs)
+
+    #         inds = _N.where(oo.gz[it+1] == 1) 
+    #         Nms = _N.empty((M, 1, 1))
+
+    #         for im in xrange(M):
+    #             minds     = _N.where(inds[1] == im)
+    #             Nms[im,0,0]       = len(minds)
+
+    #             if Nms[im,0,0] > oo.pmdim:
+    #                 clstx    = x[minds]
+    #                 mc       = _N.mean(clstx, axis=0)    #  inv wishart case
+    #                 #mc       = _N.sum(clstx, axis=0)     #  dirichlet case
+    #             # hyp
+    #             ########  POSITION
+    #             ##  mean of posterior distribution of cluster means
+    #             #  sigma^2 and mu are the current Gibbs-sampled values
+
+    #         po_mu_sg = _N.linalg.inv(oo.iPR_mu_sg[0:M] + Nms*iscov)
+    #         for im in xrange(M):
+    #             Nm = Nms[im, 0, 0]
+    #             if Nm > oo.pmdim:
+    #                 ##  mean of posterior distribution of cluster means
+    #                 po_mu_mu  = _N.dot(po_mu_sg[im], _N.dot(oo.iPR_mu_sg[im], oo.PR_mu_mu[im]) + Nm*_N.dot(iscov[im], mc))
+
+    #         #mvn1   = _N.random.randn(M, k)  #  slightly faster
+    #         #C       = _N.linalg.cholesky(po_mu_sg)    ###  REPLACE svd with Cholesky
+    #         #zrmn   = _N.einsum("njk,nk->nj", C, mvn1)
+
+    #                 oo.smu[it+1, im] = mvn(po_mu_mu, po_mu_sg[im])
+
+    #                 ##  dof of posterior distribution of cluster covariance
+    #                 po_sg_dof = oo.PR_cov_nu[im] + Nm
+    #                 ##  dof of posterior distribution of cluster covariance
+    #                 po_sg_PSI = oo.PR_cov_PSI[im] + _N.dot((clstx - oo.smu[it+1, im]).T, (clstx-oo.smu[it+1, im]))
+
+    #                 oo.scov[it+1, im] = s_u.sample_invwishart(po_sg_PSI, po_sg_dof)
+    #             else:  #  no marks assigned to this cluster 
+    #                 oo.scov[it+1, im] = oo.scov[it, im]
+    #                 oo.smu[it+1, im]  = oo.smu[it, im]
+
+    #     #  When I say prior for mu, I mean I have hyper parameters mu_mu and mu_sg.
+    #     #  hyperparameters are not sampled
+    #     hITERS = int(oo.ITERS*0.75)
+    #     oo.us[:]  = _N.mean(oo.smu[hITERS:oo.ITERS], axis=0)
+    #     oo.covs[:] = _N.mean(oo.scov[hITERS:oo.ITERS], axis=0)
+    #     oo.ms[:]  = _N.mean(oo.sm[hITERS:oo.ITERS], axis=0).reshape(oo.M, 1)
+
+    #     oo.dat = x
+
     def fit(self, M, pos, mk, n1, n2):
         """
         """
@@ -296,7 +416,6 @@ class fitMvNorm:
 
         oo.sm[0:M]   = 1./M
 
-        po_mu_mu = _N.empty((M, k))
         for it in xrange(oo.ITERS-1):
             print it
             iscov = _N.linalg.inv(oo.scov[it, 0:M])
@@ -334,42 +453,44 @@ class fitMvNorm:
             _N.add(oo.PR_m_alp[0:M], _N.sum(oo.gz[it+1], axis=0), out=dirArgs)
 
             oo.sm[it+1, 0:M, 0] = _N.random.dirichlet(dirArgs)
-
-            #po_mu_sgs = _N.linalg.inv(oo.iPR_mu_sg + Nms*iscov)
-
-            # minds[1] is col# which is set to 1 for each N rows
-            minds = _N.where(oo.gz[it+1] == 1) 
-            Nms = _N.empty((M, 1, 1))
             for im in xrange(M):
-                inds     = _N.where(minds[1] == im)
-                clstx    = x[inds]
-                mc       = _N.mean(clstx, axis=0)    #  inv wishart case
-                #mc       = _N.sum(clstx, axis=0)     #  dirichlet case
-                Nms[im, 0, 0]  = clstx.shape[0]
+                minds = _N.where(oo.gz[it+1, :, im] == 1)[0]
 
-                ##  mean of posterior distribution of cluster means
-                #  sigma^2 and mu are the current Gibbs-sampled values
+                if len(minds) > oo.pmdim:
+                    clstx    = x[minds]
+                    mc       = _N.mean(clstx, axis=0)    #  inv wishart case
+                    #mc       = _N.sum(clstx, axis=0)     #  dirichlet case
+                    Nm       = clstx.shape[0]
 
-            #  po_mu_sg 
-            po_mu_sg  = _N.linalg.inv(oo.iPR_mu_sg[0:M] + Nms*iscov)
-            ##  mean of posterior distribution of cluster means
-            for im in xrange(M):
-                #_N.dot(po_mu_sg[im], _N.dot(oo.iPR_mu_sg[im], oo.PR_mu_mu[im]) + Nms[:, :, 0]*_N.dot(iscov[im], mc), out=po_mu_mu[im])
-                _N.dot(po_mu_sg[im], _N.dot(oo.iPR_mu_sg[im], oo.PR_mu_mu[im]) + Nms[im, 0, 0]*_N.dot(iscov[im], mc), out=po_mu_mu[im])
+                    # hyp
+                    ########  POSITION
+                    ##  mean of posterior distribution of cluster means
+                    #  sigma^2 and mu are the current Gibbs-sampled values
 
-            mvn1   = _N.random.randn(M, k)  #  slightly faster
-            C       = _N.linalg.cholesky(po_mu_sg)    ###  REPLACE svd with Cholesky
-            zrmn   = _N.einsum("njk,nk->nj", C, mvn1)
+                    po_mu_sg = _N.linalg.inv(oo.iPR_mu_sg[im] + Nm*iscov[im])
+                    ##  mean of posterior distribution of cluster means
+                    po_mu_mu  = _N.dot(po_mu_sg, _N.dot(oo.iPR_mu_sg[im], oo.PR_mu_mu[im]) + Nm*_N.dot(iscov[im], mc))
+                    oo.smu[it+1, im] = mvn(po_mu_mu, po_mu_sg)
 
-            oo.smu[it+1, 0:M] = po_mu_mu + zrmn
-
-            ##  dof of posterior distribution of cluster covariance
-            po_sg_dof = oo.PR_cov_nu[0:M] + Nms[:, 0, 0]
-            for im in xrange(M):
-                ##  dof of posterior distribution of cluster covariance
-                if Nms[im, 0, 0] >= k:
+                    ##  dof of posterior distribution of cluster covariance
+                    po_sg_dof = oo.PR_cov_nu[im] + Nm
+                    ##  dof of posterior distribution of cluster covariance
                     po_sg_PSI = oo.PR_cov_PSI[im] + _N.dot((clstx - oo.smu[it+1, im]).T, (clstx-oo.smu[it+1, im]))
-                    oo.scov[it+1, im] = s_u.sample_invwishart(po_sg_PSI, po_sg_dof[im])
+
+                    oo.scov[it+1, im] = s_u.sample_invwishart(po_sg_PSI, po_sg_dof)
+
+                    """
+                    for ik in xrange(oo.pmdim):
+                        po_mu_sg = 1. / (1 / oo.PR_mu_sg[im, ik, ik] + Nm / oo.scov[it, im, ik, ik])
+                        po_mu_mu  = (oo.PR_mu_mu[im, ik] / oo.PR_mu_sg[im, ik, ik] + mc[ik] / oo.scov[it, im, ik, ik]) * po_mu_sg
+
+                        oo.smu[it+1, im, ik] = po_mu_mu + _N.sqrt(po_mu_sg)*_N.random.randn()
+
+                        ##  dof of posterior distribution of cluster covariance
+                        po_sg_a = oo.PR_cov_a[im] + 0.5*Nm
+                        po_sg_B = oo.PR_cov_B[im, ik, ik] + 0.5*_N.sum((clstx[:, ik] - oo.smu[it+1, im, ik])**2)
+                        oo.scov[it+1, im, ik, ik] = _ss.invgamma.rvs(po_sg_a, scale=po_sg_B)
+                    """
                 else:  #  no marks assigned to this cluster 
                     oo.scov[it+1, im] = oo.scov[it, im]
                     oo.smu[it+1, im]  = oo.smu[it, im]
@@ -377,9 +498,9 @@ class fitMvNorm:
         #  When I say prior for mu, I mean I have hyper parameters mu_mu and mu_sg.
         #  hyperparameters are not sampled
         hITERS = int(oo.ITERS*0.75)
-        oo.us[:]  = _N.mean(oo.smu[hITERS:], axis=0)
-        oo.covs[:] = _N.mean(oo.scov[hITERS:], axis=0)
-        oo.ms[:]  = _N.mean(oo.sm[hITERS:], axis=0).reshape(oo.M, 1)
+        oo.us[:]  = _N.mean(oo.smu[hITERS:oo.ITERS], axis=0)
+        oo.covs[:] = _N.mean(oo.scov[hITERS:oo.ITERS], axis=0)
+        oo.ms[:]  = _N.mean(oo.sm[hITERS:oo.ITERS], axis=0).reshape(oo.M, 1)
 
         oo.dat = x
 
@@ -460,13 +581,12 @@ class fitMvNorm:
 
     def evalAtFxdMks(self, fxdMks):
         oo     = self
-        iSgs= _N.linalg.inv(oo.covs)
 
         Nx     = fxdMks.shape[0]
 
         cmps= _N.empty((oo.M, Nx))
         for m in xrange(oo.M):
-            cmps[m] = 1/_N.sqrt(2*_N.pi*_N.linalg.det(oo.covs[m]))*_N.exp(-0.5*_N.sum(_N.multiply(fxdMks-oo.us[m], _N.dot(iSgs[m], (fxdMks - oo.us[m]).T).T), axis=1))
+            cmps[m] = oo.i2pidcovs[m]*_N.exp(-0.5*_N.sum(_N.multiply(fxdMks-oo.us[m], _N.dot(oo.iSgs[m], (fxdMks - oo.us[m]).T).T), axis=1))
             bnans = _N.isnan(cmps[m])
             if len(_N.where(bnans is True)[0]) > 0:
                 print _N.linalg.det(oo.covs[m])

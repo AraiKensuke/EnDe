@@ -272,6 +272,11 @@ class simDecode():
         pNkmk = _N.empty((oo.Nx, oo.nTets))
 
         tStart = _tm.time()
+
+        if not oo.kde:
+            for nt in xrange(oo.nTets):
+                oo.mvNrm[nt].iSgs  = _N.linalg.inv(oo.mvNrm[nt].covs)
+                oo.mvNrm[nt].i2pidcovs = 1/_N.sqrt(2*_N.pi*_N.linalg.det(oo.mvNrm[nt].covs))
         for t in xrange(t0+1,t1): # start at 1 because initial condition
             #tt1 = _tm.time()
             for nt in xrange(oo.nTets):
