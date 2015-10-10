@@ -117,7 +117,7 @@ class mixNormDatPoi:
 
         #########  Initial conditions
         if oo.uP0 is not None:   #  M x Npf  matrix
-            oo._uP[:, :, 0]  = oo.uP0
+            oo._uP[:, :, 0]  = 0
         else:
             oo._uP[:, :, 0]  = _N.random.randn(M, Npf)
 
@@ -127,7 +127,7 @@ class mixNormDatPoi:
             oo._alp[:, :, 0] = _N.random.randn(M, Npf)
 
         if oo.um0 is not None:  #  M x k  matrix
-            oo._um[:, 0, :] =   oo.um0
+            oo._um[:, 0, :] =   0
         else:
             oo._um[:, 0]   = _N.random.randn(oo.k)*oo.md   
 
@@ -154,6 +154,8 @@ class mixNormDatPoi:
                     oo._stdP[m, mpf, n+1] = oo.Fstd*oo._stdP[m, mpf, n] + oo.sivs*_N.random.randn()
                     oo._alp[m, mpf, n+1] = oo.Falp*oo._alp[m, mpf, n] + oo.siva*_N.random.randn()
 
+        oo._uP[:, :, :]  += oo.uP0.reshape((M, Npf, 1))
+        oo._um[:, :, :]  += oo.um0.reshape((M, 1, 1))
         for m in xrange(M):
             for ik in xrange(k):
                 oo.um[m, :, ik]   = _N.interp(ts, _ts, oo._um[m, :, ik])
