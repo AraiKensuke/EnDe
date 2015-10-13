@@ -270,124 +270,6 @@ class fitMvNorm:
             oo.sm[0] /= _N.sum(oo.sm[0])
 
 
-
-    # def fit(self, M, pos, mk, n1, n2):
-    #     """
-    #     """
-    #     oo = self
-    #     k      = oo.k
-    #     mnd    = oo.mnd
-    #     x   = _N.empty((n2-n1, k))
-    #     x[:, 0]    = pos
-    #     x[:, 1:]   = mk
-    #     N   = n2-n1
-    #     oo.pmdim = k
-    #     oo.gz   = _N.zeros((oo.ITERS, N, M), dtype=_N.int)
-    #     oo.PR_m_alp[:] = 1. / M
-
-    #     covAll = _N.cov(x.T)
-    #     dcovMag= _N.diagonal(covAll)*0.125
-
-    #     #  termporary containers
-    #     expTrm = _N.empty((M, N))
-    #     expArg = _N.empty((M, N))
-    #     crats = _N.zeros((M+1, N))
-    #     rands = _N.random.rand(N, 1)
-    #     dirArgs = _N.empty(M, dtype=_N.int)
-
-    #     rsum = _N.empty((1, N))
-    #     skpM   = _N.arange(0, N)*M
-
-    #     oo.sm[0:M]   = 1./M
-
-    #     po_mu_mu = _N.empty((M, k))
-    #     for it in xrange(oo.ITERS-1):
-    #         print it
-    #         iscov = _N.linalg.inv(oo.scov[it, 0:M])
-    #         #print iscov
-
-    #         norms = 1/_N.sqrt(2*_N.pi*_N.linalg.det(oo.scov[it, 0:M]))
-    #         norms = norms.reshape(M, 1)
-
-    #         for im in xrange(M):
-    #             expArg[im] = -0.5*_N.sum(_N.multiply((x-oo.smu[it, im]), _N.dot(x-oo.smu[it, im], iscov[im])), axis=1)   #  expArg[im] is size N
-
-    #         rexpArg = expArg.T.reshape(M*N)
-    #         lrgInM = expArg.argmax(axis=0)
-    #         lrgstArgs = rexpArg[skpM+lrgInM]
-    #         expArg0 = expArg - lrgstArgs
-
-    #         expTrm = _N.exp(expArg0)
-
-    #         rats = oo.sm[it, 0:M]*expTrm*norms  #  shape is M x oo.N
-
-    #         _N.sum(rats, axis=0, out=rsum[0, :])   
-    #         rats /= rsum   #  each column of "rats" sums to 1
-
-    #         for im in xrange(M):
-    #             crats[im+1] = rats[im] + crats[im]
-
-    #         rands = _N.random.rand(N)
-    #         rrands = _N.tile(rands, M).reshape(M, N)
-    #         ###  THIS once broke because we had an empty cluster
-    #         irw, icl = _N.where((rrands >= crats[:-1]) & (rrands <= crats[1:]))
-
-    #         oo.gz[it+1, icl, irw] = 1   #  we must clean out gz
-
-    #         #  _N.sum(oo.gz...) sz M   its vec of num. of obs of each state 'm'
-    #         _N.add(oo.PR_m_alp[0:M], _N.sum(oo.gz[it+1], axis=0), out=dirArgs)
-
-    #         oo.sm[it+1, 0:M, 0] = _N.random.dirichlet(dirArgs)
-
-    #         inds = _N.where(oo.gz[it+1] == 1) 
-    #         Nms = _N.empty((M, 1, 1))
-
-    #         for im in xrange(M):
-    #             minds     = _N.where(inds[1] == im)
-    #             Nms[im,0,0]       = len(minds)
-    #             if Nms[im,0,0] > oo.pmdim:
-    #                 clstx    = x[minds]
-    #                 mc       = _N.mean(clstx, axis=0)    #  inv wishart case
-    #                 #mc       = _N.sum(clstx, axis=0)     #  dirichlet case
-    #             # hyp
-    #             ########  POSITION
-    #             ##  mean of posterior distribution of cluster means
-    #             #  sigma^2 and mu are the current Gibbs-sampled values
-
-    #         po_mu_sg = _N.linalg.inv(oo.iPR_mu_sg[0:M] + Nms*iscov)
-    #         for im in xrange(M):
-    #             Nm = Nms[im, 0, 0]
-    #             if Nm > oo.pmdim:
-    #                 ##  mean of posterior distribution of cluster means
-    #                 po_mu_mu  = _N.dot(po_mu_sg[im], _N.dot(oo.iPR_mu_sg[im], oo.PR_mu_mu[im]) + Nm*_N.dot(iscov[im], mc))
-
-    #         mvn1   = _N.random.randn(M, k)  #  slightly faster
-    #         C       = _N.linalg.cholesky(po_mu_sg)    ###  REPLACE svd with Cholesky
-    #         zrmn   = _N.einsum("njk,nk->nj", C, mvn1)
-    #         oo.smu[it:1] = po_mu_mu + zrmn
-    #         #oo.smu[it+1, im] = mvn(po_mu_mu, po_mu_sg[im])
-    #         for im in xrange(M):
-    #             ##  dof of posterior distribution of cluster covariance
-    #             if Nms[im,0,0] >= oo.pmdim:
-    #                 minds     = _N.where(inds[1] == im)
-    #                 clstx    = x[minds]
-    #                 po_sg_dof = oo.PR_cov_nu[im] + Nms[im,0,0]
-    #                 ##  dof of posterior distribution of cluster covariance
-    #                 po_sg_PSI = oo.PR_cov_PSI[im] + _N.dot((clstx - oo.smu[it+1, im]).T, (clstx-oo.smu[it+1, im]))
-    #                 oo.scov[it+1, im] = s_u.sample_invwishart(po_sg_PSI, po_sg_dof)
-    #             else:  #  no marks assigned to this cluster 
-    #                 oo.scov[it+1, im] = oo.scov[it, im]
-    #                 oo.smu[it+1, im]  = oo.smu[it, im]
-
-    #     #  When I say prior for mu, I mean I have hyper parameters mu_mu and mu_sg.
-    #     #  hyperparameters are not sampled
-    #     hITERS = int(oo.ITERS*0.75)
-    #     oo.us[:]  = _N.mean(oo.smu[hITERS:oo.ITERS], axis=0)
-    #     oo.covs[:] = _N.mean(oo.scov[hITERS:oo.ITERS], axis=0)
-    #     oo.ms[:]  = _N.mean(oo.sm[hITERS:oo.ITERS], axis=0).reshape(oo.M, 1)
-
-    #     oo.dat = x
-
     def fit(self, M, pos, mk, n1, n2):
         """
         """
@@ -417,6 +299,7 @@ class fitMvNorm:
 
         #oo.sm[0:M]   = 1./M
 
+        
         for it in xrange(oo.ITERS-1):
             print it
             iscov = _N.linalg.inv(oo.scov[it, 0:M])
@@ -452,6 +335,7 @@ class fitMvNorm:
 
             #  _N.sum(oo.gz...) sz M   its vec of num. of obs of each state 'm'
             _N.add(oo.PR_m_alp[0:M], _N.sum(oo.gz[it+1], axis=0), out=dirArgs)
+            ##############  FIRST SAMPLE
             oo.sm[it+1, 0:M, 0] = _N.random.dirichlet(dirArgs)
 
             for im in xrange(M):
