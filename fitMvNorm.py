@@ -21,18 +21,21 @@ class fitMvNorm:
 
     ##################  hyper parameters - do not change during Gibbs
     # HYPER PARAMS for prior covariance: nu, PSI
-    PR_cov_a  = 3
-    PR_cov_B  = None
     PR_cov_nu    = 3
     PR_cov_PSI   = None
+    po_cov_nu    = None
+    po_cov_PSI   = None
 
     # HYPER PARAMS mean: nu, PSI
+    po_mu_mu = None
+    po_mu_sg = None
     PR_mu_mu = None
     PR_mu_sg = None
     iPR_mu_sg= None
 
     #  HYPER PARAMS mixture coeff
     PR_m_alp   = None
+    po_alpha   = None
     #####
 
     #  how many clusters do I think there are
@@ -73,18 +76,24 @@ class fitMvNorm:
         oo.sm   = _N.ones((oo.ITERS, M, 1))/M
 
         ###  
-        oo.PR_cov_B = _N.tile(_N.eye(k)*0.5, M).T.reshape(M, k, k)  #  we only look at the diagonal component
-        oo.PR_cov_a = _N.ones(M, dtype=_N.int)
-
+        #  
+        #  parameters of cluster covariance.  Becomes prior
+        oo.po_cov_PSI = _N.empty((ITERS, M, k, k))
+        oo.po_cov_nu  = _N.empty((ITERS, M), dtype=_N.int)
+        #  priors
         oo.PR_cov_PSI = _N.tile(_N.eye(k)*0.5, M).T.reshape(M, k, k)
         oo.PR_cov_nu  = _N.ones(M, dtype=_N.int)
-
+        #  parameters of cluster mean.  Becomes prior
+        oo.po_mu_mu = _N.zeros((ITERS, M, k))
+        oo.po_mu_sg = _N.empty((ITERS, M, k, k))
         oo.PR_mu_mu = _N.zeros((M, k))
-
         oo.PR_mu_sg = _N.tile(_N.eye(k)*0.5, M).T.reshape(M, k, k)
+
         oo.iPR_mu_sg= _N.linalg.inv(oo.PR_mu_sg)
 
+        #  parameters of cluster weights
         oo.PR_m_alp = _N.ones(M) * (1./M)
+        oo.po_alpha = _N.empty((ITERS, M))
 
         ###  posterior parameters
         oo.us   = _N.zeros((M, k))
@@ -331,12 +340,13 @@ class fitMvNorm:
             ###  THIS once broke because we had an empty cluster
             irw, icl = _N.where((rrands >= crats[:-1]) & (rrands <= crats[1:]))
 
+            ##############  GENERATE cluster membership
             oo.gz[it+1, icl, irw] = 1   #  we must clean out gz
 
             #  _N.sum(oo.gz...) sz M   its vec of num. of obs of each state 'm'
-            _N.add(oo.PR_m_alp[0:M], _N.sum(oo.gz[it+1], axis=0), out=dirArgs)
-            ##############  FIRST SAMPLE
-            oo.sm[it+1, 0:M, 0] = _N.random.dirichlet(dirArgs)
+            _N.add(oo.PR_m_alp[0:M], _N.sum(oo.gz[it+1], axis=0), out=oo.po_alpha[it+1])
+            ##############  SAMPLE WEIGHTS
+            oo.sm[it+1, 0:M, 0] = _N.random.dirichlet(oo.po_alpha[it+1])
 
             for im in xrange(M):
                 minds = _N.where(oo.gz[it+1, :, im] == 1)[0]
@@ -352,17 +362,19 @@ class fitMvNorm:
                     ##  mean of posterior distribution of cluster means
                     #  sigma^2 and mu are the current Gibbs-sampled values
 
-                    po_mu_sg = _N.linalg.inv(oo.iPR_mu_sg[im] + Nm*iscov[im])
+                    oo.po_mu_sg[it+1, im] = _N.linalg.inv(oo.iPR_mu_sg[im] + Nm*iscov[im])
                     ##  mean of posterior distribution of cluster means
-                    po_mu_mu  = _N.dot(po_mu_sg, _N.dot(oo.iPR_mu_sg[im], oo.PR_mu_mu[im]) + Nm*_N.dot(iscov[im], mc))
-                    oo.smu[it+1, im] = mvn(po_mu_mu, po_mu_sg)
+                    oo.po_mu_mu[it+1, im]  = _N.dot(oo.po_mu_sg[it+1, im], _N.dot(oo.iPR_mu_sg[im], oo.PR_mu_mu[im]) + Nm*_N.dot(iscov[im], mc))
+                    ##############  SAMPLE MEANS
+                    oo.smu[it+1, im] = mvn(oo.po_mu_mu[it+1, im], oo.po_mu_sg[it+1, im])
 
                     ##  dof of posterior distribution of cluster covariance
-                    po_sg_dof = oo.PR_cov_nu[im] + Nm
+                    oo.po_cov_nu[it+1, im] = oo.PR_cov_nu[im] + Nm
                     ##  dof of posterior distribution of cluster covariance
-                    po_sg_PSI = oo.PR_cov_PSI[im] + _N.dot((clstx - oo.smu[it+1, im]).T, (clstx-oo.smu[it+1, im]))
+                    oo.po_cov_PSI[it+1, im] = oo.PR_cov_PSI[im] + _N.dot((clstx - oo.smu[it+1, im]).T, (clstx-oo.smu[it+1, im]))
 
-                    oo.scov[it+1, im] = s_u.sample_invwishart(po_sg_PSI, po_sg_dof)
+                    ##############  SAMPLE COVARIANCES
+                    oo.scov[it+1, im] = s_u.sample_invwishart(oo.po_cov_PSI[it+1, im], oo.po_cov_nu[it+1, im])
                 else:  #  no marks assigned to this cluster 
                     oo.scov[it+1, im] = oo.scov[it, im]
                     oo.smu[it+1, im]  = oo.smu[it, im]
@@ -385,17 +397,17 @@ class fitMvNorm:
         #  hyperparameters describe the priors, and are estimated from the 
         #  posterior of the parameter
         #  the posteriors are now priors
-        oo.PR_m_alp[:] = _N.sum(_N.mean(oo.gz[mid:oo.ITERS-1], axis=0), axis=0)
+        oo.PR_m_alp[:] = _N.mean(oo.po_alpha[mid:], axis=0)
         print "=========   set_priors"
         print oo.PR_m_alp
         #  prior of cluster center is current
         #  posterior distribution of cluster center
-        oo.PR_mu_mu[:] = _N.mean(oo.smu[mid:oo.ITERS-1], axis=0)
-        oo.PR_mu_sg[:] = _N.mean(oo.scov[mid:oo.ITERS-1], axis=0)
+        oo.PR_mu_mu[:] = _N.mean(oo.po_mu_mu[mid:], axis=0)
+        oo.PR_mu_sg[:] = _N.mean(oo.po_mu_sg[mid:], axis=0)
         #  prior of cluster center is current
         #  posterior distribution of cluster center
-        oo.PR_cov_B[:] = _N.mean(oo.scov[mid:oo.ITERS-1], axis=0)
-        oo.PR_cov_a[:] = _N.sum(oo.gz[oo.ITERS-1], axis=0)
+        oo.PR_cov_nu[:] = _N.mean(oo.po_cov_nu[mid:], axis=0)
+        oo.PR_cov_PSI[:] = _N.mean(oo.po_cov_PSI[mid:], axis=0)
 
         # last sampled values will be starting values
 
