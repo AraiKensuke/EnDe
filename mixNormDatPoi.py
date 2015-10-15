@@ -155,7 +155,8 @@ class mixNormDatPoi:
                     oo._alp[m, mpf, n+1] = oo.Falp*oo._alp[m, mpf, n] + oo.siva*_N.random.randn()
 
         oo._uP[:, :, :]  += oo.uP0.reshape((M, Npf, 1))
-        oo._um[:, :, :]  += oo.um0.reshape((M, 1, 1))
+        #oo._um[:, :, :]  += oo.um0.reshape((M, 1, 1))
+        oo._um[:, :, :]  += oo.um0.reshape((M, 1, k))
         for m in xrange(M):
             for ik in xrange(k):
                 oo.um[m, :, ik]   = _N.interp(ts, _ts, oo._um[m, :, ik])
