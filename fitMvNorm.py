@@ -403,7 +403,7 @@ class fitMvNorm:
         #  prior of cluster center is current
         #  posterior distribution of cluster center
         oo.PR_mu_mu[:] = _N.mean(oo.po_mu_mu[mid:], axis=0)
-        oo.PR_mu_sg[:] = _N.mean(oo.po_mu_sg[mid:], axis=0)
+        oo.PR_mu_sg[:] = _N.mean(oo.po_mu_sg[mid:], axis=0)*1.08
         #  prior of cluster center is current
         #  posterior distribution of cluster center
         oo.PR_cov_nu[:] = _N.mean(oo.po_cov_nu[mid:], axis=0)
