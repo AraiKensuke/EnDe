@@ -279,7 +279,7 @@ class fitMvNorm:
             oo.sm[0] /= _N.sum(oo.sm[0])
 
 
-    def fit(self, M, pos, mk, n1, n2):
+    def fit(self, M, pos, mk, n1, n2, init=False):
         """
         """
         oo = self
@@ -291,7 +291,8 @@ class fitMvNorm:
         N   = n2-n1
         oo.pmdim = k
         oo.gz   = _N.zeros((oo.ITERS, N, M), dtype=_N.int)
-        oo.PR_m_alp[:] = 1. / M
+        if init is False:
+            oo.PR_m_alp[:] = 1. / M   #  initial
 
         covAll = _N.cov(x.T)
         dcovMag= _N.diagonal(covAll)*0.125
@@ -306,9 +307,6 @@ class fitMvNorm:
         rsum = _N.empty((1, N))
         skpM   = _N.arange(0, N)*M
 
-        #oo.sm[0:M]   = 1./M
-
-        
         for it in xrange(oo.ITERS-1):
             if it % 50 == 0:
                 print it
@@ -346,6 +344,7 @@ class fitMvNorm:
 
             #  _N.sum(oo.gz...) sz M   its vec of num. of obs of each state 'm'
             _N.add(oo.PR_m_alp[0:M], _N.sum(oo.gz[it+1], axis=0), out=oo.po_alpha[it+1])
+
             ##############  SAMPLE WEIGHTS
             oo.sm[it+1, 0:M, 0] = _N.random.dirichlet(oo.po_alpha[it+1])
 
@@ -382,6 +381,8 @@ class fitMvNorm:
 
         #  When I say prior for mu, I mean I have hyper parameters mu_mu and mu_sg.
         #  hyperparameters are not sampled
+
+        print oo.po_alpha[oo.ITERS-1]
         hITERS = int(oo.ITERS*0.75)
         oo.us[:]  = _N.mean(oo.smu[hITERS:oo.ITERS], axis=0)
         oo.covs[:] = _N.mean(oo.scov[hITERS:oo.ITERS], axis=0)
@@ -418,17 +419,6 @@ class fitMvNorm:
 
         #oo.gz   = _N.zeros((oo.ITERS, oo.mnd.N, oo.M), dtype=_N.int)
         oo.gz[:,:,:] = 0
-
-    def pNkmk_x(self, varXfxdMks, Nx):
-        """
-        varXfxdMks    grid of [variable X, fixed marks]     [Nx  x  mdim+1]
-        """
-        oo = self
-
-        #  given the mark, give me the firing rate as a function of x
-        
-        return zs
-
 
     def evalAll(self, Ngrd):
         oo     = self

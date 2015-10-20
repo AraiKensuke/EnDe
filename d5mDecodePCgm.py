@@ -93,6 +93,7 @@ class simDecode():
                 oo.mvpos_t = lm.mvpos_t
         except AttributeError:
             oo.mvpos_t = None
+        
 
         ####  spatial grid for evaluating firing rates
         oo.xp   = _N.linspace(-oo.xA, oo.xA, oo.Nx)  #  space points
@@ -132,13 +133,16 @@ class simDecode():
         tt1 = _tm.time()
         oo.N = t1-t0
 
-        if oo.mvpos_t is not None:   #  mvpos
-            mt = _N.array(oo.mvpos_t)
-            iis = _N.where((mt >= t0) & (mt <= t1))[0]
-            oo.mvpos = _N.array(oo.pos[mt[iis]])
-            oo.all_pos = oo.mvpos
-        else:
-            oo.all_pos = oo.mvpos[t0:t1]
+        if initPriors:
+            if oo.mvpos_t is not None:   #  mvpos
+                mt = _N.array(oo.mvpos_t)
+                iis = _N.where((mt >= t0) & (mt <= t1))[0]
+                oo.mvpos = _N.array(oo.pos[mt[iis]])
+                oo.all_pos = oo.mvpos
+            else:
+                oo.all_pos = oo.mvpos[t0:t1]
+        else:     #  just make this longer
+            oo.all_pos = _N.array(oo.all_pos.tolist() + oo.mvpos[t0:t1].tolist())
 
         dat = _N.empty(oo.N, dtype=list)
         stpos  = []   #  pos  @ time of spikes
@@ -174,7 +178,7 @@ class simDecode():
                     oo.mvNrm[nt].init0(stpos[nt], marks[nt], 0, nspks[nt], sepHash=oo.sepHash, pctH=oo.pctH, MS=oo.MS, sepHashMthd=oo.sepHashMthd, doTouchUp=doTouchUp, MF=MF, kmeansinit=kmeansinit)
             tt3 = _tm.time()
             for nt in xrange(oo.nTets):
-                oo.mvNrm[nt].fit(oo.mvNrm[nt].M, stpos[nt], marks[nt], 0, nspks[nt])
+                oo.mvNrm[nt].fit(oo.mvNrm[nt].M, stpos[nt], marks[nt], 0, nspks[nt], init=kmeansinit)
                 oo.mvNrm[nt].set_priors_and_initial_values()
             tt4 = _tm.time()
             print (tt2-tt1)
