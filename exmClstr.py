@@ -5,6 +5,8 @@ import matplotlib.pyplot as _plt
 import scipy.cluster.vq as scv
 
 def show_posmarks(dec, setname):
+    MTHR = 0.02   #  how much smaller is mixture compared to maximum
+
     for nt in xrange(dec.nTets):
         fig = _plt.figure(figsize=(10, 8))
         for k in xrange(1, dec.mdim+1):
@@ -18,20 +20,24 @@ def show_posmarks(dec, setname):
                     y.append(dec.marks[l, nt][0][k-1])
 
             _plt.scatter(x, y, color="black", s=2)
-            _plt.scatter(dec.mvNrm[nt].us[:, 0], dec.mvNrm[nt].us[:, k], color="red", s=30)
+            #_plt.scatter(dec.mvNrm[nt].us[:, 0], dec.mvNrm[nt].us[:, k], color="red", s=30)
+            mThr = MTHR * _N.max(dec.mvNrm[nt].ms)
 
             for m in xrange(dec.M):
-                ux   = dec.mvNrm[nt].us[m, 0]  #  position
-                uy   = dec.mvNrm[nt].us[m, k]
-                ex_x = _N.sqrt(dec.mvNrm[nt].covs[m, 0, 0])
-                ex_y = _N.sqrt(dec.mvNrm[nt].covs[m, k, k])
-                _plt.plot([ux-ex_x, ux+ex_x], [uy, uy], color="red", lw=2)
-                _plt.plot([ux, ux], [uy-ex_y, uy+ex_y], color="red", lw=2)
+                if dec.mvNrm[nt].ms[m, 0] >= mThr:
+                    ux   = dec.mvNrm[nt].us[m, 0]  #  position
+                    uy   = dec.mvNrm[nt].us[m, k]
+                    ex_x = _N.sqrt(dec.mvNrm[nt].covs[m, 0, 0])
+                    ex_y = _N.sqrt(dec.mvNrm[nt].covs[m, k, k])
+                    _plt.plot([ux-ex_x, ux+ex_x], [uy, uy], color="red", lw=2)
+                    _plt.plot([ux, ux], [uy-ex_y, uy+ex_y], color="red", lw=2)
+
+                    _plt.scatter(dec.mvNrm[nt].us[m, 0], dec.mvNrm[nt].us[m, k], color="red", s=30)
 
             _plt.xlim(-6, 6)
 
         fn= "look" if (dec.usetets is None) else "look_tet%s" % dec.usetets[nt]
-        _plt.savefig(resFN(fn, dir=setname))
+        _plt.savefig(resFN("%(1)s_t0=%(2)d,t1=%(3)d" % {"1" : fn, "2" : dec.tt0, "3" : dec.tt1}, dir=setname))
         _plt.close()
 
 def showMarginalMarkDistributions(dec, setname, mklim=[-6, 8], dk=0.1):

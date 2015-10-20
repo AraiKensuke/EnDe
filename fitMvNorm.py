@@ -310,7 +310,8 @@ class fitMvNorm:
 
         
         for it in xrange(oo.ITERS-1):
-            print it
+            if it % 50 == 0:
+                print it
             iscov = _N.linalg.inv(oo.scov[it, 0:M])
             #print iscov
 

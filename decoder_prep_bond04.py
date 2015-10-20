@@ -348,6 +348,7 @@ for tet in tetlist:
     _plt.savefig("tet%s" % tet)
     _plt.close()
 
+"""
 emc = EMC.ExperimentalMarkContainer()
 emc.pos   = svecL0_ms   #  marks and position are not aligned
 emc.mvpos = x
@@ -364,3 +365,4 @@ emc.Nx    = 50
 emc.Nm    = 50
 
 emc.save()
+"""
