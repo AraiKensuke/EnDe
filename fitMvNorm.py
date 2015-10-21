@@ -291,7 +291,7 @@ class fitMvNorm:
         N   = n2-n1
         oo.pmdim = k
         oo.gz   = _N.zeros((oo.ITERS, N, M), dtype=_N.int)
-        if init is False:
+        if init:
             oo.PR_m_alp[:] = 1. / M   #  initial
 
         covAll = _N.cov(x.T)

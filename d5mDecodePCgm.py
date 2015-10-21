@@ -178,7 +178,7 @@ class simDecode():
                     oo.mvNrm[nt].init0(stpos[nt], marks[nt], 0, nspks[nt], sepHash=oo.sepHash, pctH=oo.pctH, MS=oo.MS, sepHashMthd=oo.sepHashMthd, doTouchUp=doTouchUp, MF=MF, kmeansinit=kmeansinit)
             tt3 = _tm.time()
             for nt in xrange(oo.nTets):
-                oo.mvNrm[nt].fit(oo.mvNrm[nt].M, stpos[nt], marks[nt], 0, nspks[nt], init=kmeansinit)
+                oo.mvNrm[nt].fit(oo.mvNrm[nt].M, stpos[nt], marks[nt], 0, nspks[nt], init=initPriors)
                 oo.mvNrm[nt].set_priors_and_initial_values()
             tt4 = _tm.time()
             print (tt2-tt1)
@@ -355,33 +355,14 @@ class simDecode():
                 oo.lmd0[nt]    = (nspks[nt] / ((t1-t0)*0.001)) / _N.trapz(MargLam, dx=oo.dxp)
                 oo.Lam_xk[:, nt] = oo.lmd0[nt] * MargLam
 
+    def scoreDecode(self, dt0, dt1):
+        oo     = self
+        maxPos = _N.max(oo.pX_Nm[dt0:dt1], axis=1)
 
-    """
-    def getMarks(self, t0, t1):
-        oo = self
-        L = len(oo.marks)
+        inds   = _N.empty(dt1-dt0, dtype=_N.int)
 
-        store = []
-        for t in xrange(t0, t1):
-            if oo.marks[t] is not None:
-                for i in xrange(len(oo.marks[t])):
-                    store.append(oo.marks[t][i])
+        for t in xrange(dt0, dt1):
+            inds[t-dt0] = _N.where(oo.pX_Nm[t] == maxPos[t-dt0])[0][0]
 
-        return _N.array(store)
-
-
-    def lklhd(self, t0, t1):
-        oo = self
-        pNkmk   = _N.empty((t1-t0, oo.Nx))
-
-        for t in xrange(t0, t1):
-            pNkmk[t-t0]    = _N.exp(-oo.dt * oo.Lam_xk)
-
-            fxdMks = _N.empty((oo.Nx, oo.mdim+1))  #  for each pos, a fixed mark
-            fxdMks[:, 0] = oo.xp
-
-            if oo.marks[t] is not None:
-                fxdMks[:, 1:] = oo.marks[t][0]
-                pNkmk[t-t0] *= oo.mvNrm.evalAtFxdMks(fxdMks)*oo.lmd0 * oo.iocc
-        return pNkmk
-    """
+        diffPos = oo.xp[inds] - oo.pos[dt0:dt1]
+        return _N.sum(_N.abs(diffPos)) / (dt1-dt0)
