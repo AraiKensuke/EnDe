@@ -199,7 +199,7 @@ class simDecode():
         oo.intgrd= _N.empty(oo.Nx)
         oo.intgrd2d= _N.empty((oo.Nx, oo.Nx))
         oo.intgrl = _N.empty(oo.Nx)
-        oo.xTrs  = _N.empty((oo.Nx, oo.Nx))      #  Gaussian
+        oo.xTrs  = _N.zeros((oo.Nx, oo.Nx))      #  Gaussian
 
         x  = _N.linspace(-oo.xA, oo.xA, oo.Nx)
         ##  (xk - a xk1)
@@ -214,49 +214,28 @@ class simDecode():
                     j += 1
                 i += 1
         else:
-            #  second index of xTrs is old position, first index is "to"
-            for j in xrange(oo.Nx):
-                x0  = x[j]
-                for i in xrange(oo.Nx):
-                    x1  = x[i]
-                    oo.xTrs[i, j]  = _N.exp(-((x1-x0)**2)/(2*oo.q2p))   # 
+            grdsz = (12./oo.Nx)
 
-                if x0 > 0:  #  right turns
-                    for i in xrange(oo.Nx):
-                        x1  = x[i]
-                        if x1 > 0:   #  x1 = 1, x0=5  (x1-(5-6))**2 
-                            oo.xTrs[i, j]  += _N.exp(-(x1-(x0-oo.xA))**2/(2*oo.q2p))   # 
-                        elif x1 < 0:#  x1 = -1, x0=5  (x1-(6-5))**2
-                            oo.xTrs[i, j]  += _N.exp(-(x1-(oo.xA-x0))**2/(2*oo.q2p))   # 
+            spdGrdUnts = _N.diff(oo.pos) / grdsz  # unit speed ( per ms ) in grid units
 
-                    # if (x0 > 5):  #  turning around like x0 = -5.3  --> 0.7
-                    #     x0r = x0-oo.xA
-                    #     ib4M1  = _N.where((x[0:-1] < x0r) & ( x[1:] > x0r))[0]
-                        
-                    #     for i in xrange(0, ib4M1[0]+1):
-                    #         x1  = x[i]
-                    #         oo.xTrs[i, j]  += _N.exp(-(x1-x0r)**2/(2*oo.q2p)) 
-
-
-                elif x0 < 0:  #  left turns
-                    for i in xrange(oo.Nx):
-                        x1  = x[i]
-                        if x1 > 0:   #  x1 = 1, x0=5  (x1-(5-6))**2 
-                            oo.xTrs[i, j]  += _N.exp(-(x1-(-oo.xA-x0))**2/(2*oo.q2p))   # 
-                        elif x1 < 0:#  x1 = -1, x0=5  (x1-(6-5))**2
-                            oo.xTrs[i, j]  += _N.exp(-(x1-(x0-(-oo.xA)))**2/(2*oo.q2p))   # 
-
-                    # if (x0 < -5):  #  turning around like x0 = -5.3  --> 0.7
-                    #     x0r = oo.xA + x0
-                    #     ib4P1  = _N.where((x[0:-1] < x0r) & ( x[1:] > x0r))[0]
-
-                    #     for i in xrange(ib4P1[0]+1, oo.Nx):
-                    #         x1  = x[i]
-                    #         oo.xTrs[i, j]  += _N.exp(-(x1-x0r)**2/(2*oo.q2p)) 
+            #  avg. time it takes to move 1 grid is 1 / _N.mean(_N.abs(spdGrdUnts))
+            #  p(i+1, i) = 1/<avg spdGrdUnts>
+            p1 = _N.mean(_N.abs(spdGrdUnts))
+            #  assume Nx is even
+            for i in xrange(0, oo.Nx/2):
+                oo.xTrs[i, i] = 1-p1
+                if i > 1:
+                    oo.xTrs[i-1, i] = p1
+            for i in xrange(oo.Nx/2, oo.Nx):
+                oo.xTrs[i, i] = 1-p1
+                if i < oo.Nx - 1:
+                    oo.xTrs[i+1, i] = p1
+                oo.xTrs[:, i] += p1*0.01
 
                 #oo.xTrs[:, j] += _N.mean(oo.xTrs[:, j])*0.01
-                A = _N.trapz(oo.xTrs[:, j])*((2.*oo.xA)/oo.Nx)
-                oo.xTrs[:, j] /= A
+            for i in xrange(oo.Nx):
+                A = _N.trapz(oo.xTrs[:, i])*((2.*oo.xA)/oo.Nx)
+                oo.xTrs[:, i] /= A
 
         #  keep in mind that k_{k-1} is not treated as a value with a correct answer.
         #  integrate over all possible values of x_{k-1}
