@@ -50,6 +50,8 @@ class simDecode():
     tt0      = None
     tt1      = None
 
+    dbgMvt   = False
+
     def init(self, kde=False, bx=None, Bx=None, Bm=None):
         oo = self
         oo.kde = kde
@@ -166,7 +168,7 @@ class simDecode():
 
         oo.tr_pos   = []
         oo.tr_marks = []
-        
+
         for nt in xrange(oo.nTets):
             oo.tr_pos.append(_N.array(stpos[nt]))
             oo.tr_marks.append(_N.array(marks[nt]))
@@ -190,9 +192,9 @@ class simDecode():
         oo = self
         ##  each 
 
-
         oo.pX_Nm[t0] = 1. / oo.Nx
-        #oo.pX_Nm[t0, 0:10] = 151/5.
+        if oo.dbgMvt:
+            oo.pX_Nm[t0, 20:30] = 151/5.
         A = _N.trapz(oo.pX_Nm[t0], dx=oo.dxp)
         oo.pX_Nm[t0] /= A
 
@@ -220,17 +222,22 @@ class simDecode():
 
             #  avg. time it takes to move 1 grid is 1 / _N.mean(_N.abs(spdGrdUnts))
             #  p(i+1, i) = 1/<avg spdGrdUnts>
-            p1 = _N.mean(_N.abs(spdGrdUnts))
+            p1 = _N.mean(_N.abs(spdGrdUnts))*0.5
             #  assume Nx is even
             for i in xrange(0, oo.Nx/2):
                 oo.xTrs[i, i] = 1-p1
-                if i > 1:
+                if i > 0:
                     oo.xTrs[i-1, i] = p1
+                #oo.xTrs[:, i] += p1*0.00001
+            oo.xTrs[oo.Nx/2-1, 0] = p1/2
+            oo.xTrs[oo.Nx/2, 0]   = p1/2
             for i in xrange(oo.Nx/2, oo.Nx):
                 oo.xTrs[i, i] = 1-p1
                 if i < oo.Nx - 1:
                     oo.xTrs[i+1, i] = p1
-                oo.xTrs[:, i] += p1*0.01
+                #oo.xTrs[:, i] += p1*0.00001
+            oo.xTrs[oo.Nx/2-1, oo.Nx-1] = p1/2
+            oo.xTrs[oo.Nx/2, oo.Nx-1]   = p1/2
 
                 #oo.xTrs[:, j] += _N.mean(oo.xTrs[:, j])*0.01
             for i in xrange(oo.Nx):
@@ -266,7 +273,7 @@ class simDecode():
                 oo.Lklhd[nt, t] = pNkmk0[:, nt]
 
                 #  build likelihood
-                if oo.marks[t, nt] is not None:
+                if (oo.marks[t, nt] is not None) and (not oo.dbgMvt):
                     nSpks = len(oo.marks[t, nt])
 
                     for ns in xrange(nSpks):
@@ -307,6 +314,11 @@ class simDecode():
         """
         oo = self
         #####  
+        if oo.dbgMvt:
+            occ = _N.ones(oo.Nx) / oo.Nx
+            oo.iocc = 1./occ
+            oo.Lam_xk = _N.zeros((oo.Nx, oo.nTets))
+            return 
         oo.lmd0 = _N.empty(oo.nTets)
         oo.Lam_xk = _N.ones((oo.Nx, oo.nTets))
 

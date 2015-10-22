@@ -5,7 +5,6 @@ import filter as _flt
 
 #  experimental data mark, position container
 
-mSp = _sio.loadmat('../SpkSrtd/bonspikes04.mat')
 mLp = _sio.loadmat('../SpkSrtd/bonlinpos04.mat')
 
 ex=4-1; ep=2-1;
@@ -46,7 +45,7 @@ posT1=time[seg1]
 posL1=lindist[seg1]/max(lindist[seg1])
 posL1b=_N.empty(len(posL1))
 
-#for k=1:length(posL1)
+######  PHYSICAL LOCATION:  CENTER ARM  going forward or going backwards   
 for k in xrange(len(posL1)):
     if (posT1[k] >= 2460) and (posT1[k]<=2545.681):
         posL1b[k]=-posL1[k] #%0=-1
@@ -338,9 +337,7 @@ for tet in tetlist:
                     y.append(t_champs[imk, 1])
                     rngT.append(now_s)
                     rngX.append(svecL0[fd[0]])
-                    #marks[ind] = [_N.array([t_champs[imk, 1],])]
                     marks[ind, it] = [t_champs[imk, 1:]]
-                    #marks[ind] = [t_champs[imk, 1:]]
         
     fig = _plt.figure()
     _plt.scatter(x, y, s=2)
@@ -348,7 +345,7 @@ for tet in tetlist:
     _plt.savefig("tet%s" % tet)
     _plt.close()
 
-"""
+
 emc = EMC.ExperimentalMarkContainer()
 emc.pos   = svecL0_ms   #  marks and position are not aligned
 emc.mvpos = x
@@ -365,4 +362,4 @@ emc.Nx    = 50
 emc.Nm    = 50
 
 emc.save()
-"""
+
