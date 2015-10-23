@@ -16,26 +16,27 @@ ex=4-1; ep=2-1;
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 a = mLp["linpos"][0,ex][0,ep]["statematrix"][0,0]["segmentIndex"]
 
-seg1 = _N.where(a[0][0].T[0] == 1)
-seg2 = _N.where(a[0][0].T[0] == 2)
-seg3 = _N.where(a[0][0].T[0] == 3)
-seg4 = _N.where(a[0][0].T[0] == 4)
-seg5 = _N.where(a[0][0].T[0] == 5)
+seg1 = _N.where(a[0][0].T[0] == 1)[0]
+seg2 = _N.where(a[0][0].T[0] == 2)[0]
+seg3 = _N.where(a[0][0].T[0] == 3)[0]
+seg4 = _N.where(a[0][0].T[0] == 4)[0]
+seg5 = _N.where(a[0][0].T[0] == 5)[0]
 
 
 rp = mRp["rawpos"][0, ex][0,ep][0,0][0]
 rpx = rp[:, 1]
-rpy = rp[:, 1]
+rpy = rp[:, 2]
 
 time=mLp["linpos"][0,ex][0,ep]["statematrix"][0][0]["time"][0,0].T[0]
 lindist=mLp["linpos"][0,ex][0,ep]["statematrix"][0][0]["lindist"][0,0].T[0]
 
-
+"""
 _plt.plot(time[seg1[0]], lindist[seg1[0]], ls="", marker=".")
 _plt.plot(time[seg4[0]], lindist[seg4[0]], ls="", marker=".")
 _plt.plot(time[seg5[0]], lindist[seg5[0]], ls="", marker=".")
 _plt.plot(time[seg2[0]], -1*lindist[seg2[0]], ls="", marker=".")
 _plt.plot(time[seg3[0]], -1*lindist[seg3[0]], ls="", marker=".")
+"""
 
 # % figure
 # % plot(time(seg1),lindist(seg1),'b.');
@@ -46,48 +47,91 @@ _plt.plot(time[seg3[0]], -1*lindist[seg3[0]], ls="", marker=".")
 # % plot(time(seg3),-lindist(seg3),'m.');
 # % hold off
 
-
 posT1=time[seg1]
 posL1=lindist[seg1]/max(lindist[seg1])   #  posL1 is between 0 and 1
 posL1b=_N.empty(len(posL1))
 
 ##  
 #for k=1:length(posL1)
-inds = _N.where((posT1 >= 2460) & (posT1 <=2545.681))[0]
-posL1b[inds] = -posL1[inds]  #  about to go to 
+
+lseg1  = []   #  0 -> -1   (outbound)
+lseg1.append(_N.where((posT1 >= 2460) & (posT1 <=2545.681))[0])
+lseg1.append(_N.where((posT1 >= 2744.2885) & (posT1 <=2765.212))[0])
+lseg1.append(_N.where((posT1 >= 2836.1515) & (posT1 <=2849.932))[0])
+lseg1.append(_N.where((posT1 >= 2951.1645) & (posT1  <=2965.08))[0])
+lseg1.append(_N.where((posT1 >= 3077.7625) & (posT1  <=3091.307))[0])
+lseg1.append(_N.where((posT1 >= 3240.9455) & (posT1 <=3249.698))[0])
+
+lseg2  = []   #  -5 -> -6 (inbound)
+lseg2.append(_N.where((posT1 >= 2616.645) & (posT1<=2649.484))[0])
+lseg2.append(_N.where((posT1 >= 2816.852) & (posT1<=2836.1514))[0])
+lseg2.append(_N.where((posT1 >= 3124.28)  & (posT1<=3139.592))[0])
+lseg2.append(_N.where((posT1 >= 3297.737) & (posT1<=3315.681))[0])
+
+lseg3  = []   #  5  ->  6 (inbound)
+lseg3.append(_N.where((posT1 >= 2726.31)  & (posT1<=2744.2884))[0])
+lseg3.append(_N.where((posT1 >= 2931.63)  & (posT1<=2951.1644))[0])
+lseg3.append(_N.where((posT1 >= 3059.031) & (posT1<=3077.7624))[0])
+lseg3.append(_N.where((posT1 >= 3225.24)  & (posT1<=3240.9454))[0])
+lseg3.append(_N.where((posT1 >= 3385.306) & (posT1<=3405))[0])
+
+lseg4 = []
+for i in xrange():
+
+"""
+ots = seg1[lseg1[0]]
+_plt.scatter(rpx[ots], rpy[ots], color="red")
+ots = seg1[lseg2[0]]
+_plt.scatter(rpx[ots], rpy[ots], color="blue")
+
+ots = seg1[lseg1[1]]
+_plt.scatter(rpx[ots], rpy[ots], color="red")
+ots = seg1[lseg2[1]]
+_plt.scatter(rpx[ots], rpy[ots], color="blue")
+"""
+
+#_plt.scatter(rpx[seg1[lseg2[1]]], rpy[seg1[lseg2[1]]], color="red")
+#_plt.scatter(rpx[seg1[lseg2[2]]], rpy[seg1[lseg2[2]]], color="red")
 
 for k in xrange(len(posL1)):
     if (posT1[k] >= 2460) and (posT1[k]<=2545.681):
         posL1b[k]=-posL1[k] #%0=-1
+    elif posT1[k]>=2744.2885 and posT1[k]<=2765.212:
+        posL1b[k]=-posL1[k] #%0=-1
+    elif posT1[k]>=2836.1515  and posT1[k]<=2849.932:
+        posL1b[k]=-posL1[k] #%0=-1
+    elif posT1[k]>=2951.1645 and posT1[k]<=2965.08:
+        posL1b[k]=-posL1[k] #%0=-1
+    elif posT1[k]>=3077.7625 and posT1[k]<=3091.307:
+        posL1b[k]=-posL1[k] #%0=-1
+    elif posT1[k]>=3240.9455 and posT1[k]<=3249.698:
+        posL1b[k]=-posL1[k] #%0=-1
+
+
+
+
     elif (posT1[k]>=2616.645) and (posT1[k]<=2649.484):
         posL1b[k]=-(posL1[k]+2*(3-posL1[k])) #%#-5=-6
     elif posT1[k]>=2726.31 and posT1[k]<=2744.2884:
         posL1b[k]=posL1[k]+2*(3-posL1[k]) #%5=6
-    elif posT1[k]>=2744.2885 and posT1[k]<=2765.212:
-        posL1b[k]=-posL1[k] #%0=-1
     elif posT1[k]>=2816.852 and posT1[k]<=2836.1514:
         posL1b[k]=-(posL1[k]+2*(3-posL1[k])) #%-5=-6
-    elif posT1[k]>=2836.1515 and posT1[k]<=2849.932:
-        posL1b[k]=-posL1[k] #%0=-1
     elif posT1[k]>=2931.63 and posT1[k]<=2951.1644:
         posL1b[k]=posL1[k]+2*(3-posL1[k]) #%5=6
-    elif posT1[k]>=2951.1645 and posT1[k]<=2965.08:
-        posL1b[k]=-posL1[k] #%0=-1
     elif posT1[k]>=3059.031 and posT1[k]<=3077.7624:
         posL1b[k]=posL1[k]+2*(3-posL1[k]) #%5=6
-    elif posT1[k]>=3077.7625 and posT1[k]<=3091.307:
-        posL1b[k]=-posL1[k] #%0=-1
     elif posT1[k]>=3124.28 and posT1[k]<=3139.592:
         posL1b[k]=-(posL1[k]+2*(3-posL1[k])) #%-5=-6
     elif posT1[k]>=3225.24 and posT1[k]<=3240.9454:
         posL1b[k]=posL1[k]+2*(3-posL1[k]) #%5=6
-    elif posT1[k]>=3240.9455 and posT1[k]<=3249.698:
-        posL1b[k]=-posL1[k] #%0=-1
     elif posT1[k]>=3297.737 and posT1[k]<=3315.681:
         posL1b[k]=-(posL1[k]+2*(3-posL1[k])) #%-5=-6
     elif posT1[k]>=3385.306 and posT1[k]<=3405:
         posL1b[k]=posL1[k]+2*(3-posL1[k]) #%5=6
-    else:
+
+
+
+    else:   #  outbound 0->1
         posL1b[k]=posL1[k]
 
 # #%0-ACE
