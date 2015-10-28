@@ -76,7 +76,6 @@ lseg3.append(_N.where((posT1 >= 3225.24)  & (posT1<=3240.9454))[0])
 lseg3.append(_N.where((posT1 >= 3385.306) & (posT1<=3405))[0])
 
 lseg4 = []
-for i in xrange():
 
 """
 ots = seg1[lseg1[0]]

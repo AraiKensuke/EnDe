@@ -227,8 +227,11 @@ ch4amp = A["filedata"][0, 0]["params"][:, 4]
 _plt.scatter(ch1amp[0:2000], ch3amp[0:2000])
 """
 
+#  t_champs[-1, 0] - t_champs[0, 0]       neural recording length, 2 10kHz
+#  svecT[0]...svecT[-1]                   sorted time of behavioral observation
+
 sinds = [i[0] for i in sorted(enumerate(vecT), key=lambda x:x[1])]
-svecT  = vecT[sinds]   #  this creates a new instance 
+svecT  = vecT[sinds]   #  SORTED.    this creates a new instance.
 svecL0 = vecL0[sinds]    #  ordered in time
 spd   = _N.diff(svecL0)
 pj    = _N.where(spd > 4)[0]   #  -6-->0
@@ -267,9 +270,8 @@ for itv in xrange(len(crgns)-2, -1, -1):
         crgns[itv][1] = crgns[itv+1][1]
         crgns.pop(itv+1)
 
-
 #  show detected moving states
-_plt.plot(svecT, svecL0, color="blue")
+#_plt.plot(svecT, svecL0, color="blue")
 vrgns = _N.array(crgns)
 
 for itv in xrange(vrgns.shape[0]):
@@ -292,6 +294,7 @@ svecT_ms = _N.linspace(t0, t1, t1-t0, endpoint=False)    #
 svecL0_ms = _N.interp(svecT_ms, svecT*1000, svecL0)
 
 tetlist = ["01", "02", "03", "04", "05", "07", "08", "10", "11", "12", "13", "14", "17", "18", "19", "20", "21", "22", "23", "24", "25", "27", "28", "29"]
+
 marks   =  _N.empty((t1-t0, len(tetlist)), dtype=list)
 
 it      = -1
@@ -315,8 +318,6 @@ for tet in tetlist:
     #  tm  chXamp       (time and mark)     10kHz
 
     #  need to match start times
-    x  = []
-    xt = []
     y  = []
     #  t = 0 for the marks is 
 
@@ -324,35 +325,45 @@ for tet in tetlist:
     rngX = []
 
     for imk in xrange(t_champs.shape[0]):  #  more marks than there is behavioral data
-        now_s  = t_champs[imk, 0]/10000.
+        now_s  = t_champs[imk, 0]/10000.    #  now_s
         now_ms = t_champs[imk, 0]/10.
-        #ind = int(500 + (now_ms - svecT[0]*1000))
-        ind = int(now_ms - svecT[0]*1000)
+        ind = int(now_ms - svecT[0]*1000)  # svecT[0] is start of data we use
         if (now_s > svecT[0]) and (now_s < svecT[-1]):
             for nr in xrange(trgns.shape[0]):
                 if (now_s >= trgns[nr, 0]) and (now_s <= trgns[nr, 1]):
                     fd = _N.where((now_s >= svecT[0:-1]) & (now_s <= svecT[1:]))[0]
-                    x.append(svecL0[fd[0]])   #  position
-                    xt.append(ind)
+                    #x.append(svecL0[fd[0]])   #  position
+                    #xt.append(ind)
                     y.append(t_champs[imk, 1])
                     rngT.append(now_s)
                     rngX.append(svecL0[fd[0]])
                     marks[ind, it] = [t_champs[imk, 1:]]
         
-    fig = _plt.figure()
-    _plt.scatter(x, y, s=2)
-    _plt.suptitle("tet  %s" % tet)
-    _plt.savefig("tet%s" % tet)
-    _plt.close()
 
+x  = []
+xt = []
+minds = _N.empty((trgns.shape[0], 2), dtype=_N.int)
+
+for nr in xrange(trgns.shape[0]):
+    t0 = vrgns[nr, 0]   #  @ 33.4 Hz
+    t1 = vrgns[nr, 1]  
+
+    minds[nr] = int((svecT[t0] - svecT[0]) * 1000), int((svecT[t1] - svecT[0]) * 1000)
+    t0 = minds[nr, 0]
+    t1 = minds[nr, 1]
+
+    x.extend(svecL0_ms[t0:t1].tolist())   #  position
+    xt.extend(range(t0, t1))
+
+    _plt.plot(_N.arange(t0, t1), svecL0_ms[t0:t1])
 
 emc = EMC.ExperimentalMarkContainer()
 emc.pos   = svecL0_ms   #  marks and position are not aligned
 emc.mvpos = x
 emc.mvpos_t = xt
-emc.mvpost = x
 emc.marks = marks
 emc.tetlist = tetlist
+emc.minds = minds
 
 emc.xA    = 6
 emc.mA    = 8
@@ -362,4 +373,7 @@ emc.Nx    = 50
 emc.Nm    = 50
 
 emc.save()
+
+
+
 

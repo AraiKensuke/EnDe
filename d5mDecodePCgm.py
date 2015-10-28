@@ -52,6 +52,8 @@ class simDecode():
 
     dbgMvt   = False
 
+    minds    = None   #  
+
     def init(self, kde=False, bx=None, Bx=None, Bm=None):
         oo = self
         oo.kde = kde
@@ -88,6 +90,7 @@ class simDecode():
 
         oo.Nx = lm.Nx;        oo.Nm = lm.Nm
         oo.xA = lm.xA;        oo.mA = lm.mA
+            
         oo.mdim  = lm.k#kde.mdim
         oo.mvpos  = lm.mvpos
         try:
@@ -95,7 +98,11 @@ class simDecode():
                 oo.mvpos_t = lm.mvpos_t
         except AttributeError:
             oo.mvpos_t = None
-        
+        try:
+            if lm.minds is not None:
+                oo.minds = lm.minds
+        except AttributeError:
+            pass
 
         ####  spatial grid for evaluating firing rates
         oo.xp   = _N.linspace(-oo.xA, oo.xA, oo.Nx)  #  space points
@@ -180,6 +187,7 @@ class simDecode():
                     oo.mvNrm[nt].init0(stpos[nt], marks[nt], 0, nspks[nt], sepHash=oo.sepHash, pctH=oo.pctH, MS=oo.MS, sepHashMthd=oo.sepHashMthd, doTouchUp=doTouchUp, MF=MF, kmeansinit=kmeansinit)
             tt3 = _tm.time()
             for nt in xrange(oo.nTets):
+                print "encode Doing fit tetrode %d" % nt
                 oo.mvNrm[nt].fit(oo.mvNrm[nt].M, stpos[nt], marks[nt], 0, nspks[nt], init=initPriors)
                 oo.mvNrm[nt].set_priors_and_initial_values()
             tt4 = _tm.time()
