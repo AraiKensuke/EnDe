@@ -378,6 +378,11 @@ class fitMvNorm:
                 else:  #  no marks assigned to this cluster 
                     oo.scov[it+1, im] = oo.scov[it, im]
                     oo.smu[it+1, im]  = oo.smu[it, im]
+                    oo.po_mu_sg[it+1, im] = oo.PR_mu_sg[im]
+                    oo.po_mu_mu[it+1, im] = oo.PR_mu_mu[im]
+                    oo.po_cov_nu[it+1, im] = oo.PR_cov_nu[im]
+                    ##  dof of posterior distribution of cluster covariance
+                    oo.po_cov_PSI[it+1, im] = oo.PR_cov_PSI[im]
 
         #  When I say prior for mu, I mean I have hyper parameters mu_mu and mu_sg.
         #  hyperparameters are not sampled

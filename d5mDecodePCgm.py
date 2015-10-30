@@ -230,20 +230,34 @@ class simDecode():
 
             #  avg. time it takes to move 1 grid is 1 / _N.mean(_N.abs(spdGrdUnts))
             #  p(i+1, i) = 1/<avg spdGrdUnts>
-            p1 = _N.mean(_N.abs(spdGrdUnts))*0.5
+            p1 = _N.mean(_N.abs(spdGrdUnts))*2
             #  assume Nx is even
+            k2 = 0.1
             for i in xrange(0, oo.Nx/2):
                 oo.xTrs[i, i] = 1-p1
                 if i > 0:
                     oo.xTrs[i-1, i] = p1
-                #oo.xTrs[:, i] += p1*0.00001
+                if i > 1:        ##  next nearest neighbor
+                    oo.xTrs[i-2, i] = p1*k2
+                    oo.xTrs[i+1, i] = p1*k2
+                elif i == 1:
+                    oo.xTrs[oo.Nx/2-1, 1] = p1*k2/2
+                    oo.xTrs[oo.Nx/2, 1]   = p1*k2/2
+                    oo.xTrs[i+1, i] = p1*k2
+
             oo.xTrs[oo.Nx/2-1, 0] = p1/2
             oo.xTrs[oo.Nx/2, 0]   = p1/2
             for i in xrange(oo.Nx/2, oo.Nx):
                 oo.xTrs[i, i] = 1-p1
                 if i < oo.Nx - 1:
                     oo.xTrs[i+1, i] = p1
-                #oo.xTrs[:, i] += p1*0.00001
+                if i < oo.Nx - 2:
+                    oo.xTrs[i-1, i] = p1*k2
+                    oo.xTrs[i+2, i] = p1*k2
+                elif i == oo.Nx-2:
+                    oo.xTrs[i-1, i] = p1*k2
+                    oo.xTrs[oo.Nx/2-1, oo.Nx-2] = p1*k2/2
+                    oo.xTrs[oo.Nx/2, oo.Nx-2]   = p1*k2/2
             oo.xTrs[oo.Nx/2-1, oo.Nx-1] = p1/2
             oo.xTrs[oo.Nx/2, oo.Nx-1]   = p1/2
 
