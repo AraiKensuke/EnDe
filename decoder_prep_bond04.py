@@ -329,16 +329,13 @@ for tet in tetlist:
         now_ms = t_champs[imk, 0]/10.
         ind = int(now_ms - svecT[0]*1000)  # svecT[0] is start of data we use
         if (now_s > svecT[0]) and (now_s < svecT[-1]):
-            for nr in xrange(trgns.shape[0]):
-                if (now_s >= trgns[nr, 0]) and (now_s <= trgns[nr, 1]):
-                    fd = _N.where((now_s >= svecT[0:-1]) & (now_s <= svecT[1:]))[0]
-                    #x.append(svecL0[fd[0]])   #  position
-                    #xt.append(ind)
-                    y.append(t_champs[imk, 1])
-                    rngT.append(now_s)
-                    rngX.append(svecL0[fd[0]])
-                    marks[ind, it] = [t_champs[imk, 1:]]
-        
+            #for nr in xrange(trgns.shape[0]):
+            #    if (now_s >= trgns[nr, 0]) and (now_s <= trgns[nr, 1]):
+            fd = _N.where((now_s >= svecT[0:-1]) & (now_s <= svecT[1:]))[0]
+            y.append(t_champs[imk, 1])
+            rngT.append(now_s)
+            rngX.append(svecL0[fd[0]])
+            marks[ind, it] = [t_champs[imk, 1:]]
 
 x  = []
 xt = []
@@ -352,15 +349,13 @@ for nr in xrange(trgns.shape[0]):
     t0 = minds[nr, 0]
     t1 = minds[nr, 1]
 
-    x.extend(svecL0_ms[t0:t1].tolist())   #  position
-    xt.extend(range(t0, t1))
+    #x.extend(svecL0_ms[t0:t1].tolist())   #  position
+    #xt.extend(range(t0, t1))
 
     _plt.plot(_N.arange(t0, t1), svecL0_ms[t0:t1])
 
 emc = EMC.ExperimentalMarkContainer()
 emc.pos   = svecL0_ms   #  marks and position are not aligned
-emc.mvpos = x
-emc.mvpos_t = xt
 emc.marks = marks
 emc.tetlist = tetlist
 emc.minds = minds

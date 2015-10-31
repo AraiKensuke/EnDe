@@ -54,6 +54,8 @@ class simDecode():
 
     minds    = None   #  
 
+    encN     = 0  #  how many time points used in encode
+
     def init(self, kde=False, bx=None, Bx=None, Bm=None):
         oo = self
         oo.kde = kde
@@ -92,12 +94,7 @@ class simDecode():
         oo.xA = lm.xA;        oo.mA = lm.mA
             
         oo.mdim  = lm.k#kde.mdim
-        oo.mvpos  = lm.mvpos
-        try:
-            if lm.mvpos_t is not None:
-                oo.mvpos_t = lm.mvpos_t
-        except AttributeError:
-            oo.mvpos_t = None
+
         try:
             if lm.minds is not None:
                 oo.minds = lm.minds
@@ -135,25 +132,41 @@ class simDecode():
                 oo.mvNrm.append(fMN.fitMvNorm(oo.ITERS, oo.M, oo.mdim + 1))
                 oo.mvNrm[nt].ITERS = oo.ITERS
 
-    def encode(self, t0, t1, initPriors=False, doTouchUp=False, MF=None, kmeansinit=True):
+    def encode(self, t0=None, t1=None, encIntvs=None, initPriors=False, doTouchUp=False, MF=None, kmeansinit=True):
+        """
+        eIntvs: array of times whose spikes we use to create encoding model
+        """
         oo = self
-        oo.tt0 = t0
-        oo.tt1 = t1
+
+        if encIntvs is None:
+            encIntvs = _N.array([[t0, t1]])
+            oo.N = t1-t0
+        else:
+            oo.N = encIntvs[-1, 1] - encIntvs[0, 0]
+            
+        oo.tt0 = encIntvs[0, 0]
+        oo.tt1 = encIntvs[-1, 1]
         tt1 = _tm.time()
-        oo.N = t1-t0
+
+        oo.encN = _N.sum(encIntvs[:, 1] - encIntvs[:, 0])
+
 
         if initPriors:
-            if oo.mvpos_t is not None:   #  mvpos
-                mt = _N.array(oo.mvpos_t)
-                iis = _N.where((mt >= t0) & (mt <= t1))[0]
-                oo.mvpos = _N.array(oo.pos[mt[iis]])
-                oo.all_pos = oo.mvpos
-            else:
-                oo.all_pos = oo.mvpos[t0:t1]
+            oo.all_pos = _N.empty(oo.encN)
+            ii = 0
+            for ein in xrange(encIntvs.shape[0]):
+                oo.all_pos[ii:ii+(encIntvs[ein,1]-encIntvs[ein,0])] = oo.pos[encIntvs[ein,0]:encIntvs[ein,1]]
+                ii += encIntvs[ein,1]-encIntvs[ein,0]
         else:     #  just make this longer
-            oo.all_pos = _N.array(oo.all_pos.tolist() + oo.mvpos[t0:t1].tolist())
+            tmp = _N.empty(oo.encN)
+            ii = 0
+            for ein in xrange(encIntvs.shape[0]):
+                tmp[ii:ii+(encIntvs[ein,1]-encIntvs[ein,0])] = oo.pos[encIntvs[ein,0]:encIntvs[ein,1]]
+                ii += encIntvs[ein,1]-encIntvs[ein,0]
 
-        dat = _N.empty(oo.N, dtype=list)
+            oo.all_pos = _N.array(oo.all_pos.tolist() + tmp.tolist())
+
+        dat = _N.empty(oo.N, dtype=list)       # include times when no mvt.
         stpos  = []   #  pos  @ time of spikes
         marks  = []   #  mark @ time of spikes
         nspks  = _N.zeros(oo.nTets, dtype=_N.int)
@@ -161,17 +174,18 @@ class simDecode():
             marks.append([])
             stpos.append([])
             nspks[nt]  = 0
-            for n in xrange(t0, t1):         # oo.marks   "list of arrays"
-                if oo.marks[n, nt] is not None:  # [arr(k-dim mark1), arr(k-dim mark2)]
-                    themarks = oo.marks[n, nt]
-                    for l in xrange(len(themarks)):
-                        stpos[nt].append(oo.pos[n])
-                        marks[nt].append(themarks[l])
-                        nspks[nt] += 1
+            for ein in xrange(encIntvs.shape[0]):
+                t0, t1 = encIntvs[ein]
+
+                for n in xrange(t0, t1):         # oo.marks   "list of arrays"
+                    if oo.marks[n, nt] is not None:  # [arr(k-dim mark1), arr(k-dim mark2)]
+                        themarks = oo.marks[n, nt]
+                        for l in xrange(len(themarks)):
+                            stpos[nt].append(oo.pos[n])
+                            marks[nt].append(themarks[l])
+                            nspks[nt] += 1
 
             print "nspikes tet %(tet)d %(s)d  from %(t0)d   %(t1)d" % {"t0" : t0, "t1" : t1, "s" : nspks[nt], "tet" : nt}
-
-
 
         oo.tr_pos   = []
         oo.tr_marks = []
@@ -179,6 +193,7 @@ class simDecode():
         for nt in xrange(oo.nTets):
             oo.tr_pos.append(_N.array(stpos[nt]))
             oo.tr_marks.append(_N.array(marks[nt]))
+
 
         if not oo.kde:
             tt2 = _tm.time()
@@ -194,7 +209,8 @@ class simDecode():
             print (tt2-tt1)
             print (tt3-tt2)
             print (tt4-tt3)
-        oo.setLmd0(t0, t1, nspks)
+
+        oo.setLmd0(nspks)
 
     def decode(self, t0, t1):
         oo = self
@@ -285,6 +301,8 @@ class simDecode():
 
         tStart = _tm.time()
 
+        if oo.kde:
+            occ    = 1./oo.iocc
         if not oo.kde:
             for nt in xrange(oo.nTets):
                 oo.mvNrm[nt].iSgs  = _N.linalg.inv(oo.mvNrm[nt].covs)
@@ -303,7 +321,7 @@ class simDecode():
                         if oo.kde:
                             #(atMark, fld_x, tr_pos, tr_mks, all_pos, mdim, Bx, cBm, bx)
                             #_ku.kerFr(fxdMks[0, 1:], fxdMks[:, 0], oo.tr_pos, oo.tr_mks, oo.mvpos, oo.mdim, oo.Bx, oo.cBm, oo.bx)
-                            oo.Lklhd[nt, t] *= _ku.kerFr(fxdMks[0, 1:], oo.xpr, oo.tr_pos[nt], oo.tr_marks[nt], oo.all_pos, oo.mdim, oo.Bx, oo.Bm, oo.bx)* oo.iocc * oo.dt
+                            oo.Lklhd[nt, t] *= _ku.kerFr(fxdMks[0, 1:], oo.xpr, oo.tr_pos[nt], oo.tr_marks[nt], occ, oo.mdim, oo.Bx, oo.Bm, oo.bx)* oo.iocc * oo.dt
                         else:
                             oo.Lklhd[nt, t] *= oo.mvNrm[nt].evalAtFxdMks(fxdMks)*oo.lmd0[nt] * oo.iocc * oo.dt
 
@@ -330,7 +348,7 @@ class simDecode():
         tEnd = _tm.time()
         print "decode   %(1).3e" % {"1" : (tEnd-tStart)}
     
-    def setLmd0(self, t0, t1, nspks):
+    def setLmd0(self, nspks):
         """
         Lmd0.  
         """
@@ -353,7 +371,6 @@ class simDecode():
 
         if oo.kde:
             for nt in xrange(oo.nTets):
-                #oo.Lam_xk[:, nt] = _ku.Lambda(oo.xpr, oo.tr_pos[nt], oo.all_pos[t0:t1], oo.Bx, oo.bx)
                 oo.Lam_xk[:, nt] = _ku.Lambda(oo.xpr, oo.tr_pos[nt], oo.all_pos, oo.Bx, oo.bx)
         else:  #####  fit mix gaussian
             for nt in xrange(oo.nTets):
@@ -365,7 +382,7 @@ class simDecode():
 
                 y  = _N.sum(oo.mvNrm[nt].ms*cmps, axis=0)
                 MargLam = y * oo.iocc
-                oo.lmd0[nt]    = (nspks[nt] / ((t1-t0)*0.001)) / _N.trapz(MargLam, dx=oo.dxp)
+                oo.lmd0[nt]    = (nspks[nt] / (oo.encN*0.001)) / _N.trapz(MargLam, dx=oo.dxp)
                 oo.Lam_xk[:, nt] = oo.lmd0[nt] * MargLam
 
     def scoreDecode(self, dt0, dt1):
