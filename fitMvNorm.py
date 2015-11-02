@@ -557,6 +557,10 @@ class fitMvNorm:
         mcs   = _N.empty((M, k))
         clstxs= []
 
+        ####  stuff used repeatedly
+        k_zeros    = _N.zeros(k)
+        pr_iSg_Mu = _N.einsum("mjk,mk->mj", oo.iPR_mu_sg, oo.PR_mu_mu)
+
         for it in xrange(oo.ITERS-1):
             if it % 50 == 0:
                 print it
@@ -598,9 +602,10 @@ class fitMvNorm:
             ##############  SAMPLE WEIGHTS
             oo.sm[it+1, 0:M, 0] = _N.random.dirichlet(oo.po_alpha[it+1])
 
-            pomusg = _N.empty((M, k, k))
             clstxs = []
             mindss = []
+            mcs = _N.empty((M, k))   # cluster sample means
+            
             for im in xrange(M):  # 111111111111111
                 minds    = _N.where(oo.gz[it+1, :, im] == 1)[0]
                 Nms[im,0,0]      = minds.shape[0]
@@ -608,14 +613,12 @@ class fitMvNorm:
             oo.po_mu_sg[it+1] = _N.linalg.inv(oo.iPR_mu_sg + Nms*iscov)
 
             for im in xrange(M):  # 222222222222222
-                Nm = Nms[im,0,0]
-                minds    = mindss[im]#_N.where(oo.gz[it+1, :, im] == 1)[0]
-                if Nm > 0:
-                    clstx    = x[minds]
-                    mc       = _N.mean(clstx, axis=0)
+                if Nms[im,0,0] > 0:
+                    clstx    = x[mindss[im]]
+                    mcs[im]       = _N.mean(clstx, axis=0)
                 else:
-                    clstx    = _N.zeros(k)
-                    mc       = clstx
+                    clstx    = k_zeros
+                    mcs[im]       = clstx
                 clstxs.append(clstx)
 
                 # hyp
@@ -624,7 +627,10 @@ class fitMvNorm:
                 #  sigma^2 and mu are the current Gibbs-sampled values
 
                 ##  mean of posterior distribution of cluster means
-                oo.po_mu_mu[it+1, im]  = _N.dot(oo.po_mu_sg[it+1, im], _N.dot(oo.iPR_mu_sg[im], oo.PR_mu_mu[im]) + Nm*_N.dot(iscov[im], mc))
+
+            oo.po_mu_mu[it+1] = _N.einsum("mjk,mk->mj", oo.po_mu_sg[it+1], pr_iSg_Mu + Nms[:,:,0]*_N.einsum("mjk,mk->mj", iscov, mcs))
+            # dot(MATRIX, vector)   
+            
                 ##############  SAMPLE MEANS
                 #  this can be done without
 
@@ -681,6 +687,7 @@ class fitMvNorm:
         #  posterior distribution of cluster center
         oo.PR_mu_mu[:] = _N.mean(oo.po_mu_mu[mid:], axis=0)
         oo.PR_mu_sg[:] = _N.mean(oo.po_mu_sg[mid:], axis=0)*1.08
+        oo.iPR_mu_sg   = _N.linalg.inv(oo.PR_mu_sg)
         #  prior of cluster center is current
         #  posterior distribution of cluster center
         oo.PR_cov_nu[:] = _N.mean(oo.po_cov_nu[mid:], axis=0)
