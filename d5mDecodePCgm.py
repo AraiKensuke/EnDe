@@ -203,7 +203,7 @@ class simDecode():
             tt3 = _tm.time()
             for nt in xrange(oo.nTets):
                 print "encode Doing fit tetrode %d" % nt
-                oo.mvNrm[nt].fit(oo.mvNrm[nt].M, stpos[nt], marks[nt], 0, nspks[nt], init=initPriors)
+                oo.mvNrm[nt].fitD(oo.mvNrm[nt].M, stpos[nt], marks[nt], 0, nspks[nt], init=initPriors)
                 oo.mvNrm[nt].set_priors_and_initial_values()
             tt4 = _tm.time()
             print (tt2-tt1)
@@ -301,12 +301,18 @@ class simDecode():
 
         tStart = _tm.time()
 
+
         if oo.kde:
             occ    = 1./oo.iocc
+            iBx2   = 1. / (oo.Bx * oo.Bx)
+            sptl   =  []
+            for nt in xrange(oo.nTets):
+                sptl.append(-0.5*iBx2*(oo.xpr - oo.tr_pos[nt])**2)  #  this piece doesn't need to be evalu
         if not oo.kde:
             for nt in xrange(oo.nTets):
                 oo.mvNrm[nt].iSgs  = _N.linalg.inv(oo.mvNrm[nt].covs)
                 oo.mvNrm[nt].i2pidcovs = 1/_N.sqrt(2*_N.pi*_N.linalg.det(oo.mvNrm[nt].covs))
+                oo.mvNrm[nt].i2pidcovsr= oo.mvNrm[nt].i2pidcovs.reshape((oo.mvNrm[nt].M, 1))
         for t in xrange(t0+1,t1): # start at 1 because initial condition
             #tt1 = _tm.time()
             for nt in xrange(oo.nTets):
@@ -321,9 +327,9 @@ class simDecode():
                         if oo.kde:
                             #(atMark, fld_x, tr_pos, tr_mks, all_pos, mdim, Bx, cBm, bx)
                             #_ku.kerFr(fxdMks[0, 1:], fxdMks[:, 0], oo.tr_pos, oo.tr_mks, oo.mvpos, oo.mdim, oo.Bx, oo.cBm, oo.bx)
-                            oo.Lklhd[nt, t] *= _ku.kerFr(fxdMks[0, 1:], oo.xpr, oo.tr_pos[nt], oo.tr_marks[nt], occ, oo.mdim, oo.Bx, oo.Bm, oo.bx)* oo.iocc * oo.dt
+                            oo.Lklhd[nt, t] *= _ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx)* oo.iocc*oo.dt
                         else:
-                            oo.Lklhd[nt, t] *= oo.mvNrm[nt].evalAtFxdMks(fxdMks)*oo.lmd0[nt] * oo.iocc * oo.dt
+                            oo.Lklhd[nt, t] *= oo.mvNrm[nt].evalAtFxdMks_new(fxdMks)*oo.lmd0[nt] * oo.iocc * oo.dt
 
             ttt1 =0
             ttt2 =0
