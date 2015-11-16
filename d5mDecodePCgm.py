@@ -23,6 +23,8 @@ class simDecode():
     lmd   = None
     lmd0  = None
     mltMk = 1    #  multiply mark values to 
+    AR    = 0.5
+    AR0    = 1
 
     #  xp   position grid.  need this in decode
     xp    = None
@@ -56,11 +58,16 @@ class simDecode():
 
     encN     = 0  #  how many time points used in encode
 
+    snpsht_us  = []
+    snpsht_covs= []
+    snpsht_ms  = []
+
     def init(self, kde=False, bx=None, Bx=None, Bm=None):
         oo = self
         oo.kde = kde
         with open(oo.tetfile, "rb") as f:
             lm = pickle.load(f)
+        f.close()
 
         if oo.usetets is None:
             oo.tetlist = lm.tetlist
@@ -131,8 +138,10 @@ class simDecode():
             for nt in xrange(oo.nTets):
                 oo.mvNrm.append(fMN.fitMvNorm(oo.ITERS, oo.M, oo.mdim + 1))
                 oo.mvNrm[nt].ITERS = oo.ITERS
+                oo.mvNrm[nt].AR = oo.AR
+                oo.mvNrm[nt].AR0 = oo.AR0
 
-    def encode(self, t0=None, t1=None, encIntvs=None, initPriors=False, doTouchUp=False, MF=None, kmeansinit=True):
+    def encode(self, t0=None, t1=None, encIntvs=None, initPriors=False, doTouchUp=False, MF=None, kmeansinit=True, telapse=0):
         """
         eIntvs: array of times whose spikes we use to create encoding model
         """
@@ -149,7 +158,6 @@ class simDecode():
         tt1 = _tm.time()
 
         oo.encN = _N.sum(encIntvs[:, 1] - encIntvs[:, 0])
-
 
         if initPriors:
             oo.all_pos = _N.empty(oo.encN)
@@ -196,6 +204,10 @@ class simDecode():
 
 
         if not oo.kde:
+            oo.snpsht_us.append([])
+            oo.snpsht_covs.append([])
+            oo.snpsht_ms.append([])
+
             tt2 = _tm.time()
             if initPriors:
                 for nt in xrange(oo.nTets):
@@ -203,8 +215,12 @@ class simDecode():
             tt3 = _tm.time()
             for nt in xrange(oo.nTets):
                 print "encode Doing fit tetrode %d" % nt
-                oo.mvNrm[nt].fitD(oo.mvNrm[nt].M, stpos[nt], marks[nt], 0, nspks[nt], init=initPriors)
-                oo.mvNrm[nt].set_priors_and_initial_values()
+                oo.mvNrm[nt].fit(oo.mvNrm[nt].M, stpos[nt], marks[nt], 0, nspks[nt], init=initPriors)
+                oo.mvNrm[nt].set_priors_and_initial_values(telapse=telapse)
+
+                oo.snpsht_us[-1].append(_N.array(oo.mvNrm[nt].us))
+                oo.snpsht_covs[-1].append(_N.array(oo.mvNrm[nt].covs))
+                oo.snpsht_ms[-1].append(_N.array(oo.mvNrm[nt].ms))
             tt4 = _tm.time()
             print (tt2-tt1)
             print (tt3-tt2)
@@ -246,20 +262,20 @@ class simDecode():
 
             #  avg. time it takes to move 1 grid is 1 / _N.mean(_N.abs(spdGrdUnts))
             #  p(i+1, i) = 1/<avg spdGrdUnts>
-            p1 = _N.mean(_N.abs(spdGrdUnts))*2
+            p1 = _N.mean(_N.abs(spdGrdUnts))*0.5
             #  assume Nx is even
-            k2 = 0.1
+            k2 = 0.02
             for i in xrange(0, oo.Nx/2):
                 oo.xTrs[i, i] = 1-p1
                 if i > 0:
                     oo.xTrs[i-1, i] = p1
                 if i > 1:        ##  next nearest neighbor
                     oo.xTrs[i-2, i] = p1*k2
-                    oo.xTrs[i+1, i] = p1*k2
+                    oo.xTrs[i+1, i] = p1*k2*0.5
                 elif i == 1:
                     oo.xTrs[oo.Nx/2-1, 1] = p1*k2/2
                     oo.xTrs[oo.Nx/2, 1]   = p1*k2/2
-                    oo.xTrs[i+1, i] = p1*k2
+                    oo.xTrs[i+1, i] = p1*k2*0.5
 
             oo.xTrs[oo.Nx/2-1, 0] = p1/2
             oo.xTrs[oo.Nx/2, 0]   = p1/2
@@ -268,10 +284,10 @@ class simDecode():
                 if i < oo.Nx - 1:
                     oo.xTrs[i+1, i] = p1
                 if i < oo.Nx - 2:
-                    oo.xTrs[i-1, i] = p1*k2
+                    oo.xTrs[i-1, i] = p1*k2*0.5
                     oo.xTrs[i+2, i] = p1*k2
                 elif i == oo.Nx-2:
-                    oo.xTrs[i-1, i] = p1*k2
+                    oo.xTrs[i-1, i] = p1*k2*0.5
                     oo.xTrs[oo.Nx/2-1, oo.Nx-2] = p1*k2/2
                     oo.xTrs[oo.Nx/2, oo.Nx-2]   = p1*k2/2
             oo.xTrs[oo.Nx/2-1, oo.Nx-1] = p1/2
@@ -402,3 +418,21 @@ class simDecode():
 
         diffPos = oo.xp[inds] - oo.pos[dt0:dt1]
         return _N.sum(_N.abs(diffPos)) / (dt1-dt0)
+
+    def dump(self, dir):
+        oo    = self
+        pcklme = {}
+        pcklme["posteriors"] = oo.pX_Nm
+        pcklme["Lklhds"] = oo.Lklhd
+        if not oo.kde:
+            pcklme["snpsht_us"] = oo.snpsht_us
+            pcklme["snpsht_covs"] = oo.snpsht_covs
+            pcklme["snpsht_ms"] = oo.snpsht_ms
+
+        dmp = open("%s/dec.dump" % dir, "wb")
+        pickle.dump(pcklme, dmp, -1)
+        dmp.close()
+
+        # import pickle
+        # with open("mARp.dump", "rb") as f:
+        # lm = pickle.load(f)
