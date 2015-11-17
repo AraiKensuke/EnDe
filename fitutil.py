@@ -3,6 +3,126 @@ import fastdist as _fdst
 import scipy.cluster.vq as scv
 import matplotlib.pyplot as _plt
 import clrs as _clrs
+from filter import gauKer
+from sklearn import cluster
+from scipy.spatial import distance
+import sklearn.datasets
+from sklearn.preprocessing import StandardScaler
+
+def spClstrs3MkCl(smkpos):
+    spbins   = _N.linspace(-6, 6, 121)   # spatial bins
+    hst, bns = _N.histogram(smkpos[:, 0], bins=spbins)
+    gk = gauKer(2)
+    gk /= _N.sum(gk)
+
+    cx = _N.convolve(hst, gk, mode="same")
+
+    dcx = _N.diff(cx)
+
+    #
+    _bdrs = _N.where((dcx[0:-1] <= 0) & (dcx[1:] >= 0))[0]
+    bdrs  = _N.empty(len(_bdrs) + 2, dtype=_N.int)
+    bdrs[1:-1] = _bdrs
+    bdrs[0] = 0
+    bdrs[-1] = 120
+
+    allLabs = _N.empty(smkpos.shape[0], dtype=_N.int)
+
+    iss = -1
+
+    bestKs = _N.empty(len(bdrs)-1, dtype=_N.int)
+
+    labsAll   = []
+
+    globalInds = _N.ones(smkpos.shape[0], dtype=_N.int)*-1
+
+    for spcl in xrange(len(bdrs)-1):
+        iss += 1
+        L = spbins[bdrs[spcl]]
+        R = spbins[bdrs[spcl+1]]
+
+        clInSp = _N.where((smkpos[:, 0] >= L) & (smkpos[:, 0] <= R))[0]
+
+        TR = 20
+        bics = _N.empty((6, TR))
+
+        labsTemp = []
+        for K in xrange(1, 7):
+            labsTemp.append([])
+            for tr in xrange(TR):
+                cls, labs = scv.kmeans2(smkpos[clInSp, 1:], K)
+                bcs = _N.bincount(labs)
+                zrs = _N.where(bcs == 0)[0]
+
+                if (len(bcs) < K) or (len(zrs) > 0):  #  missing a cluster
+                    bics[K-1, tr] = -10e50
+                else:
+                    bics[K-1, tr] = kmBIC(cls, labs, K, smkpos[clInSp, 1:])
+                labsTemp[K-1].append(labs)
+
+        mb = _N.max(bics, axis=1)
+        bestKs[spcl] = _N.where(mb == _N.max(mb))[0][0] + 1
+
+        coords = _N.where(bics == _N.max(bics))
+        bestLab = labsTemp[coords[0][0]][coords[1][0]]
+
+        labsAll.append(bestLab)
+
+        # fig = _plt.figure()
+        # _plt.plot(_N.max(bics, axis=1))
+        # fig = _plt.figure(figsize=(8, 8))
+        # fig.add_subplot(2, 2, 1)
+        # aclrs = _N.array(clrs.get_colors(bestKs[spcl]))[bestLab]
+        # _plt.scatter(mkpos[nhid[clInSp], 0], mkpos[nhid[clInSp], 1], c=aclrs, s=50)
+        # fig.add_subplot(2, 2, 2)
+        # _plt.scatter(mkpos[nhid[clInSp], 0], mkpos[nhid[clInSp], 2], c=aclrs, s=50)
+        # fig.add_subplot(2, 2, 3)
+        # _plt.scatter(mkpos[nhid[clInSp], 0], mkpos[nhid[clInSp], 3], c=aclrs, s=50)
+        # fig.add_subplot(2, 2, 4)
+        # _plt.scatter(mkpos[nhid[clInSp], 0], mkpos[nhid[clInSp], 4], c=aclrs, s=50)
+
+        globalInds[clInSp] = bestLab + _N.sum(bestKs[0:spcl])
+
+    #aclrs = _N.array(clrs.get_colors(_N.sum(bestKs)))[globalInds]
+
+    # fig = _plt.figure(figsize=(11, 11))
+    # for i in xrange(4):
+    #     fig.add_subplot(2, 2, i+1)
+    #     _plt.scatter(mkpos[nhid, 0], mkpos[nhid, i+1], c=aclrs, s=50)
+    return globalInds
+
+    # spbins   = _N.linspace(-6, 6, 121)   # spatial bins
+    # hst, bns = _N.histogram(smkpos[:, 0], bins=spbins)
+    # gk = gauKer(2)
+    # gk /= _N.sum(gk)
+
+    # cx = _N.convolve(hst, gk, mode="same")
+    
+    # dcx = _N.diff(cx)
+
+    # #
+    # _bdrs = _N.where((dcx[0:-1] <= 0) & (dcx[1:] >= 0))[0]
+    # bdrs  = _N.empty(len(_bdrs) + 2, dtype=_N.int)
+    # bdrs[1:-1] = _bdrs
+    # bdrs[0] = 0
+    # bdrs[-1] = 120
+
+    # allLabs = _N.empty(smkpos.shape[0], dtype=_N.int)
+
+    # iss = -1
+    # for spcl in xrange(len(bdrs)-1):
+    #     iss += 1
+    #     L = spbins[bdrs[spcl]]
+    #     R = spbins[bdrs[spcl+1]]
+
+    #     clInSp = _N.where((smkpos[:, 0] >= L) & (smkpos[:, 0] <= R))[0]
+    #     cls, labs = scv.kmeans2(smkpos[clInSp, 1:], 3)
+    #     for clInMk in xrange(3):
+    #         inds = _N.where(labs == clInMk)[0]
+
+    #         if len(inds) > 0:
+    #             allLabs[clInSp[inds]] = clInMk + iss*4
+    # return allLabs
 
 
 def bestcluster(ITERS, smkpos, MS):
@@ -232,6 +352,8 @@ def oneORtwo(mks):
     if (len(_N.where(labs == 0)[0]) < 2) or (len(_N.where(labs == 1)[0]) < 2):
         return 1, None
     else:
+        return 2, labs
+        """
         D0 = _fdst.dist(mks[_N.where(labs == 0)[0]])
         D1 = _fdst.dist(mks[_N.where(labs == 1)[0]])
         DA = _fdst.dist(mks)
@@ -241,7 +363,7 @@ def oneORtwo(mks):
             return 2, labs
         else:
             return 1, None
-
+        """
 
 def sepHash(_x, BINS=20, blksz=20, xlo=-6, xhi=6):
     ##########################
@@ -269,3 +391,40 @@ def sepHash(_x, BINS=20, blksz=20, xlo=-6, xhi=6):
     hashsp   = _N.setdiff1d(inds, unonhash)  #  inds is contiguous but reordered all
 
     return unonhash, hashsp
+
+
+def kmBIC(ctrs, labs, K, X):
+    """
+    Computes the BIC metric for a given clusters
+
+    Parameters:
+    -----------------------------------------
+    kmeans:  List of clustering object from scikit learn
+
+    X     :  multidimension np array of data points
+
+    Returns:
+    -----------------------------------------
+    BIC value
+    """
+    # assign centers and labels
+    #number of clusters
+    m = K
+    # size of the clusters
+    n = _N.bincount(labs)
+    #size of data set
+    N, d = X.shape
+
+    #compute variance for all clusters beforehand
+    #cl_var = [(1.0 / (n[i] - m)) * sum(distance.cdist(X[np.where(labels == i)], [centers[0][i]], 'euclidean')**2)  for i in xrange(m)]
+    cl_var = (1.0 / (N - m) / d) * sum([sum(distance.cdist(X[_N.where(labs == i)], [ctrs[i]], 'euclidean')**2) for i in range(m)])
+
+    const_term = 0.5 * m * _N.log(N) * (d+1)
+
+    BIC = _N.sum([n[i] * _N.log(n[i]) -
+                  n[i] * _N.log(N) -
+                  ((n[i] * d) / 2) * _N.log(2*_N.pi*cl_var) -
+                  ((n[i] - 1) * d/ 2) for i in range(m)]) - const_term
+
+    return(BIC)
+

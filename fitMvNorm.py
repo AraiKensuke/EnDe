@@ -179,12 +179,14 @@ class fitMvNorm:
                 smkpos        = _x[sigInds]
 
                 #labS = _fu.bestcluster(50, smkpos, MS)
-                labS, MSA = _fu.findBestClusterBySplit(smkpos, MS, oo.k, 15)
+                #labS, MSA = _fu.findBestClusterBySplit(smkpos, MS, oo.k, 15)
+                labS = _fu.spClstrs3MkCl(smkpos)
+                MSA  = len(labS)
                 if MSA > MS:
                     MH        = MF - MS
                     MS        = MSA
 
-                _fu.colorclusters(smkpos, labS, MSA)
+                #_fu.colorclusters(smkpos, labS, MSA)
 
                 labH = _fu.bestcluster(50, _x[hashsp], MH)
                 #bins = _N.linspace(-30, 30, 101)
@@ -310,6 +312,11 @@ class fitMvNorm:
 
             ##############  GENERATE cluster membership
             oo.gz[it+1, icl, irw] = 1   #  we must clean out gz
+            #  For the 
+
+            ##  For the j-th cluster, look at the std. dev in position space.
+            #   from current it. value.
+            #   Either put into it 
 
             #  _N.sum(oo.gz...) sz M   its vec of num. of obs of each state 'm'
             _N.add(oo.PR_m_alp[0:M], _N.sum(oo.gz[it+1], axis=0), out=oo.po_alpha[it+1])
