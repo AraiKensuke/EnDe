@@ -8,7 +8,43 @@ from sklearn import cluster
 from scipy.spatial import distance
 import sklearn.datasets
 from sklearn.preprocessing import StandardScaler
+import openTets as _oT
 
+def contiguous_pack(arr, startAt=0):
+    """
+    arr4 = _N.array([10, 4, 2, 2, 9, 3])
+    contiguous_pack(arr4)
+    #  arr4  ->  4 2 0 0 3 1
+    """
+    unqItms = _N.unique(arr)   #  5 uniq items
+    nUnqItms= unqItms.shape[0] #  
+
+    #sunqItms = _N.sort(unqItms)
+
+    n = -1
+    for uI in unqItms:
+        n += 1
+        arr[_N.where(arr == uI)[0]] = n
+
+    arr += startAt
+
+def contiguous_pack2(arr, startAt=0):
+    """
+    arr4 = _N.array([10, 4, 2, 2, 9, 3])
+    contiguous_pack(arr4)
+    #  arr4  ->  4 2 0 0 3 1
+    Probably faster previous version
+    """
+    unqItms = _N.unique(arr)   #  5 uniq items
+    nUnqItms= unqItms.shape[0] #  
+
+    contg   = _N.arange(0, len(unqItms)) + unqItms[0]
+    nei     = _N.where(unqItms > contg)[0]
+    for i in xrange(len(nei)):
+        arr[_N.where(arr == unqItms[nei[i]])[0]] = contg[nei[i]]
+    arr += (startAt - unqItms[0])
+    return nUnqItms
+    
 def spClstrs3MkCl(smkpos):
     spbins   = _N.linspace(-6, 6, 121)   # spatial bins
     hst, bns = _N.histogram(smkpos[:, 0], bins=spbins)
@@ -41,6 +77,7 @@ def spClstrs3MkCl(smkpos):
         L = spbins[bdrs[spcl]]
         R = spbins[bdrs[spcl+1]]
 
+        #####  TODO  len(clInSp) < dim
         clInSp = _N.where((smkpos[:, 0] >= L) & (smkpos[:, 0] <= R))[0]
 
         TR = 20
@@ -57,7 +94,7 @@ def spClstrs3MkCl(smkpos):
                 if (len(bcs) < K) or (len(zrs) > 0):  #  missing a cluster
                     bics[K-1, tr] = -10e50
                 else:
-                    bics[K-1, tr] = kmBIC(cls, labs, K, smkpos[clInSp, 1:])
+                    bics[K-1, tr], bk = kmBIC(cls, labs, smkpos[clInSp, 1:])
                 labsTemp[K-1].append(labs)
 
         mb = _N.max(bics, axis=1)
@@ -82,6 +119,7 @@ def spClstrs3MkCl(smkpos):
         # _plt.scatter(mkpos[nhid[clInSp], 0], mkpos[nhid[clInSp], 4], c=aclrs, s=50)
 
         globalInds[clInSp] = bestLab + _N.sum(bestKs[0:spcl])
+    print "best K for signal clusters %d" %_N.sum(bestKs)
 
     #aclrs = _N.array(clrs.get_colors(_N.sum(bestKs)))[globalInds]
 
@@ -124,6 +162,56 @@ def spClstrs3MkCl(smkpos):
     #             allLabs[clInSp[inds]] = clInMk + iss*4
     # return allLabs
 
+
+def bestcluster(ITERS, smkpos, MS):
+    """
+    MS  # of clusters
+    """
+    ICR         = _N.zeros(ITERS)
+    minOfMaxICR = _N.zeros(ITERS)
+    maxOfMaxICR = _N.zeros(ITERS)
+    InterCR     = _N.zeros(ITERS)
+
+    allCtrs = []
+    allLabs = []
+
+    for it in xrange(ITERS):
+        ctrs, labs = scv.kmeans2(smkpos, MS)  #  big clear
+        intraClusRadii = []
+        maxIntraClusRadii = []
+        tot  = 0
+        #interClusRadii = 0
+
+        prs = 0
+        for m in xrange(MS):
+            inClus = _N.where(labs == m)[0]
+
+            if len(inClus) > 3:
+                radii = _N.sqrt(_N.sum((smkpos[inClus] - ctrs[m])**2, axis=1))
+                intraClusRadii.append(_N.sum(radii))
+                maxIntraClusRadii.append(_N.max(radii))
+                tot += len(inClus)
+        ICR[it]    = _N.sum(intraClusRadii)/ tot
+        #minOfMaxICR[it] = _N.min(maxIntraClusRadii)
+        maxOfMaxICR[it] = _N.max(maxIntraClusRadii)
+        #InterCR[it]     = interClusRadii
+
+        allCtrs.append(ctrs)
+        allLabs.append(labs)
+
+
+    m1 = _N.mean(ICR)
+    s1 = _N.std(ICR)
+    z1 = (ICR - m1) / s1
+
+    m3 = _N.mean(maxOfMaxICR)
+    s3 = _N.std(maxOfMaxICR)
+    z3 = (maxOfMaxICR - m3) / s3
+    
+    z13 = z1 * z3
+    bestlabs = _N.where(z13 == _N.min(z13))[0]
+
+    return allLabs[bestlabs[0]]
 
 def bestcluster(ITERS, smkpos, MS):
     """
@@ -383,7 +471,7 @@ def sepHash(_x, BINS=20, blksz=20, xlo=-6, xhi=6):
             blk += 1
             cnts, bns = _N.histogram(_x[inds[blk*blksz:(blk+1)*blksz], 0], bins=bins)
             cumcnts += cnts
-            if len(_N.where(cumcnts < 2)[0]) <= 5:
+            if len(_N.where(cumcnts < 2)[0]) <= 3:
                 done = True
                 nonhash.extend(inds[0:(blk+1)*blksz])
 
@@ -392,8 +480,7 @@ def sepHash(_x, BINS=20, blksz=20, xlo=-6, xhi=6):
 
     return unonhash, hashsp
 
-
-def kmBIC(ctrs, labs, K, X):
+def kmBIC(ctrs, labs, X):
     """
     Computes the BIC metric for a given clusters
 
@@ -409,7 +496,7 @@ def kmBIC(ctrs, labs, K, X):
     """
     # assign centers and labels
     #number of clusters
-    m = K
+    m = contiguous_pack2(labs, startAt=0)
     # size of the clusters
     n = _N.bincount(labs)
     #size of data set
@@ -426,5 +513,118 @@ def kmBIC(ctrs, labs, K, X):
                   ((n[i] * d) / 2) * _N.log(2*_N.pi*cl_var) -
                   ((n[i] - 1) * d/ 2) for i in range(m)]) - const_term
 
-    return(BIC)
+    return(BIC), m
 
+
+def emMKPOS(nhmks, hmks, TR=5, minK=2, maxK=15):
+    TR = 5
+    minK=2
+    maxK=15
+
+    iNH = -1
+    sNH = ["nh", "h"]
+
+    bestLabs = []
+
+    # nhid, hid = sepHash(mkpos)
+
+    # nhmks     = mkpos[nhid]
+    # hmks      = mkpos[hid]
+
+    for mks in [nhmks, hmks]:
+        iNH += 1
+        labs, bics, bestLab, nClstrs = _oT.EMwfBICs(mks, minK=minK, maxK=maxK, TR=TR)
+        bestLab = _N.array(labs[nClstrs-minK, 0], dtype=_N.int)
+
+        #    if mks == nhmks:
+
+        ##  non-hash, do spatial clustering
+        startCl = 0 
+        bestLabMP = _N.array(bestLab)
+        maxK = 3 if (iNH == 1) else 10
+        minK = 2 if (iNH == 1) else 3
+
+        for nc in xrange(nClstrs):
+            inThisClstr = _N.where(bestLab == nc)[0]
+            pos = mks[inThisClstr, 0]
+
+            pos = pos.reshape(len(inThisClstr), 1)
+
+            if len(inThisClstr) > maxK:
+                plabs, pbics, pbestLab, pClstrs = _oT.EMposBICs(pos, minK=1, maxK=maxK, TR=3)
+                pClstrs = contiguous_pack2(pbestLab)
+                cmp = _N.where(pbics == _N.min(pbics))[0]
+            else:
+                pbestLab = _N.zeros(len(inThisClstr), dtype=_N.int)
+                pClstrs  = 1
+            bestLabMP[inThisClstr] = pbestLab + startCl
+            startCl += pClstrs
+        bestLabs.append(_N.array(bestLabMP))
+    return bestLabs[0], bestLabs[1]
+
+def emMKPOS_sep(nhmks, hmks, TR=5, minK=2, maxK=15):
+    TR = 5
+    minK=2
+    maxK=15
+
+    iNH = -1
+    sNH = ["nh", "h"]
+
+    bestLabs = []
+
+    minSz = 8
+    for mks in [nhmks, hmks]:
+        iNH += 1
+        labs, bics, bestLab, nClstrs = _oT.EMwfBICs(mks, minK=minK, maxK=maxK, TR=TR)
+        bestLab = _N.array(labs[nClstrs-minK, 0], dtype=_N.int)
+
+        #    if mks == nhmks:
+
+        ##  non-hash, do spatial clustering
+
+        startCl = 0 
+        bestLabMP = _N.array(bestLab)
+        maxK = 3
+        minK = 1
+
+        for nc in xrange(nClstrs):
+            inThisClstr = _N.where(bestLab == nc)[0]
+            pbestLab = _N.ones(len(inThisClstr), dtype=_N.int) * -1   #  poslabs
+            pos = mks[inThisClstr, 0]
+            pos = pos.reshape(len(inThisClstr), 1)
+
+            nB_pos = _N.where((pos >= -6) & (pos < -3))[0]   #  -6 to -3
+            nF_pos = _N.where((pos >= -3) & (pos < 0))[0]   #  -3 to 0
+            pF_pos = _N.where((pos >= 0)  & (pos < 3))[0]   #  0 to 3
+            pB_pos = _N.where(pos >= 3)[0]
+
+            nB_pClstrs = nF_pClstrs = pF_pClstrs = pB_pClstrs = 0
+            #########
+            if len(nB_pos) >= minSz:
+                nB_plabs, nB_pbics, nB_pbestLab, nB_pClstrs = _oT.EMposBICs(pos[nB_pos], minK=minK, maxK=maxK, TR=2)
+                nB_pClstrs = contiguous_pack2(nB_pbestLab)
+                pbestLab[nB_pos] = nB_pbestLab
+            #########
+            if len(nF_pos) >= minSz:
+                nF_plabs, nF_pbics, nF_pbestLab, nF_pClstrs = _oT.EMposBICs(pos[nF_pos], minK=minK, maxK=maxK, TR=2)
+                nF_pClstrs = contiguous_pack2(nF_pbestLab)
+                pbestLab[nF_pos] = nF_pbestLab + nB_pClstrs
+            #########
+            if len(pF_pos) >= minSz:
+                pF_plabs, pF_pbics, pF_pbestLab, pF_pClstrs = _oT.EMposBICs(pos[pF_pos], minK=minK, maxK=maxK, TR=2)
+                pF_pClstrs = contiguous_pack2(pF_pbestLab)
+                pbestLab[pF_pos] = pF_pbestLab + nB_pClstrs + nF_pClstrs
+            #########
+            if len(pB_pos) >= minSz:
+                pB_plabs, pB_pbics, pB_pbestLab, pB_pClstrs = _oT.EMposBICs(pos[pB_pos], minK=minK, maxK=maxK, TR=2)
+                pB_pClstrs = contiguous_pack2(pB_pbestLab)
+                pbestLab[pB_pos] = pB_pbestLab + nB_pClstrs + nF_pClstrs + pF_pClstrs
+            pClstrs    = nB_pClstrs + nF_pClstrs + pF_pClstrs + pB_pClstrs
+            startCl += pClstrs
+
+            pbestLab[_N.where(pbestLab >= 0)[0]] += startCl  #  only the ones used for init
+            bestLabMP[inThisClstr] = pbestLab
+
+
+        bestLabs.append(_N.array(bestLabMP))
+    return bestLabs[0], bestLabs[1]

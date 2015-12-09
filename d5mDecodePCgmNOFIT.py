@@ -214,22 +214,15 @@ class simDecode():
             tt2 = _tm.time()
             if initPriors:
                 for nt in xrange(oo.nTets):
+                    print "initPriors for tet %d" % nt
                     oo.mvNrm[nt].init0(stpos[nt], marks[nt], 0, nspks[nt], sepHash=oo.sepHash, pctH=oo.pctH, MS=oo.MS, sepHashMthd=oo.sepHashMthd, doTouchUp=doTouchUp, MF=MF, kmeansinit=kmeansinit)
-            tt3 = _tm.time()
-            for nt in xrange(oo.nTets):
-                print "encode Doing fit tetrode %d" % nt
-                oo.mvNrm[nt].fit(oo.mvNrm[nt].M, stpos[nt], marks[nt], 0, nspks[nt], init=initPriors)
-                oo.mvNrm[nt].set_priors_and_initial_values(telapse=telapse)
+                    for m in xrange(oo.mvNrm[nt].M):
+                        oo.mvNrm[nt].us[m] = oo.mvNrm[nt].smu[0, m]
+                        oo.mvNrm[nt].covs[m] = oo.mvNrm[nt].scov[0, m]
+                        oo.mvNrm[nt].ms[m] = oo.mvNrm[nt].sm[0, m]
+                        
 
-                oo.snpsht_us[-1].append(_N.array(oo.mvNrm[nt].us))
-                oo.snpsht_covs[-1].append(_N.array(oo.mvNrm[nt].covs))
-                oo.snpsht_ms[-1].append(_N.array(oo.mvNrm[nt].ms))
-                oo.snpsht_gz[-1].append(_N.array(oo.mvNrm[nt].gz))
-            tt4 = _tm.time()
-            print (tt2-tt1)
-            print (tt3-tt2)
-            print (tt4-tt3)
-
+        print "setLmd0"
         oo.setLmd0(nspks)
 
     def decode(self, t0, t1):
@@ -405,6 +398,7 @@ class simDecode():
                 cmps   = _N.zeros((oo.mvNrm[nt].M, oo.Nx))
                 for m in xrange(oo.mvNrm[nt].M):
                     var = oo.mvNrm[nt].covs[m, 0, 0]
+                    print "m is %(m)d    var is %(var).3f" % {"m" : m, "var" : var}
                     ivar = 1./var
                     cmps[m] = (1/_N.sqrt(2*_N.pi*var)) * _N.exp(-0.5*ivar*(oo.xp - oo.mvNrm[nt].us[m, 0])**2)
 

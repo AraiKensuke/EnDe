@@ -4,7 +4,7 @@ import matplotlib.pyplot as _plt
 import kde as _kde
 import scipy.stats as _ss
 #import fitMvNormE as fMN   
-import fitMvNormTet as fMN   
+import fitMvNorm2 as fMN   
 import time as _tm
 import kdeutil as _ku
 import scipy.integrate as _si
@@ -61,7 +61,8 @@ class simDecode():
     snpsht_us  = []
     snpsht_covs= []
     snpsht_ms  = []
-    snpsht_gz  = []
+
+    curr_encpos = None
 
     def init(self, kde=False, bx=None, Bx=None, Bm=None):
         oo = self
@@ -160,21 +161,21 @@ class simDecode():
 
         oo.encN = _N.sum(encIntvs[:, 1] - encIntvs[:, 0])
 
+        oo.curr_encpos = _N.empty(oo.encN)
         if initPriors:
             oo.all_pos = _N.empty(oo.encN)
-            print "here"
             ii = 0
             for ein in xrange(encIntvs.shape[0]):
                 oo.all_pos[ii:ii+(encIntvs[ein,1]-encIntvs[ein,0])] = oo.pos[encIntvs[ein,0]:encIntvs[ein,1]]
+                oo.curr_encpos[ii:ii+(encIntvs[ein,1]-encIntvs[ein,0])] = oo.pos[encIntvs[ein,0]:encIntvs[ein,1]]
                 ii += encIntvs[ein,1]-encIntvs[ein,0]
         else:     #  just make this longer
-            tmp = _N.empty(oo.encN)
             ii = 0
             for ein in xrange(encIntvs.shape[0]):
-                tmp[ii:ii+(encIntvs[ein,1]-encIntvs[ein,0])] = oo.pos[encIntvs[ein,0]:encIntvs[ein,1]]
+                oo.curr_encpos[ii:ii+(encIntvs[ein,1]-encIntvs[ein,0])] = oo.pos[encIntvs[ein,0]:encIntvs[ein,1]]
                 ii += encIntvs[ein,1]-encIntvs[ein,0]
 
-            oo.all_pos = _N.array(oo.all_pos.tolist() + tmp.tolist())
+            oo.all_pos = _N.array(oo.all_pos.tolist() + oo.curr_encpos.tolist())
 
         dat = _N.empty(oo.N, dtype=list)       # include times when no mvt.
         stpos  = []   #  pos  @ time of spikes
@@ -209,7 +210,6 @@ class simDecode():
             oo.snpsht_us.append([])
             oo.snpsht_covs.append([])
             oo.snpsht_ms.append([])
-            oo.snpsht_gz.append([])
 
             tt2 = _tm.time()
             if initPriors:
@@ -218,13 +218,12 @@ class simDecode():
             tt3 = _tm.time()
             for nt in xrange(oo.nTets):
                 print "encode Doing fit tetrode %d" % nt
-                oo.mvNrm[nt].fit(oo.mvNrm[nt].M, stpos[nt], marks[nt], 0, nspks[nt], init=initPriors)
+                oo.mvNrm[nt].fit(oo.mvNrm[nt].M, stpos[nt], marks[nt], 0, nspks[nt], oo.curr_encpos, init=initPriors)
                 oo.mvNrm[nt].set_priors_and_initial_values(telapse=telapse)
 
                 oo.snpsht_us[-1].append(_N.array(oo.mvNrm[nt].us))
                 oo.snpsht_covs[-1].append(_N.array(oo.mvNrm[nt].covs))
                 oo.snpsht_ms[-1].append(_N.array(oo.mvNrm[nt].ms))
-                oo.snpsht_gz[-1].append(_N.array(oo.mvNrm[nt].gz))
             tt4 = _tm.time()
             print (tt2-tt1)
             print (tt3-tt2)
@@ -268,20 +267,18 @@ class simDecode():
             #  p(i+1, i) = 1/<avg spdGrdUnts>
             p1 = _N.mean(_N.abs(spdGrdUnts))*0.5
             #  assume Nx is even
-            #k2 = 0.02
-            k2 = 0.04
-            k3 = 0.1
+            k2 = 0.02
             for i in xrange(0, oo.Nx/2):
                 oo.xTrs[i, i] = 1-p1
                 if i > 0:
                     oo.xTrs[i-1, i] = p1
                 if i > 1:        ##  next nearest neighbor
                     oo.xTrs[i-2, i] = p1*k2
-                    oo.xTrs[i+1, i] = p1*k2*k3
+                    oo.xTrs[i+1, i] = p1*k2*0.5
                 elif i == 1:
                     oo.xTrs[oo.Nx/2-1, 1] = p1*k2/2
                     oo.xTrs[oo.Nx/2, 1]   = p1*k2/2
-                    oo.xTrs[i+1, i] = p1*k2*k3
+                    oo.xTrs[i+1, i] = p1*k2*0.5
 
             oo.xTrs[oo.Nx/2-1, 0] = p1/2
             oo.xTrs[oo.Nx/2, 0]   = p1/2
@@ -290,10 +287,10 @@ class simDecode():
                 if i < oo.Nx - 1:
                     oo.xTrs[i+1, i] = p1
                 if i < oo.Nx - 2:
-                    oo.xTrs[i-1, i] = p1*k2*k3
+                    oo.xTrs[i-1, i] = p1*k2*0.5
                     oo.xTrs[i+2, i] = p1*k2
                 elif i == oo.Nx-2:
-                    oo.xTrs[i-1, i] = p1*k2*k3
+                    oo.xTrs[i-1, i] = p1*k2*0.5
                     oo.xTrs[oo.Nx/2-1, oo.Nx-2] = p1*k2/2
                     oo.xTrs[oo.Nx/2, oo.Nx-2]   = p1*k2/2
             oo.xTrs[oo.Nx/2-1, oo.Nx-1] = p1/2
@@ -351,7 +348,7 @@ class simDecode():
                             #_ku.kerFr(fxdMks[0, 1:], fxdMks[:, 0], oo.tr_pos, oo.tr_mks, oo.mvpos, oo.mdim, oo.Bx, oo.cBm, oo.bx)
                             oo.Lklhd[nt, t] *= _ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx)* oo.iocc*oo.dt
                         else:
-                            oo.Lklhd[nt, t] *= oo.mvNrm[nt].evalAtFxdMks_new(fxdMks)*oo.lmd0[nt] * oo.iocc * oo.dt
+                            oo.Lklhd[nt, t] *= oo.mvNrm[nt].evalAtFxdMks_new(fxdMks)*oo.lmd0[nt] * oo.dt
 
             ttt1 =0
             ttt2 =0
@@ -409,7 +406,7 @@ class simDecode():
                     cmps[m] = (1/_N.sqrt(2*_N.pi*var)) * _N.exp(-0.5*ivar*(oo.xp - oo.mvNrm[nt].us[m, 0])**2)
 
                 y  = _N.sum(oo.mvNrm[nt].ms*cmps, axis=0)
-                MargLam = y * oo.iocc
+                MargLam = y# * oo.iocc
                 oo.lmd0[nt]    = (nspks[nt] / (oo.encN*0.001)) / _N.trapz(MargLam, dx=oo.dxp)
                 oo.Lam_xk[:, nt] = oo.lmd0[nt] * MargLam
 

@@ -56,6 +56,9 @@ class mixNormDatPoi:
 
     vAmp   = 1.
     constV = False
+    nLf    = None
+    nRh    = None
+    pLR    = 0.5
 
     tetlist= ["01"]
 
@@ -82,7 +85,7 @@ class mixNormDatPoi:
         mr  = _N.random.rand(N)
 
         if oo.bWtrack:
-            oo.pos = _U.generateMvt(N, vAmp=oo.vAmp, constV=oo.constV)
+            oo.pos = _U.generateMvt(N, vAmp=oo.vAmp, constV=oo.constV, pLR=oo.pLR, nLf=oo.nLf, nRh=oo.nRh)
 
         else:
             oo._pos   = _N.empty(N)

@@ -17,15 +17,15 @@ def show_posmarks(dec, setname, ylim=None, win=None, singles=False):
                 ax  = fig.add_subplot(1, 1, 1)
             else:
                 ax  = fig.add_subplot(2, 2, k)
-            x = []
-            y = []
 
+            """
             for l in xrange(dec.tt0, dec.tt1):
                 if (dec.marks[l, nt] is not None):
                     x.append(dec.pos[l])
                     y.append(dec.marks[l, nt][0][k-1])
+            """
 
-            _plt.scatter(x, y, color="black", s=2)
+            _plt.scatter(dec.tr_pos[nt], dec.tr_marks[nt][:, k-1], color="black", s=2)
             #_plt.scatter(dec.mvNrm[nt].us[:, 0], dec.mvNrm[nt].us[:, k], color="red", s=30)
             mThr = MTHR * _N.max(dec.mvNrm[nt].ms)
 
@@ -58,7 +58,7 @@ def show_posmarks(dec, setname, ylim=None, win=None, singles=False):
         if not singles:
             _plt.suptitle("t0=%(2)d,t1=%(3)d" % {"2" : dec.tt0, "3" : dec.tt1})
             fn= "look" if (dec.usetets is None) else "look_tet%s" % dec.usetets[nt]
-            _plt.savefig(resFN("%(1)s_win=%(w)d.eps" % {"1" : fn, "w" : win}, dir=setname), transparent=True)
+            _plt.savefig(resFN("%(1)s_win=%(w)d.eps" % {"1" : fn, "w" : win}, dir=setname, create=True), transparent=True)
             _plt.close()
 
 def showMarginalMarkDistributions(dec, setname, mklim=[-6, 8], dk=0.1):

@@ -1,9 +1,15 @@
 import numpy as _N
 import matplotlib.pyplot as _plt
 
-def generateMvt(N, vAmp=1, constV=False):
+def generateMvt(N, vAmp=1, constV=False, pLR=0.5, nLf=None, nRh=None, Fv=0.9995, sv=0.00007):
     """
-    vAmp  is speed amplitude
+    vAmp  is speed amplitude.  Different meaning when constV==True
+
+    specify
+    
+    pLR
+    --or--
+    nLf and nRh
     """
     x = 0
     pos = _N.empty(N)
@@ -12,28 +18,50 @@ def generateMvt(N, vAmp=1, constV=False):
     done = False
     v    = 0
 
-    pLR  = 0.5
+    bFxdLRsq = True if (nLf is not None) and (nRh is not None) else False
+    fLRdir   = 1 if (_N.random.rand() < 0.5) else -1
+    if bFxdLRsq:
+        dirc = fLRdir
+        
+    nL       = 0;    nR       = 0
     for n in xrange(N):
         if constV:
             x += vAmp*dirc            
         else:
-            v = 0.9995*v + 0.00007*_N.random.randn() 
+            v = Fv*v + sv*_N.random.randn() 
             x += vAmp*_N.abs(v)*dirc
 
         if (x > 6) and (dirc > 0):
             done = True
         elif (x < -6) and (dirc < 0):
             done = True
-        if done:
-            if not constV:
+
+        if done:         ######  PASSED BOUNDARY
+            if not bFxdLRsq:
                 dirc = -1 if _N.random.rand() < pLR else 1
                 pLR = (pLR - 0.25) if (dirc == -1) else pLR + 0.25
             else:
-                dirc = -1 if (dirc == 1) else 1
-            if dirc < 0:
-                if x <= -6:  #  -6.1 -> -0.1
+                if fLRdir == 1:  #  
+                    if nR < nRh-1:
+                        nR += 1
+                        dirc = 1
+                    else:
+                        nR = 0
+                        dirc = -1
+                        fLRdir = -1
+                else:
+                    if nL < nLf-1:
+                        nL += 1
+                        dirc = -1
+                    else:
+                        nL = 0
+                        dirc = 1
+                        fLRdir = 1
+
+            if dirc < 0:     #  dirc is direction to go next
+                if x <= -6:  #  -6.1 -> -0.1   #    prev. dirc was -1
                     x = x + 6
-                else:  #  6.1 -> -0.1
+                else:  #  6.1 -> -0.1     prev. dirc was 1
                     x = -1*(x - 6)
             if dirc > 0:
                 if x <= -6:  #  -6.1 -> 0.1

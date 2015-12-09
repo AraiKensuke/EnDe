@@ -235,7 +235,7 @@ class fitMvNorm:
 
 
 
-    def fit(self, M, pos, mk, n1, n2, init=False):
+    def fit(self, M, pos, mk, n1, n2, curr_encpos, init=False):
         """
         Fit, with the inverting done in blocks
         """
@@ -325,7 +325,55 @@ class fitMvNorm:
             #  _N.sum(oo.gz...) sz M   its vec of num. of obs of each state 'm'
 
             #oo.smu[it, im]
-            _N.add(oo.PR_m_alp[0:M], _N.sum(oo.gz[it+1], axis=0), out=oo.po_alpha[it+1])
+            xcnp = _N.linspace(-6, 6, 241)   
+            xt = _N.tile(xcnp, M)   
+            xt = xt.reshape(M, 241)
+
+            xb = _N.linspace(-6, 6, 242)
+
+            dx = 0.05
+            #print curr_encpos
+            occ, bns = _N.histogram(curr_encpos, bins=xb)   # occ gives # of milliseconds in that bin
+            focc = _N.asarray(occ, dtype=_N.double)
+            focct = _N.tile(focc, M)   
+            focct = focct.reshape(M, 241)
+
+            sgs  = oo.scov[it, :, 0, 0].reshape(M, 1)
+            isgs = 1/sgs
+
+            us   = oo.smu[it, :, 0].reshape(M, 1)
+
+            spfrPr= (1/_N.sqrt(2*_N.pi*sgs))*_N.exp(-0.5*isgs*(xt-us)**2)*dx   # spatial firing profile for each cluster
+
+            osp = focct*spfrPr  #  this gives me a unit time
+
+            sumGz = _N.sum(oo.gz[it+1], axis=0)#
+            wocc = _N.sum(osp, axis=1)  #     weighted occupancy
+
+            wGz = sumGz / wocc
+            wGz  /= _N.sum(wGz)    #  mean wGz is 1
+            wGz *= N   #  number of clusters  wGz sums to # of marks
+
+            #zrOcc = _N.where(occ == 0)[0]
+            #zrOcc = _N.where(occ == 0)[0]
+            #bFullySampled = not (len(zrOcc) == 0)
+
+            maxwocc = _N.max(wocc)
+
+            inds = _N.where((wocc < 0.01 * maxwocc) & (sumGz[m] < 1))[0]
+            for m in inds:
+                if it == 0:
+                    wGz[m] = oo.po_alpha[it, m]
+                else:
+                    wGz[m] = oo.po_alpha[it, m] - oo.PR_m_alp[m]
+
+            #  if wocc is large, it means we can trust this as measure of firing
+            #  if wocc is small, it means we can trust this as a reasonable measure
+
+            #_N.add(oo.PR_m_alp[0:M], _N.sum(oo.gz[it+1], axis=0), out=oo.po_alpha[it+1])
+            #print "--------------"
+            #print (wGz - _N.sum(oo.gz[it+1], axis=0))
+            _N.add(oo.PR_m_alp[0:M], wGz, out=oo.po_alpha[it+1])
 
             ##############  SAMPLE WEIGHTS
             oo.sm[it+1, 0:M, 0] = _N.random.dirichlet(oo.po_alpha[it+1])
@@ -423,7 +471,7 @@ class fitMvNorm:
         #  hyperparameters describe the priors, and are estimated from the 
         #  posterior of the parameter
         #  the posteriors are now priors
-        oo.PR_m_alp[:] = _N.mean(oo.po_alpha[mid:], axis=0)*0.7
+        oo.PR_m_alp[:] = _N.mean(oo.po_alpha[mid:], axis=0)*0.8
         print "=========   set_priors"
         print oo.PR_m_alp
         #  prior of cluster center is current
