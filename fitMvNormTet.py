@@ -127,13 +127,17 @@ class fitMvNorm:
             bins    = _N.linspace(-6, 6, BINS+1)
             blksz   = 20
 
+            unonhash, hashsp = _fu.sepHashEM(_x)
+            labS, labH, clstrs = _fu.emMKPOS_sep3(_x[unonhash], _x[hashsp])
+            print labS
+            print labH
+            print "****   clusters sig:  %(1)d   hash:  %(2)d" % {"1" : clstrs[0], "2" : clstrs[1]}
 
-            unonhash, hashsp = _fu.sepHash(_x, BINS=BINS,blksz=20,xlo=-6,xhi=6)
-            labS, labH,  = _fu.emMKPOS_sep(_x[unonhash], _x[hashsp])
+            print "min labS %(min)d   max labS %(max)d" % {"min" :_N.min(labS), "max" : _N.max(labS)}
 
             MS = _N.max(_N.unique(labS)) + 1
             ##################
-            lab        = _N.array(labS.tolist() + (labH + MS).tolist())
+            lab        = _N.array(labS.tolist() + (labH + clstrs[0]).tolist())
             x          = _N.empty((n2-n1, k))
             if sepHashMthd == 0:
                 x[:, 0]    = _x[inds, 0]
@@ -169,15 +173,23 @@ class fitMvNorm:
         covAll = _N.cov(x.T)
         dcovMag= _N.diagonal(covAll)*0.005
 
+        print "look at the covariances"
         for im in xrange(MF):  #  if lab < 0, these marks not used for init
             kinds = _N.where(lab == im)[0]  #  inds
 
-            if len(kinds) >= 2:   # problem when cov is not positive def.
+            if len(kinds) >= 6:   # problem when cov is not positive def.
                 oo.smu[0, im]  = _N.mean(x[kinds], axis=0)
                 oo.scov[0, im] = _N.cov(x[kinds], rowvar=0)
+                print "im %(im)d  %(c).3e" % {"im" : im, "c" : _N.linalg.det(oo.scov[0, im])}
+                if _N.linalg.det(oo.scov[0, im]) < 0:
+                    print len(kinds)
+                    print x[kinds]
                 oo.sm[0, im]   = float(len(kinds)+1) / (N+MF)
             else:
-                oo.smu[0, im]  = _N.mean(x, axis=0)
+                if len(kinds) > 2:
+                    oo.smu[0, im]  = _N.mean(x[kinds], axis=0)
+                else:
+                    oo.smu[0, im]  = _N.mean(x, axis=0)
                 oo.scov[0, im] = covAll*0.125
                 oo.sm[0, im]   = float(len(kinds)+1) / (N+MF)
         

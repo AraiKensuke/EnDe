@@ -6,7 +6,7 @@ import scipy.cluster.vq as scv
 import mcmcFigs as mF
 
 def show_posmarks(dec, setname, ylim=None, win=None, singles=False):
-    MTHR = 0.02   #  how much smaller is mixture compared to maximum
+    MTHR = 0.001   #  how much smaller is mixture compared to maximum
 
     for nt in xrange(dec.nTets):
         if not singles:

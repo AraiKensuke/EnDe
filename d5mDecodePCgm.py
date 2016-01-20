@@ -62,6 +62,7 @@ class simDecode():
     snpsht_covs= []
     snpsht_ms  = []
     snpsht_gz  = []
+    spdMult   = 0.5
 
     def init(self, kde=False, bx=None, Bx=None, Bm=None):
         oo = self
@@ -200,31 +201,32 @@ class simDecode():
         oo.tr_pos   = []
         oo.tr_marks = []
 
+        setprior = True   #TEMPORARY.  After init, make it a prior
         for nt in xrange(oo.nTets):
             oo.tr_pos.append(_N.array(stpos[nt]))
             oo.tr_marks.append(_N.array(marks[nt]))
 
 
         if not oo.kde:
-            oo.snpsht_us.append([])
-            oo.snpsht_covs.append([])
-            oo.snpsht_ms.append([])
-            oo.snpsht_gz.append([])
+            # oo.snpsht_us.append([])
+            # oo.snpsht_covs.append([])
+            # oo.snpsht_ms.append([])
+            # oo.snpsht_gz.append([])
 
             tt2 = _tm.time()
             if initPriors:
                 for nt in xrange(oo.nTets):
-                    oo.mvNrm[nt].init0(stpos[nt], marks[nt], 0, nspks[nt], sepHash=oo.sepHash, pctH=oo.pctH, MS=oo.MS, sepHashMthd=oo.sepHashMthd, doTouchUp=doTouchUp, MF=MF, kmeansinit=kmeansinit)
+                    oo.mvNrm[nt].init0(stpos[nt], marks[nt], 0, nspks[nt], sepHash=oo.sepHash, pctH=oo.pctH, MS=oo.MS, sepHashMthd=oo.sepHashMthd, doTouchUp=doTouchUp, MF=MF, kmeansinit=kmeansinit)#, setprior=setprior)
             tt3 = _tm.time()
             for nt in xrange(oo.nTets):
                 print "encode Doing fit tetrode %d" % nt
                 oo.mvNrm[nt].fit(oo.mvNrm[nt].M, stpos[nt], marks[nt], 0, nspks[nt], init=initPriors)
                 oo.mvNrm[nt].set_priors_and_initial_values(telapse=telapse)
 
-                oo.snpsht_us[-1].append(_N.array(oo.mvNrm[nt].us))
-                oo.snpsht_covs[-1].append(_N.array(oo.mvNrm[nt].covs))
-                oo.snpsht_ms[-1].append(_N.array(oo.mvNrm[nt].ms))
-                oo.snpsht_gz[-1].append(_N.array(oo.mvNrm[nt].gz))
+                # oo.snpsht_us[-1].append(_N.array(oo.mvNrm[nt].us))
+                # oo.snpsht_covs[-1].append(_N.array(oo.mvNrm[nt].covs))
+                # oo.snpsht_ms[-1].append(_N.array(oo.mvNrm[nt].ms))
+                # oo.snpsht_gz[-1].append(_N.array(oo.mvNrm[nt].gz))
             tt4 = _tm.time()
             print (tt2-tt1)
             print (tt3-tt2)
@@ -266,10 +268,10 @@ class simDecode():
 
             #  avg. time it takes to move 1 grid is 1 / _N.mean(_N.abs(spdGrdUnts))
             #  p(i+1, i) = 1/<avg spdGrdUnts>
-            p1 = _N.mean(_N.abs(spdGrdUnts))*0.5
+            p1 = _N.mean(_N.abs(spdGrdUnts))*oo.spdMult
             #  assume Nx is even
             #k2 = 0.02
-            k2 = 0.04
+            k2 = 0.1
             k3 = 0.1
             for i in xrange(0, oo.Nx/2):
                 oo.xTrs[i, i] = 1-p1

@@ -41,10 +41,10 @@ class mixNormDatPoi:
 
     Fm     = 0.999
 
-    sivu   = 0.1
+    sivu   = 0.1        #  position mean 
     sivs   = 0.03
     siva   = 0.5
-    sivm   = 0.02
+    sivm   = 0.02       #  mark mean wander
     xA     = 4
     mA     = 4
 
@@ -163,11 +163,12 @@ class mixNormDatPoi:
             for mpf in xrange(Npf):
                 oo.uP[m, mpf]   = _N.interp(ts, _ts, oo._uP[m, mpf])
                 oo.stdP[m, mpf] = _N.interp(ts, _ts, _N.abs(oo._stdP[m, mpf])) + oo.stdPMags[m, mpf]
-                oo.alp[m, mpf] = _N.log(_N.interp(ts, _ts, _N.abs(oo._alp[m, mpf])) + 8 + 40*_N.random.rand())
+                oo.alp[m, mpf] = _N.log(_N.interp(ts, _ts, _N.abs(oo._alp[m, mpf])))
 
         ######  now create spikes
         oo.marks    = _N.empty((oo.N, 1), dtype=list)
 
+        nspks = 0
         for m in xrange(M):#  For each cluster
             fr          = _N.zeros(oo.N)
             for mpf in xrange(Npf):
@@ -187,11 +188,13 @@ class mixNormDatPoi:
                     oo.marks[tm, 0] = [mk]
                 else:
                     oo.marks[tm, 0].append(mk)
+                nspks += 1
 
         #kde = _kde.kde(setname)
         #oo.marks = None
         #kde.est(oo.pos, oo.marks, oo.k, oo.xA, oo.mA, oo.Nx, oo.Nm, oo.Bx, oo.Bm, oo.bx, t0=t0, t1=t1, filename="kde.dump")
 
+        print "total spikes created %d" % nspks
         dmp = open(_edd.resFN("marks.pkl", dir=setname, create=True), "wb")
         pickle.dump(oo, dmp, -1)
         dmp.close()

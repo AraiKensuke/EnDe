@@ -162,7 +162,6 @@ class simDecode():
 
         if initPriors:
             oo.all_pos = _N.empty(oo.encN)
-            print "here"
             ii = 0
             for ein in xrange(encIntvs.shape[0]):
                 oo.all_pos[ii:ii+(encIntvs[ein,1]-encIntvs[ein,0])] = oo.pos[encIntvs[ein,0]:encIntvs[ein,1]]
@@ -220,9 +219,7 @@ class simDecode():
                         oo.mvNrm[nt].us[m] = oo.mvNrm[nt].smu[0, m]
                         oo.mvNrm[nt].covs[m] = oo.mvNrm[nt].scov[0, m]
                         oo.mvNrm[nt].ms[m] = oo.mvNrm[nt].sm[0, m]
-                        
 
-        print "setLmd0"
         oo.setLmd0(nspks)
 
     def decode(self, t0, t1):
@@ -259,10 +256,10 @@ class simDecode():
 
             #  avg. time it takes to move 1 grid is 1 / _N.mean(_N.abs(spdGrdUnts))
             #  p(i+1, i) = 1/<avg spdGrdUnts>
-            p1 = _N.mean(_N.abs(spdGrdUnts))*0.5
+            p1 = _N.mean(_N.abs(spdGrdUnts))*1
             #  assume Nx is even
             #k2 = 0.02
-            k2 = 0.04
+            k2 = 0.2
             k3 = 0.1
             for i in xrange(0, oo.Nx/2):
                 oo.xTrs[i, i] = 1-p1
@@ -326,6 +323,7 @@ class simDecode():
         if not oo.kde:
             for nt in xrange(oo.nTets):
                 oo.mvNrm[nt].iSgs  = _N.linalg.inv(oo.mvNrm[nt].covs)
+                
                 oo.mvNrm[nt].i2pidcovs = 1/_N.sqrt(2*_N.pi*_N.linalg.det(oo.mvNrm[nt].covs))
                 oo.mvNrm[nt].i2pidcovsr= oo.mvNrm[nt].i2pidcovs.reshape((oo.mvNrm[nt].M, 1))
         for t in xrange(t0+1,t1): # start at 1 because initial condition

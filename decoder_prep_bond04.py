@@ -9,6 +9,8 @@ mLp = _sio.loadmat('../SpkSrtd/bonlinpos04.mat')
 
 ex=4-1; ep=2-1;
 
+#  episodes 2, 4, 6
+
 #%%
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%%%%            Linearization           %%%% 
@@ -39,7 +41,6 @@ _plt.plot(time[seg3[0]], -1*lindist[seg3[0]], ls="", marker=".")
 # % plot(time(seg2),-lindist(seg2),'r.');
 # % plot(time(seg3),-lindist(seg3),'m.');
 # % hold off
-
 
 posT1=time[seg1]
 posL1=lindist[seg1]/max(lindist[seg1])
