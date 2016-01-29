@@ -21,14 +21,15 @@ anim3 = "bond"
 
 #  experimental data mark, position container
 
-rip = _sio.loadmat("../SpkSrtd/%(s2)s_data_day%(dy)d/%(s3)s/%(s1)sripplescons0%(dy)d.mat" % {"s1" : anim1, "s2" : anim2, "s3" : anim3, "dy" : day})
+rip = _sio.loadmat("../Data/%(s2)s_data_day%(dy)d/%(s3)s/%(s1)sripplescons0%(dy)d.mat" % {"s1" : anim1, "s2" : anim2, "s3" : anim3, "dy" : day})
 
 #  these are in seconds
 strt = rip["ripplescons"][0, ex][0, ep][0, 0]["starttime"][0,0]
 endt = rip["ripplescons"][0, ex][0, ep][0, 0]["endtime"][0,0]
 
-mLp = _sio.loadmat("../SpkSrtd/%(s2)s_data_day%(dy)d/%(s3)s/%(s1)slinpos0%(dy)d.mat" % {"s1" : anim1, "s2" : anim2, "s3" : anim3, "dy" : day})
-mRp = _sio.loadmat("../SpkSrtd/%(s2)s_data_day%(dy)d/%(s3)s/%(s1)srawpos0%(dy)d.mat" % {"s1" : anim1, "s2" : anim2, "s3" : anim3, "dy" : day})
+mLp = _sio.loadmat("../Data/%(s2)s_data_day%(dy)d/%(s3)s/%(s1)slinpos0%(dy)d.mat" % {"s1" : anim1, "s2" : anim2, "s3" : anim3, "dy" : day})
+mRp = _sio.loadmat("../Data/%(s2)s_data_day%(dy)d/%(s3)s/%(s1)srawpos0%(dy)d.mat" % {"s1" : anim1, "s2" : anim2, "s3" : anim3, "dy" : day})
+
 
 ex=4-1; ep=4-1;
 
@@ -420,7 +421,7 @@ marks   =  _N.empty((t1-t0, len(tetlist)), dtype=list)
 it      = -1
 for tet in tetlist:
     it += 1
-    A = _sio.loadmat("../SpkSrtd/bond_data_day4/bond04/%(tt)s/bond04-%(tt)s_params.mat" % {"tt" : tet})
+    A = _sio.loadmat("../Data/bond_data_day4/bond04/%(tt)s/bond04-%(tt)s_params.mat" % {"tt" : tet})
     t_champs = A["filedata"][0,0]["params"][:, 0:5]  # time and amplitudes
     t_champs[:, 1:5] /= 50.
 
@@ -488,6 +489,7 @@ emc.Nx    = 50
 emc.Nm    = 50
 
 emc.save(ep+1)
+
 
 
 

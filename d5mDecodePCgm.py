@@ -264,7 +264,7 @@ class simDecode():
         else:
             grdsz = (12./oo.Nx)
 
-            spdGrdUnts = _N.diff(oo.pos) / grdsz  # unit speed ( per ms ) in grid units
+            spdGrdUnts = 0.2*_N.diff(oo.pos) / grdsz  # unit speed ( per ms ) in grid units
 
             #  avg. time it takes to move 1 grid is 1 / _N.mean(_N.abs(spdGrdUnts))
             #  p(i+1, i) = 1/<avg spdGrdUnts>

@@ -467,5 +467,3 @@ class fitMvNorm:
         zs = _N.sum(oo.ms*cmps, axis=0)
 
         return zs
-        
-        
