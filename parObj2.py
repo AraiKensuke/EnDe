@@ -2,21 +2,26 @@ import numpy as np
 import multiprocessing as mp
 
 class Tester:
-    num = 0.0
-    def __init__(self, tnum=num):
-        self.num  = tnum
-        print self.num
+    def __init__(self, tnum=-1):
+        self.num   = tnum
+        self.num2  = 10*tnum
 
-    def modme(self, nn):
+    def modme(self, nn, val2=None):
         self.num += nn
-        print self.num
+        if val2 is not None:
+            print "Got non-None value for val2"
+            self.num2 = val2
         #return self
         return (nn+5)
 
-def modhelp(test, nn):
-    test.modme(nn)
-    #out_queue.put(test)
+def modhelp(test, name, *args, **kwargs):
+    callme = getattr(test, name)
+    callme(*args, **kwargs)#, kwargs)
     return test
+
+def modhelpSP(test, nn, name, **kwargs):
+    callme = getattr(test, name)
+    callme(nn, **kwargs)#, kwargs)
 
 
 N = 2
@@ -25,8 +30,11 @@ p = mp.Pool(processes=N)
 tts = _N.empty(N, dtype=object)
 for nt in xrange(N):
     tts[nt] = Tester(tnum=nt)
+    #modhelpSP(tts[nt], nt+5, "modme", val2=(nt*5))
+
 
 results = _N.empty(N, dtype=object)
 for nt in xrange(N):
-    print "doing this"
-    results[nt] = p.apply_async(modhelp, args=(tts[nt], nt+5,))
+    kwds = {"val2" : (nt*5+1)}
+    results[nt] = p.apply_async(modhelp, args=(tts[nt], "modme", nt+5, ), kwds=kwds)
+

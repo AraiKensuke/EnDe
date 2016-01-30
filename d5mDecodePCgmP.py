@@ -15,6 +15,14 @@ import multiprocessing as _mp
 #  In our case with no history dependence
 #  p(X_t | dN_t, m_t) 
 
+def par_call_class_mthd(test, name, *args, **kwargs):
+    """
+    helper function for calling a class method inside a pool.apply_async
+    """
+    callme = getattr(test, name)
+    callme(*args, **kwargs)
+    return test
+
 class simDecode():
     procs = None
     nTets   = 1
@@ -225,7 +233,7 @@ class simDecode():
                     kwargs = {"pctH" : oo.pctH, "MS" : oo.MS, "sepHashMthd" : oo.sepHashMthd, "MF" : MF, "kmeansinit" : kmeansinit, "returnMyself" : True}
                     for nt in xrange(oo.nTets):
                         print "call init0   %d" % nt
-                        oo.mvNrm[nt] = p.apply_async(oo.mvNrm[nt].init0, args=(stpos[nt], marks[nt], 0, nspks[nt]), kwds=kwargs).get()
+                        oo.mvNrm[nt] = p.apply_async(par_call_class_mthd, args=(oo.mvNrm[nt], "init0", stpos[nt], marks[nt], 0, nspks[nt]), kwds=kwargs).get()
 
             tt3 = _tm.time()
             # for nt in xrange(oo.nTets):
