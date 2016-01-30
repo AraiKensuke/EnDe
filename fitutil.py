@@ -1,5 +1,4 @@
 import numpy as _N
-import fastdist as _fdst
 import scipy.cluster.vq as scv
 import matplotlib.pyplot as _plt
 import clrs as _clrs

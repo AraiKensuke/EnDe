@@ -98,7 +98,7 @@ class fitMvNorm:
     #  M initial guess # of clusters
     #  k
     #  pos, mk    position and mark at spike time
-    def init0(self, pos, mk, n1, n2, sepHash=False, pctH=0.7, MS=None, sepHashMthd=0, doTouchUp=False, MF=None, kmeansinit=True):
+    def init0(self, pos, mk, n1, n2, pctH=0.7, MS=None, sepHashMthd=0, MF=None, kmeansinit=True, returnMyself=False):
         """
         M       total number of clusters
 
@@ -112,8 +112,6 @@ class fitMvNorm:
         k  = oo.k
         MF = oo.M if MF is None else MF
 
-        print "MF  %d" % MF
-
         _x   = _N.empty((n2-n1, k))
         _x[:, 0]    = pos
         _x[:, 1:]   = mk
@@ -121,52 +119,28 @@ class fitMvNorm:
 
         #  Gibbs sampling 
         ################  init cluster centers
-        if sepHash:  #  treat hash spikes seperately
-            ##########################
-            BINS    = 20
-            bins    = _N.linspace(-6, 6, BINS+1)
-            blksz   = 20
 
-            unonhash, hashsp = _fu.sepHashEM(_x)
-            labS, labH, clstrs = _fu.emMKPOS_sep3(_x[unonhash], _x[hashsp])
-            print labS
-            print labH
-            print "****   clusters sig:  %(1)d   hash:  %(2)d" % {"1" : clstrs[0], "2" : clstrs[1]}
+        ##########################
+        BINS    = 20
+        bins    = _N.linspace(-6, 6, BINS+1)
+        blksz   = 20
 
-            print "min labS %(min)d   max labS %(max)d" % {"min" :_N.min(labS), "max" : _N.max(labS)}
+        unonhash, hashsp = _fu.sepHashEM(_x)
+        labS, labH, clstrs = _fu.emMKPOS_sep3(_x[unonhash], _x[hashsp])
+        print "****   clusters sig:  %(1)d   hash:  %(2)d" % {"1" : clstrs[0], "2" : clstrs[1]}
 
-            MS = _N.max(_N.unique(labS)) + 1
-            ##################
-            lab        = _N.array(labS.tolist() + (labH + clstrs[0]).tolist())
-            x          = _N.empty((n2-n1, k))
-            if sepHashMthd == 0:
-                x[:, 0]    = _x[inds, 0]
-                x[:, 1:]   = _x[inds, 1:]
-            else:
-                x[0:len(unonhash)] = _x[unonhash]
-                x[len(unonhash):]  = _x[hashsp]
-        else:  #  don't separate hash from signal marks. simple kmeans2
-            x = _x
-            if not kmeansinit:  #  just random initial conditions
-                print "random initial conditions"
-                lab = _N.array(_N.random.rand(N)*MF, dtype=_N.int)
-            else:
-                ITERS = 20
-                labsAll = []
-                mAll    = []
-                bics  = _N.empty(ITERS)
+        print "min labS %(min)d   max labS %(max)d" % {"min" :_N.min(labS), "max" : _N.max(labS)}
 
-                for it in xrange(ITERS):
-                    scr, lab = scv.kmeans2(x, MF)
-                    _fu.contiguous_pack(lab)
-                    bic, K     = _fu.kmBIC(scr, lab, x)
-                    bics[it]   = bic
-                    mAll.append(K)
-                    labsAll.append(lab)
-
-                bestI = _N.where(bics == _N.max(bics))[0][0]
-                lab = labsAll[bestI]
-                MF  = mAll[bestI]
+        MS = _N.max(_N.unique(labS)) + 1
+        ##################
+        lab        = _N.array(labS.tolist() + (labH + clstrs[0]).tolist())
+        x          = _N.empty((n2-n1, k))
+        if sepHashMthd == 0:
+            x[:, 0]    = _x[inds, 0]
+            x[:, 1:]   = _x[inds, 1:]
+        else:
+            x[0:len(unonhash)] = _x[unonhash]
+            x[len(unonhash):]  = _x[hashsp]
 
         #  now assign the cluster we've found to Gaussian mixtures
         SI = N / MF
@@ -180,7 +154,7 @@ class fitMvNorm:
             if len(kinds) >= 6:   # problem when cov is not positive def.
                 oo.smu[0, im]  = _N.mean(x[kinds], axis=0)
                 oo.scov[0, im] = _N.cov(x[kinds], rowvar=0)
-                print "im %(im)d  %(c).3e" % {"im" : im, "c" : _N.linalg.det(oo.scov[0, im])}
+                #print "im %(im)d  %(c).3e" % {"im" : im, "c" : _N.linalg.det(oo.scov[0, im])}
                 if _N.linalg.det(oo.scov[0, im]) < 0:
                     print len(kinds)
                     print x[kinds]
@@ -192,6 +166,9 @@ class fitMvNorm:
                     oo.smu[0, im]  = _N.mean(x, axis=0)
                 oo.scov[0, im] = covAll*0.125
                 oo.sm[0, im]   = float(len(kinds)+1) / (N+MF)
+
+        if returnMyself:
+            return oo
         
 
     def fit(self, M, pos, mk, n1, n2, init=False):
