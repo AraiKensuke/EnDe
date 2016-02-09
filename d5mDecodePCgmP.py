@@ -9,6 +9,8 @@ import time as _tm
 import kdeutil as _ku
 import scipy.integrate as _si
 import multiprocessing as _mp
+import os
+import justInit as jI
 
 #  Decode unsorted spike train
 
@@ -153,6 +155,10 @@ class simDecode():
                 oo.mvNrm[nt].AR = oo.AR
                 oo.mvNrm[nt].AR0 = oo.AR0
 
+        if oo.procs > 1:
+            os.system("taskset -p 0xffffffff %d" % os.getpid())
+
+
     def encode(self, t0=None, t1=None, encIntvs=None, initPriors=False, MF=None, kmeansinit=True, telapse=0):
         """
         eIntvs: array of times whose spikes we use to create encoding model
@@ -233,7 +239,8 @@ class simDecode():
                     kwargs = {"pctH" : oo.pctH, "MS" : oo.MS, "sepHashMthd" : oo.sepHashMthd, "MF" : MF, "kmeansinit" : kmeansinit, "returnMyself" : True}
                     for nt in xrange(oo.nTets):
                         print "call init0   %d" % nt
-                        oo.mvNrm[nt] = p.apply_async(par_call_class_mthd, args=(oo.mvNrm[nt], "init0", stpos[nt], marks[nt], 0, nspks[nt]), kwds=kwargs).get()
+                        #oo.mvNrm[nt] = p.apply_async(par_call_class_mthd, args=(oo.mvNrm[nt], "init0", stpos[nt], marks[nt], 0, nspks[nt]), kwds=kwargs).get()
+                        oo.mvNrm[nt] = p.apply_async(jI.init0, args=(stpos[nt], marks[nt], 0, nspks[nt]), kwds=kwargs).get()
 
             tt3 = _tm.time()
             # for nt in xrange(oo.nTets):
@@ -250,7 +257,7 @@ class simDecode():
             # print (tt3-tt2)
             # print (tt4-tt3)
 
-        oo.setLmd0(nspks)
+        #oo.setLmd0(nspks)
 
     def decode(self, t0, t1):
         oo = self

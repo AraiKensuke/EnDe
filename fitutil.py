@@ -343,7 +343,7 @@ def emMKPOS_sep3(nhmks, hmks, TR=5, minK=2, maxK=15):
     """
     EM for wf cluster, heuristic density for position
     """
-    TR = 3
+    TR = 2
     minK=5
     maxK=15
 
@@ -521,7 +521,7 @@ def emMKPOS_sep3(nhmks, hmks, TR=5, minK=2, maxK=15):
             inds[_N.where(inds >= 0)[0]] += startCl  #  only the ones used for init
             startCl += pClstrs
             bestLabMP[inThisClstr] = inds
-            print bestLabMP[inThisClstr]
+            #print bestLabMP[inThisClstr]
         #_plt.savefig("posClstrs")
 
         startClstrs[iNH] = startCl

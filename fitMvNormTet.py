@@ -124,9 +124,10 @@ class fitMvNorm:
         BINS    = 20
         bins    = _N.linspace(-6, 6, BINS+1)
         blksz   = 20
-
+        
         unonhash, hashsp = _fu.sepHashEM(_x)
-        labS, labH, clstrs = _fu.emMKPOS_sep3(_x[unonhash], _x[hashsp])
+
+        labS, labH, clstrs = _fu.emMKPOS_sep(_x[unonhash], _x[hashsp])
         print "****   clusters sig:  %(1)d   hash:  %(2)d" % {"1" : clstrs[0], "2" : clstrs[1]}
 
         print "min labS %(min)d   max labS %(max)d" % {"min" :_N.min(labS), "max" : _N.max(labS)}
@@ -185,7 +186,8 @@ class fitMvNorm:
             x[:, 1:]   = mk
             N   = n2-n1
             oo.pmdim = k
-            oo.gz   = _N.zeros((oo.ITERS, N, M), dtype=_N.int)
+            #oo.gz   = _N.zeros((oo.ITERS, N, M), dtype=_N.int8)
+            oo.gz   = _N.zeros((oo.ITERS, N, M), dtype=_N.bool)
             oo.gz[:,:,:] = 0
 
             if init:
@@ -374,11 +376,11 @@ class fitMvNorm:
         with open('po_alpha.txt', 'a') as fh:
             _N.savetxt(fh, oo.PR_m_alp.reshape(1, oo.M), fmt=("%.3e " * oo.M))
         fh.close()
-        print "=========   set_priors"
-        print oo.PR_m_alp
+        # print "=========   set_priors"
+        # print oo.PR_m_alp
 
-        print "=========   set_priors"
-        print oo.PR_m_alp
+        # print "=========   set_priors"
+        # print oo.PR_m_alp
         #  prior of cluster center is current
         #  posterior distribution of cluster center
         tS = _N.sqrt(telapse / 60000.)

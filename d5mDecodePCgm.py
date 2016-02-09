@@ -216,7 +216,7 @@ class simDecode():
             tt2 = _tm.time()
             if initPriors:
                 for nt in xrange(oo.nTets):
-                    oo.mvNrm[nt].init0(stpos[nt], marks[nt], 0, nspks[nt], sepHash=oo.sepHash, pctH=oo.pctH, MS=oo.MS, sepHashMthd=oo.sepHashMthd, doTouchUp=doTouchUp, MF=MF, kmeansinit=kmeansinit)#, setprior=setprior)
+                    oo.mvNrm[nt].init0(stpos[nt], marks[nt], 0, nspks[nt], pctH=oo.pctH, MS=oo.MS, sepHashMthd=oo.sepHashMthd, MF=MF, kmeansinit=kmeansinit)#, setprior=setprior)
             tt3 = _tm.time()
             for nt in xrange(oo.nTets):
                 print "encode Doing fit tetrode %d" % nt
