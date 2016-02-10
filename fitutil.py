@@ -152,9 +152,9 @@ def emMKPOS(nhmks, hmks, TR=5, minK=2, maxK=15):
     return bestLabs[0], bestLabs[1]
 
 def emMKPOS_sep(nhmks, hmks, TR=5, minK=2, maxK=15):
-    TR = 5
+    TR = 2
     minK=2
-    maxK=15
+    maxK=8
 
     iNH = -1
     sNH = ["nh", "h"]

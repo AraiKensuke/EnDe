@@ -98,7 +98,7 @@ class fitMvNorm:
     #  M initial guess # of clusters
     #  k
     #  pos, mk    position and mark at spike time
-    def init0(self, pos, mk, n1, n2, pctH=0.7, MS=None, sepHashMthd=0, MF=None, kmeansinit=True, returnMyself=False):
+    def init0(self, pos, mk, n1, n2, MS=None, sepHashMthd=0, MF=None, kmeansinit=True):
         """
         M       total number of clusters
 
@@ -168,11 +168,8 @@ class fitMvNorm:
                 oo.scov[0, im] = covAll*0.125
                 oo.sm[0, im]   = float(len(kinds)+1) / (N+MF)
 
-        if returnMyself:
-            return oo
-        
-
-    def fit(self, M, pos, mk, n1, n2, init=False):
+    #def fit(self, M, pos, mk, n1, n2, init=False):
+    def fit(self, M, pos, mk, n1, n2, init):
         """
         Fit, with the inverting done in blocks
         """
@@ -339,7 +336,6 @@ class fitMvNorm:
             #  When I say prior for mu, I mean I have hyper parameters mu_mu and mu_sg.
             #  hyperparameters are not sampled
 
-            print oo.po_alpha[oo.ITERS-1]
             #hITERS = int(oo.ITERS*0.75)
             hITERS = 0
             oo.us[:]  = _N.mean(oo.smu[hITERS:oo.ITERS], axis=0)
@@ -349,13 +345,9 @@ class fitMvNorm:
             oo.dat = x
         else:
             print "NO DATA for this encoding epoch.  Not doing anything."
+        
 
 
-        print "!!!!!!!!!!!!!!!!!!!!"
-        print oo.PR_m_alp[0:M]
-        print _N.sum(oo.gz[oo.ITERS-1], axis=0)
-        print oo.po_alpha[oo.ITERS-1]
-        print "^-^^^^^^^^^^^^^^^^"
     ###
     ###   length of previous (encoding episode + decoding episode) * AR
     ###   AR = adaptation rate - per minute
