@@ -98,7 +98,7 @@ class fitMvNorm:
     #  M initial guess # of clusters
     #  k
     #  pos, mk    position and mark at spike time
-    def init0(self, pos, mk, n1, n2, MS=None, sepHashMthd=0, MF=None, kmeansinit=True):
+    def init0(self, pos, mk, n1, n2):
         """
         M       total number of clusters
 
@@ -110,7 +110,7 @@ class fitMvNorm:
         oo = self
 
         k  = oo.k
-        MF = oo.M if MF is None else MF
+        MF = oo.M 
 
         _x   = _N.empty((n2-n1, k))
         _x[:, 0]    = pos
@@ -126,25 +126,30 @@ class fitMvNorm:
         blksz   = 20
         
         unonhash, hashsp = _fu.sepHashEM(_x)
+        if (len(unonhash) > 0) and (len(hashsp) > 0):
+            labS, labH, clstrs = _fu.emMKPOS_sep(_x[unonhash], _x[hashsp])
+        elif len(unonhash) == 0:
+            labS, labH, clstrs = _fu.emMKPOS_sep(None, _x[hashsp])
+        else:
+            labS, labH, clstrs = _fu.emMKPOS_sep(_x[unonhash], None)
 
-        labS, labH, clstrs = _fu.emMKPOS_sep(_x[unonhash], _x[hashsp])
         print "****   clusters sig:  %(1)d   hash:  %(2)d" % {"1" : clstrs[0], "2" : clstrs[1]}
 
-        print "min labS %(min)d   max labS %(max)d" % {"min" :_N.min(labS), "max" : _N.max(labS)}
-
-        MS = _N.max(_N.unique(labS)) + 1
+        MS     = 0
+        if len(labS) > 0:
+            MS = _N.max(_N.unique(labS)) + 1
         ##################
         lab        = _N.array(labS.tolist() + (labH + clstrs[0]).tolist())
         x          = _N.empty((n2-n1, k))
-        if sepHashMthd == 0:
-            x[:, 0]    = _x[inds, 0]
-            x[:, 1:]   = _x[inds, 1:]
-        else:
+
+        strt = 0
+        if len(unonhash) > 0:
             x[0:len(unonhash)] = _x[unonhash]
-            x[len(unonhash):]  = _x[hashsp]
+            strt = len(unonhash)
+        if len(hashsp) > 0:
+            x[strt:]  = _x[hashsp]
 
         #  now assign the cluster we've found to Gaussian mixtures
-        SI = N / MF
         covAll = _N.cov(x.T)
         dcovMag= _N.diagonal(covAll)*0.005
 
@@ -183,7 +188,7 @@ class fitMvNorm:
             x[:, 1:]   = mk
             N   = n2-n1
             oo.pmdim = k
-            #oo.gz   = _N.zeros((oo.ITERS, N, M), dtype=_N.int8)
+            #oo.gz   = _N.zeros((oo.ITERS, N, M), dtype=_N.int)
             oo.gz   = _N.zeros((oo.ITERS, N, M), dtype=_N.bool)
             oo.gz[:,:,:] = 0
 

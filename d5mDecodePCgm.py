@@ -24,11 +24,13 @@ def parWrapFit(args):
     M     = args[1]
     stpos = args[2]
     marks = args[3]
-    n1    = args[4]
-    n2    = args[5]
-    initPriors    = args[6]
-    telapse    = args[7]
-    mvNrm.fit(M, stpos, marks, n1, n2, init=initPriors)
+    initPriors    = args[4]
+    telapse    = args[5]
+    n12s    = args[6]
+
+    if initPriors:
+        mvNrm.init0(stpos, marks, n12s[0], n12s[1])
+    mvNrm.fit(M, stpos, marks, n12s[0], n12s[1], init=initPriors)
     mvNrm.set_priors_and_initial_values(telapse=telapse)
 
     return mvNrm
@@ -235,29 +237,28 @@ class simDecode():
             # oo.snpsht_ms.append([])
             # oo.snpsht_gz.append([])
 
-            tt2 = _tm.time()
-            if initPriors:
-                for nt in xrange(oo.nTets):
-                    oo.mvNrm[nt].init0(stpos[nt], marks[nt], 0, nspks[nt], MS=oo.MS, sepHashMthd=oo.sepHashMthd, MF=MF, kmeansinit=kmeansinit)#, setprior=setprior)
-            tt3 = _tm.time()
-            #for nt in xrange(oo.nTets):
-            
+            tt1 = _tm.time()
             if oo.procs == 1:
+                if initPriors:
+                    for nt in xrange(oo.nTets):
+                        oo.mvNrm[nt].init0(stpos[nt], marks[nt], 0, nspks[nt])
                 for nt in xrange(oo.nTets):
                     print "encode Doing fit tetrode %d" % nt
                     oo.mvNrm[nt].fit(oo.mvNrm[nt].M, stpos[nt], marks[nt], 0, nspks[nt], init=initPriors)
                     oo.mvNrm[nt].set_priors_and_initial_values(telapse=telapse)
             else:
                 print "multiprocess"
-                Ms  = _N.empty(oo.nTets, dtype=_N.int)
-                Zs  = _N.zeros(oo.nTets, dtype=_N.int)
+                Ms   = _N.empty(oo.nTets, dtype=_N.int)
                 IPs  = _N.ones(oo.nTets, dtype=_N.bool)
                 tes  = _N.ones(oo.nTets, dtype=_N.int)
+                n12s = _N.zeros((oo.nTets, 2), dtype=_N.int)
+
                 for nt in xrange(oo.nTets):
                     Ms[nt] = oo.mvNrm[nt].M
                     IPs[nt] = initPriors
                     tes[nt] = telapse
-                tpl_args = zip(oo.mvNrm, Ms, stpos, marks, Zs, nspks, IPs, tes)
+                    n12s[nt] = 0, nspks[nt]
+                tpl_args = zip(oo.mvNrm, Ms, stpos, marks, IPs, tes, n12s)
     
                 sxv = pool.map(parWrapFit, tpl_args)
                 for nt in xrange(oo.nTets):
@@ -266,10 +267,8 @@ class simDecode():
                 # oo.snpsht_covs[-1].append(_N.array(oo.mvNrm[nt].covs))
                 # oo.snpsht_ms[-1].append(_N.array(oo.mvNrm[nt].ms))
                 # oo.snpsht_gz[-1].append(_N.array(oo.mvNrm[nt].gz))
-            tt4 = _tm.time()
-            print (tt2-tt1)
-            print (tt3-tt2)
-            print (tt4-tt3)
+            tt2 = _tm.time()
+            print "time for init0 + fit:  %.3f" % (tt2-tt1)
 
         oo.setLmd0(nspks)
 

@@ -138,7 +138,7 @@ class mixNormDatPoi:
                 oo.Cov[m, ik, ik] = oo.min_var + (oo.max_var - oo.min_var)*_N.random.rand()
             for ik1 in xrange(k):
                 for ik2 in xrange(ik1 + 1, k):        #  set up cov. matrices
-                    oo.Cov[m, ik1, ik2] = 0.04*(0.1+_N.abs(_N.random.randn()))
+                    oo.Cov[m, ik1, ik2] = 0.4*(0.6+0.4*_N.abs(_N.random.rand()))*_N.sqrt(oo.Cov[m, ik1, ik1]*oo.Cov[m, ik2, ik2])
                     oo.Cov[m, ik2, ik1] = oo.Cov[m, ik1, ik2]
 
         oo._stdP[:, 0] = 0.1*_N.random.randn()

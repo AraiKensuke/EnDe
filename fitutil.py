@@ -165,90 +165,93 @@ def emMKPOS_sep(nhmks, hmks, TR=5, minK=2, maxK=15):
     startClstrs = _N.empty(2, dtype=_N.int)
     for mks in [nhmks, hmks]:
         iNH += 1
-        labs, bics, bestLab, nClstrs = _oT.EMwfBICs(mks, minK=minK, maxK=maxK, TR=TR)
-        bestLab = _N.array(labs[nClstrs-minK, 0], dtype=_N.int)
-
-        #    if mks == nhmks:
-
-        ##  non-hash, do spatial clustering
-
         startCl = 0 
-        bestLabMP = _N.array(bestLab)
-        maxK = 3
-        minK = 1
+        bestLabMP = None
+        if mks is not None:
+            labs, bics, bestLab, nClstrs = _oT.EMwfBICs(mks, minK=minK, maxK=maxK, TR=TR)
+            bestLab = _N.array(labs[nClstrs-minK, 0], dtype=_N.int)
 
-        splitSpace = _single_
+            #    if mks == nhmks:
 
-        if splitSpace == _qrtrd_:
+            ##  non-hash, do spatial clustering
+
+            bestLabMP = _N.array(bestLab)
             maxK = 3
-        if splitSpace == _halved_:
-            maxK = 4
-        if splitSpace == _single_:
-            maxK = 7
+            minK = 1
 
-        print "neurons for iNH=%(nh)d   %(nc)d" % {"nh" : iNH, "nc" : nClstrs}
-        for nc in xrange(nClstrs):
-            inThisClstr = _N.where(bestLab == nc)[0]
-            pbestLab = _N.ones(len(inThisClstr), dtype=_N.int) * -1   #  poslabs
-            pos = mks[inThisClstr, 0]
-            pos = pos.reshape(len(inThisClstr), 1)
+            splitSpace = _single_
 
             if splitSpace == _qrtrd_:
-                nB_pos = _N.where((pos >= -6) & (pos < -3))[0]   #  -6 to -3
-                nF_pos = _N.where((pos >= -3) & (pos < 0))[0]   #  -3 to 0
-                pF_pos = _N.where((pos >= 0)  & (pos < 3))[0]   #  0 to 3
-                pB_pos = _N.where(pos >= 3)[0]
+                maxK = 3
+            if splitSpace == _halved_:
+                maxK = 4
+            if splitSpace == _single_:
+                maxK = 7
 
-                nB_pClstrs = nF_pClstrs = pF_pClstrs = pB_pClstrs = 0
+            print "neurons for iNH=%(nh)d   %(nc)d" % {"nh" : iNH, "nc" : nClstrs}
+            for nc in xrange(nClstrs):
+                inThisClstr = _N.where(bestLab == nc)[0]
+                pbestLab = _N.ones(len(inThisClstr), dtype=_N.int) * -1   #  poslabs
+                pos = mks[inThisClstr, 0]
+                pos = pos.reshape(len(inThisClstr), 1)
 
-                #########
-                if len(nB_pos) >= minSz:
-                    nB_plabs, nB_pbics, nB_pbestLab, nB_pClstrs = _oT.EMposBICs(pos[nB_pos], minK=minK, maxK=maxK, TR=2)
-                    nB_pClstrs = contiguous_pack2(nB_pbestLab)
-                    pbestLab[nB_pos] = nB_pbestLab
-                #########
-                if len(nF_pos) >= minSz:
-                    nF_plabs, nF_pbics, nF_pbestLab, nF_pClstrs = _oT.EMposBICs(pos[nF_pos], minK=minK, maxK=maxK, TR=2)
-                    nF_pClstrs = contiguous_pack2(nF_pbestLab)
-                    pbestLab[nF_pos] = nF_pbestLab + nB_pClstrs
-                #########
-                if len(pF_pos) >= minSz:
-                    pF_plabs, pF_pbics, pF_pbestLab, pF_pClstrs = _oT.EMposBICs(pos[pF_pos], minK=minK, maxK=maxK, TR=2)
-                    pF_pClstrs = contiguous_pack2(pF_pbestLab)
-                    pbestLab[pF_pos] = pF_pbestLab + nB_pClstrs + nF_pClstrs
-                #########
-                if len(pB_pos) >= minSz:
-                    pB_plabs, pB_pbics, pB_pbestLab, pB_pClstrs = _oT.EMposBICs(pos[pB_pos], minK=minK, maxK=maxK, TR=2)
-                    pB_pClstrs = contiguous_pack2(pB_pbestLab)
-                    pbestLab[pB_pos] = pB_pbestLab + nB_pClstrs + nF_pClstrs + pF_pClstrs
-                pClstrs    = nB_pClstrs + nF_pClstrs + pF_pClstrs + pB_pClstrs
-            elif splitSpace == _halved_:
-                n_pos = _N.where((pos >= -6) & (pos < 0))[0]   #  -6 to -3
-                p_pos = _N.where(pos >= 0)[0]   #  0 to 3
+                if splitSpace == _qrtrd_:
+                    nB_pos = _N.where((pos >= -6) & (pos < -3))[0]   #  -6 to -3
+                    nF_pos = _N.where((pos >= -3) & (pos < 0))[0]   #  -3 to 0
+                    pF_pos = _N.where((pos >= 0)  & (pos < 3))[0]   #  0 to 3
+                    pB_pos = _N.where(pos >= 3)[0]
 
-                n_pClstrs  = p_pClstrs  = 0
+                    nB_pClstrs = nF_pClstrs = pF_pClstrs = pB_pClstrs = 0
 
-                if len(n_pos) >= minSz:
-                    n_plabs, n_pbics, n_pbestLab, n_pClstrs = _oT.EMposBICs(pos[n_pos], minK=minK, maxK=maxK, TR=2)
-                    n_pClstrs = contiguous_pack2(n_pbestLab)
-                    pbestLab[n_pos] = n_pbestLab
-                #########
-                if len(p_pos) >= minSz:
-                    p_plabs, p_pbics, p_pbestLab, p_pClstrs = _oT.EMposBICs(pos[p_pos], minK=minK, maxK=maxK, TR=10)
-                    p_pClstrs = contiguous_pack2(p_pbestLab)
-                    pbestLab[p_pos] = n_pbestLab + p_pClstrs
-                pClstrs    = n_pClstrs + p_pClstrs
-            else:
-                plabs, pbics, pbestLab, pClstrs = _oT.EMposBICs(pos, minK=minK, maxK=maxK, TR=2)
-                pClstrs = contiguous_pack2(pbestLab)
+                    #########
+                    if len(nB_pos) >= minSz:
+                        nB_plabs, nB_pbics, nB_pbestLab, nB_pClstrs = _oT.EMposBICs(pos[nB_pos], minK=minK, maxK=maxK, TR=2)
+                        nB_pClstrs = contiguous_pack2(nB_pbestLab)
+                        pbestLab[nB_pos] = nB_pbestLab
+                    #########
+                    if len(nF_pos) >= minSz:
+                        nF_plabs, nF_pbics, nF_pbestLab, nF_pClstrs = _oT.EMposBICs(pos[nF_pos], minK=minK, maxK=maxK, TR=2)
+                        nF_pClstrs = contiguous_pack2(nF_pbestLab)
+                        pbestLab[nF_pos] = nF_pbestLab + nB_pClstrs
+                    #########
+                    if len(pF_pos) >= minSz:
+                        pF_plabs, pF_pbics, pF_pbestLab, pF_pClstrs = _oT.EMposBICs(pos[pF_pos], minK=minK, maxK=maxK, TR=2)
+                        pF_pClstrs = contiguous_pack2(pF_pbestLab)
+                        pbestLab[pF_pos] = pF_pbestLab + nB_pClstrs + nF_pClstrs
+                    #########
+                    if len(pB_pos) >= minSz:
+                        pB_plabs, pB_pbics, pB_pbestLab, pB_pClstrs = _oT.EMposBICs(pos[pB_pos], minK=minK, maxK=maxK, TR=2)
+                        pB_pClstrs = contiguous_pack2(pB_pbestLab)
+                        pbestLab[pB_pos] = pB_pbestLab + nB_pClstrs + nF_pClstrs + pF_pClstrs
+                    pClstrs    = nB_pClstrs + nF_pClstrs + pF_pClstrs + pB_pClstrs
+                elif splitSpace == _halved_:
+                    n_pos = _N.where((pos >= -6) & (pos < 0))[0]   #  -6 to -3
+                    p_pos = _N.where(pos >= 0)[0]   #  0 to 3
 
-            pbestLab[_N.where(pbestLab >= 0)[0]] += startCl  #  only the ones used for init
-            startCl += pClstrs
-            bestLabMP[inThisClstr] = pbestLab
+                    n_pClstrs  = p_pClstrs  = 0
+
+                    if len(n_pos) >= minSz:
+                        n_plabs, n_pbics, n_pbestLab, n_pClstrs = _oT.EMposBICs(pos[n_pos], minK=minK, maxK=maxK, TR=2)
+                        n_pClstrs = contiguous_pack2(n_pbestLab)
+                        pbestLab[n_pos] = n_pbestLab
+                    #########
+                    if len(p_pos) >= minSz:
+                        p_plabs, p_pbics, p_pbestLab, p_pClstrs = _oT.EMposBICs(pos[p_pos], minK=minK, maxK=maxK, TR=10)
+                        p_pClstrs = contiguous_pack2(p_pbestLab)
+                        pbestLab[p_pos] = n_pbestLab + p_pClstrs
+                    pClstrs    = n_pClstrs + p_pClstrs
+                else:
+                    plabs, pbics, pbestLab, pClstrs = _oT.EMposBICs(pos, minK=minK, maxK=maxK, TR=2)
+                    pClstrs = contiguous_pack2(pbestLab)
+
+                pbestLab[_N.where(pbestLab >= 0)[0]] += startCl  #  only the ones used for init
+                startCl += pClstrs
+                bestLabMP[inThisClstr] = pbestLab
         startClstrs[iNH] = startCl
-
-
-        bestLabs.append(_N.array(bestLabMP))
+        if bestLabMP is None:
+            bestLabs.append(_N.array([], dtype=_N.int))
+        else:
+            bestLabs.append(_N.array(bestLabMP))
     return bestLabs[0], bestLabs[1], startClstrs
 
 def emMKPOS_sep2(nhmks, hmks, TR=5, minK=2, maxK=15):
@@ -536,7 +539,7 @@ def sepHashEM(mks):
     hashes = []
 
     if mks.shape[0] > 500:
-        for sh in xrange(1, 5):
+        for sh in xrange(1, mks.shape[1]):
             rmks = mks[:, sh].reshape(mks.shape[0], 1)
             for ncmp in xrange(1, 3):
                 gmm = mixture.GMM(n_components=ncmp)

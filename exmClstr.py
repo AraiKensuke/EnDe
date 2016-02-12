@@ -58,7 +58,7 @@ def show_posmarks(dec, setname, ylim=None, win=None, singles=False):
         if not singles:
             _plt.suptitle("t0=%(2)d,t1=%(3)d" % {"2" : dec.tt0, "3" : dec.tt1})
             fn= "look" if (dec.usetets is None) else "look_tet%s" % dec.usetets[nt]
-            _plt.savefig(resFN("%(1)s_win=%(w)d.eps" % {"1" : fn, "w" : win}, dir=setname, create=True), transparent=True)
+            _plt.savefig(resFN("%(1)s_win=%(w)d.png" % {"1" : fn, "w" : win}, dir=setname, create=True), transparent=True)
             _plt.close()
 
 def showMarginalMarkDistributions(dec, setname, mklim=[-6, 8], dk=0.1):
