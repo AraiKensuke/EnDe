@@ -61,6 +61,58 @@ def show_posmarks(dec, setname, ylim=None, win=None, singles=False):
             _plt.savefig(resFN("%(1)s_win=%(w)d.png" % {"1" : fn, "w" : win}, dir=setname, create=True), transparent=True)
             _plt.close()
 
+def show_posmarksCNTR(dec, setname, mvNrm, ylim=None, win=None, singles=False, showScatter=True, baseFN="look", scatskip=1):
+    for nt in xrange(dec.nTets):
+        if not singles:
+            fig = _plt.figure(figsize=(7, 5))
+        for k in xrange(1, dec.mdim+1):
+            if singles:
+                fig = _plt.figure(figsize=(4, 3))
+                ax  = fig.add_subplot(1, 1, 1)
+            else:
+                ax  = fig.add_subplot(2, 2, k)
+
+            """
+            for l in xrange(dec.tt0, dec.tt1):
+                if (dec.marks[l, nt] is not None):
+                    x.append(dec.pos[l])
+                    y.append(dec.marks[l, nt][0][k-1])
+            """
+
+
+            _plt.xlim(-6, 6)
+            if ylim is not None:
+                _plt.ylim(ylim[0], ylim[1])
+            else:
+                ylim = _N.empty(2)
+                ylim[0] = _N.min(dec.tr_marks[nt][:, k-1])
+                ylim[1] = _N.max(dec.tr_marks[nt][:, k-1])
+                yAMP    = ylim[1] - ylim[0]
+                ylim[0] -= 0.1*yAMP
+                ylim[1] += 0.1*yAMP
+
+
+            if showScatter:
+                _plt.scatter(dec.tr_pos[nt][::scatskip], dec.tr_marks[nt][::scatskip, k-1], color="grey", s=1)
+            img = mvNrm.evalAll(1000, k-1, ylim=ylim)
+            _plt.imshow(img, origin="lower", extent=(-6, 6, ylim[0], ylim[1]), cmap=_plt.get_cmap("Reds"))
+            if singles:
+                _plt.suptitle("k=%(k)d  t0=%(2).2fs : t1=%(3).2fs" % {"2" : (dec.tt0/1000.), "3" : (dec.tt1/1000.), "k" : k})
+                fn= baseFN if (dec.usetets is None) else "%(fn)s_tet%(tets)s" % {"fn" : baseFN, "tets" : dec.usetets[nt]}
+
+                mF.arbitraryAxes(ax)
+                mF.setLabelTicks(_plt, xlabel="position", ylabel="mark", xtickFntSz=14, ytickFntSz=14, xlabFntSz=16, ylabFntSz=16)
+                fig.subplots_adjust(left=0.2, bottom=0.2, top=0.85)
+                _plt.savefig(resFN("%(k)d_%(1)s_win=%(w)d.eps" % {"1" : fn, "w" : win, "k" : k}, dir=setname), transparent=True)
+                _plt.close()
+
+
+        if not singles:
+            _plt.suptitle("t0=%(2)d,t1=%(3)d" % {"2" : dec.tt0, "3" : dec.tt1})
+            fn= baseFN if (dec.usetets is None) else "%(fn)s_tet%(tets)s" % {"fn" : baseFN, "tets" : dec.usetets[nt]}
+            _plt.savefig(resFN("%(1)s_win=%(w)d.png" % {"1" : fn, "w" : win}, dir=setname, create=True), transparent=True)
+            _plt.close()
+
 def showMarginalMarkDistributions(dec, setname, mklim=[-6, 8], dk=0.1):
     for tet in xrange(dec.nTets):
         ###    marginalize tetrode marks

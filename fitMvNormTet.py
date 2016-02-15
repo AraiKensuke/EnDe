@@ -64,7 +64,10 @@ class fitMvNorm:
         oo.k    = k
         oo.pmdim= oo.k
         oo.ITERS = ITERS
-        
+
+        oo.R    = _N.zeros((k, k))
+        oo.R[0, 0] = 0.2**2   #  per minute add 0.01
+        _N.fill_diagonal(oo.R[1:, 1:], 0.2**2)
         #  sampled variables
         oo.scov = _N.zeros((oo.ITERS, M, k, k))
         oo.smu  = _N.empty((oo.ITERS, M, k))
@@ -188,7 +191,6 @@ class fitMvNorm:
             x[:, 1:]   = mk
             N   = n2-n1
             oo.pmdim = k
-            #oo.gz   = _N.zeros((oo.ITERS, N, M), dtype=_N.int)
             oo.gz   = _N.zeros((oo.ITERS, N, M), dtype=_N.bool)
             oo.gz[:,:,:] = 0
 
@@ -380,12 +382,14 @@ class fitMvNorm:
         # print oo.PR_m_alp
         #  prior of cluster center is current
         #  posterior distribution of cluster center
-        tS = _N.sqrt(telapse / 60000.)
+
+        dt             = float(telapse)/60000.   #  in minutes
         oo.PR_mu_mu[:] = _N.mean(oo.po_mu_mu[mid:], axis=0)
-        oo.PR_mu_sg[:] = _N.mean(oo.po_mu_sg[mid:], axis=0)*(oo.AR0+oo.AR*tS)
-        print "adaptation factor  %.3f" % (oo.AR0+oo.AR*tS)
+        oo.PR_mu_sg[:] = _N.mean(oo.po_mu_sg[mid:], axis=0) + oo.R * dt
+        print "dt  %.5f" % dt
         #oo.PR_mu_sg[:] = _N.mean(oo.po_mu_sg[mid:], axis=0)*5
-        #oo.PR_mu_sg[:] = _N.mean(oo.po_mu_sg[mid:], axis=0)*1.08
+        #print (_N.mean(oo.po_mu_sg[mid:], axis=0)*5)
+        #print (_N.mean(oo.po_mu_sg[mid:], axis=0) + oo.R * dt)
         oo.iPR_mu_sg   = _N.linalg.inv(oo.PR_mu_sg)
         #  prior of cluster center is current
         #  posterior distribution of cluster center
@@ -398,12 +402,16 @@ class fitMvNorm:
         oo.smu[0]  = oo.smu[oo.ITERS-1]
         oo.scov[0] = oo.scov[oo.ITERS-1]
 
-    def evalAll(self, Ngrd):
+    def evalAll(self, Ngrd, mc, ylim=None):
         oo     = self
-        x0      = min(oo.dat[:, 0])
-        x1      = max(oo.dat[:, 0])
-        y0      = min(oo.dat[:, 1])
-        y1      = max(oo.dat[:, 1])
+        x0      = -6
+        x1      = 6
+        if ylim is None:
+            y0      = min(oo.dat[:, mc+1])
+            y1      = max(oo.dat[:, mc+1])
+        else:
+            y0      = ylim[0]
+            y1      = ylim[1]
 
         x      = _N.linspace(x0, x1, Ngrd)#.reshape(Ngrd, 1)
         y      = _N.linspace(y0, y1, Ngrd)#.reshape(1, Ngrd)
@@ -411,26 +419,36 @@ class fitMvNorm:
         xg, yg = _N.meshgrid(x, y)
 
         xy = _N.array([xg, yg])
-        xy = xy.reshape(oo.pmdim, Ngrd*Ngrd)
+        xy = xy.reshape(2, Ngrd*Ngrd)
         #   xy.T    goes from lower left, scans right, to upper right
 
+        ppm = _N.array([0, mc+1])
+
         us  = _N.mean(oo.smu[100:], axis=0)
-        Sgs = _N.mean(oo.scov[100:], axis=0)
-        iSgs= _N.linalg.inv(Sgs)
+        us2 = _N.empty((oo.M, 2))
+        Sgs = _N.mean(oo.scov[100:], axis=0)  #  full covariance.
+        Sgs2 = _N.zeros((oo.M, 2, 2))   # pos + 1 mk at a time
+        for m in xrange(oo.M):
+            us2[m, 0]     = us[m, 0]
+            us2[m, 1]     = us[m, mc+1]
+            Sgs2[m, 0, 0] = Sgs[m, 0, 0]
+            Sgs2[m, 0, 1] = Sgs[m, 0, mc+1]
+            Sgs2[m, 1, 0] = Sgs[m, mc+1, 0]
+            Sgs2[m, 1, 1] = Sgs[m, mc+1, mc+1]
+
+        iSgs2= _N.linalg.inv(Sgs2)
+        print us2
+        print Sgs2
 
         cmps= _N.empty((oo.M, Ngrd, Ngrd))
         for m in xrange(oo.M):
-            cmps[m] = 1/_N.sqrt(2*_N.pi*_N.linalg.det(Sgs[m]))*_N.exp(-0.5*_N.sum(_N.multiply(xy.T-us[m], _N.dot(iSgs[m], (xy.T - us[m]).T).T), axis=1)).reshape(Ngrd, Ngrd)
+            cmps[m] = 1/_N.sqrt(2*_N.pi*_N.linalg.det(Sgs2[m]))*_N.exp(-0.5*_N.sum(_N.multiply(xy.T-us2[m], _N.dot(iSgs2[m], (xy.T - us2[m]).T).T), axis=1)).reshape(Ngrd, Ngrd)
 
         ms  = _N.mean(oo.sm[100:], axis=0).reshape(oo.M, 1, 1)
         zs = ms*cmps
 
-        smpMn   = _N.mean(oo.dat, axis=0)
-
-        _plt.scatter(oo.dat[:, 0], oo.dat[:, 1], s=10)
-        _plt.imshow(_N.sum(zs, axis=0), origin="lower", extent=(x0, x1, y0, y1))
-
-        return zs
+        #_plt.imshow(_N.sum(zs, axis=0), origin="lower", extent=(x0, x1, y0, y1))
+        return _N.sum(zs, axis=0)
 
     def evalAtFxdMks_new(self, fxdMks):
         oo     = self
