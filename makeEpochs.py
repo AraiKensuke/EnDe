@@ -1,25 +1,30 @@
-outDir   = "../Results/wtrackS2"
+#  in terms of relative length
+firstT   = 3
+minT     = 0.5
+maxT     = 3
 
-firstT   = 120000
-minT     = 45000
-maxT     = 80000
+epochs   = 80
 
-totalT   = 1000000
-mmT      = maxT - minT
+intvs = _N.empty(epochs+1)
 
-t0        = 0
-t1        = firstT + int(_N.random.rand()*mmT)
+t     = 0
+intvs[0] = 0
+for epc in xrange(epochs):
+    if epc == 0:
+        t += firstT
+    else:
+        t += minT + (maxT - minT)*_N.random.rand()
+    intvs[epc+1] = t
 
-lencIntvs = []
-lencIntvs.append([t0, t1])
+intvs /= intvs[-1]
+iInd = 0
+bFnd = False
+while not bFnd:
+    iInd += 1
+    fn = "../DATA/itv%(e)d_%(iI)d.dat" % {"e" : epochs, "iI" : iInd}
 
-while t1 < totalT:
+    if not os.access(fn, os.F_OK):  # file exists
+        bFnd = True
+        _N.savetxt(fn, intvs, fmt="%.5f")
 
-    t0 = t1
-    t1        = t0 + minT + int(_N.random.rand()*mmT)
-    
-    if t1 >= totalT:
-        t1 = totalT
-    lencIntvs.append([t0, t1])
-
-_N.savetxt("%s/epochs.txt" % outDir, _N.array(lencIntvs), fmt="%d %d")
+print "saved to %s" % fn

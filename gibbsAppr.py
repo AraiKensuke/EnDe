@@ -30,13 +30,16 @@ class singleRecptvFld:
     intvs = None    #  
     dat   = None
 
-    diffPerMin = .01  #  diffusion per minute
+    diffPerMin = 1.  #  diffusion per minute
     epochs   = None
 
-    def __init__(self, fn, intvfn):
+    outdir   = None
+
+    def __init__(self, outdir, fn, intvfn):
         oo     = self
         ######################################  DATA input, define intervals
         # bFN = fn[0:-4]
+        oo.outdir = outdir
 
         # if not os.access(bFN, os.F_OK):
         #     os.mkdir(bFN)
@@ -49,8 +52,7 @@ class singleRecptvFld:
         
         NT     = oo.dat.shape[0]
 
-
-    def gibbs(self, ITERS, ep1=0, ep2=None):
+    def gibbs(self, ITERS, ep1=0, ep2=None, savePosterior=True):
         oo = self
 
         #  PRIORS
@@ -62,6 +64,7 @@ class singleRecptvFld:
         _l0_a = 0;     _l0_B = 0
 
         ep2 = oo.epochs if (ep2 == None) else ep2
+        oo.epochs = ep2-ep1
         oo.posSmpls = _N.zeros((oo.epochs, 3))   # mode of the params
         oo.posHyps  = _N.zeros((oo.epochs, 2+2+2))   # the hyper params
         twpi     = 2*_N.pi
@@ -292,12 +295,36 @@ class singleRecptvFld:
                 elif ip == oo.ky_h_f_q2: _f_q2 = oo.posHyps[epc, ip] = bns[ib]
                 elif ip == oo.ky_h_q2_a: _q2_a = oo.posHyps[epc, ip] = bns[ib]
                 elif ip == oo.ky_h_q2_B: _q2_B = oo.posHyps[epc, ip] = bns[ib]
+        if savePosterior:
+            _N.savetxt(resFN("posParams.dat", dir=oo.outdir), smp_prms[:, :, 0].T, fmt="%.4f %.4f %.4f")
+            _N.savetxt(resFN("posHypParams.dat", dir=oo.outdir), smp_hyps[:, :, 0].T, fmt="%.4f %.4f %.4f %.4f %.4f %.4f")
 
-    def figs():
-            fig = _plt.figure(figsize=(8, 9))
-            ax0 = fig.add_subplot(3, 1, 1)
-            _plt.plot(dat[(sts + t0), 0], _N.ones(len(sts)), marker="*", ms=3, ls="")
-            _plt.plot(dat[(nts + t0), 0], _N.zeros(len(nts)), marker=".", ms=3, ls="")
-            _plt.xlim(-2, 5)
-            _plt.ylim(-0.1, 1.1)
+        
+    def figs(self, ep1=0, ep2=None):
+        oo  = self
+        ep2 = oo.epochs if (ep2 == None) else ep2
 
+        fig = _plt.figure(figsize=(8, 9))
+        mnUs   = _N.empty(ep2-ep1)
+        mnL0s  = _N.empty(ep2-ep1)
+        mnSq2s = _N.empty(ep2-ep1)
+
+        for epc in xrange(ep1, ep2):
+            t0 = oo.intvs[epc]
+            t1 = oo.intvs[epc+1]
+            sts    = _N.where(oo.dat[t0:t1, 1] == 1)[0]
+
+            mnUs[epc-ep1]   = _N.mean(oo.dat[t0:t1, 2])
+            mnSq2s[epc-ep1] = _N.mean(oo.dat[t0:t1, 3])
+            mnL0s[epc-ep1]  = _N.mean(oo.dat[t0:t1, 4])
+
+        fig.add_subplot(3, 1, 1)
+        _plt.plot(mnUs)
+        _plt.plot(oo.posSmpls[:, oo.ky_p_f])
+        fig.add_subplot(3, 1, 2)
+        _plt.plot(mnL0s)
+        _plt.plot(oo.posSmpls[:, oo.ky_p_l0])
+        fig.add_subplot(3, 1, 3)
+        _plt.plot(mnSq2s)
+        _plt.plot(oo.posSmpls[:, oo.ky_p_q2])
+            
