@@ -26,6 +26,19 @@ def resFN(fn, dir=None, create=False):
                 os.mkdir(rD)
     return "%(rd)s/%(fn)s" % {"rd" : rD, "fn" : fn}
 
+def resFN(fn, dir=None, create=False):
+    #  ${EnDedir}/Results/
+    __EnDeResultDir__ = os.environ["__EnDeResultDir__"]
+    rD = __EnDeResultDir__
+
+    if dir != None:
+        lvls = dir.split("/")
+        for lvl in lvls:
+            rD += "/%s" % lvl
+            if not os.access("%s" % rD, os.F_OK) and create:
+                os.mkdir(rD)
+    return "%(rd)s/%(fn)s" % {"rd" : rD, "fn" : fn}
+
 def pracFN(fn, dir=None, create=False):
     #  ${EnDedir}/Results/
     __EnDePracDir__ = os.environ["__EnDePracDir__"]
@@ -60,3 +73,4 @@ def datFN(fn, dir=None, create=False):
         if not os.access("%s" % dD, os.F_OK) and create:
             os.mkdir(dD)
     return "%(dd)s/%(fn)s" % {"dd" : dD, "fn" : fn}
+
