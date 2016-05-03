@@ -45,6 +45,8 @@ class singleRecptvFld:
         #     os.mkdir(bFN)
 
         oo.dat    = _N.loadtxt("%s.dat" % datFN(fn, create=False))
+        oo.datprms= _N.loadtxt("%s_prms.dat" % datFN(fn, create=False))
+
         intvs     = _N.loadtxt("%s.dat" % datFN(intvfn, create=False))
 
         oo.intvs  = _N.array(intvs*oo.dat.shape[0], dtype=_N.int)
@@ -62,9 +64,9 @@ class singleRecptvFld:
         #  priors  prefixed w/ _
         _f_u   = 0;    _f_q2  = 1
         #  inverse gamma
-        _q2_a  = 1e-6;    _q2_B  = 1e-3
+        _q2_a  = 1e-4;    _q2_B  = 1e-3
         #_plt.plot(q2x, q2x**(-_q2_a-1)*_N.exp(-_q2_B / q2x))
-        _l0_a = 0;     _l0_B = 0
+        _l0_a = 1.;     _l0_B = 1/30.   #  mean 30Hz peak firing rate
 
         ep2 = oo.epochs if (ep2 == None) else ep2
         oo.epochs = ep2-ep1
@@ -107,9 +109,7 @@ class singleRecptvFld:
 
         x      = oo.dat[:, 0]
 
-        q2rate = (oo.diffPerMin/(60.*1000))**2  #  unit of minutes  
-        Tepch      = ((oo.dat.shape[0])/float(oo.epochs)) 
-        q2rate  *=  Tepch
+        q2rate = oo.diffPerEpoch**2  #  unit of minutes  
         ######################################  PRECOMPUTED
         posbins  = _N.linspace(0, 3, oo.Nupx+1)
 
@@ -150,21 +150,15 @@ class singleRecptvFld:
                 #  likelihood
 
                 ###############  CONDITIONAL f
-                if epc == 0:
+                q2pr = _f_q2 + q2rate
+                if nSpks > 0:  #  spiking portion likelihood x prior
                     fs  = (1./nSpks)*_N.sum(xt0t1[sts])
                     fq2 = q2/nSpks
-                    M   = fs
-                    Sg2 = fq2
+                    M   = (fs*q2pr +  + _f_u*fq2) / (q2pr + fq2)
+                    Sg2 = (q2pr*fq2) / (q2pr + fq2)
                 else:
-                    q2pr = _f_q2 + q2rate
-                    if nSpks > 0:  #  spiking portion likelihood x prior
-                        fs  = (1./nSpks)*_N.sum(xt0t1[sts])
-                        fq2 = q2/nSpks
-                        M   = (fs*q2pr +  + _f_u*fq2) / (q2pr + fq2)
-                        Sg2 = (q2pr*fq2) / (q2pr + fq2)
-                    else:
-                        M   = _f_u
-                        Sg2 = q2pr
+                    M   = _f_u
+                    Sg2 = q2pr
 
                 Sg    = _N.sqrt(Sg2)
                 fx    = _N.linspace(M - Sg*50, M + Sg*50, oo.fss)
@@ -220,10 +214,7 @@ class singleRecptvFld:
                     SL_a = 0.5*nSpks - 1   #  spiking part of likelihood
                     SL_B = _N.sum(xI)  #  spiking part of likelihood
                     #  spiking prior x prior
-                    if epc > 0:
-                        sLLkPr = -(_q2_a + SL_a + 2)*lq2x - iq2x*(_q2_B + SL_B)
-                    else:
-                        sLLkPr = -(SL_a + 1)*lq2x - iq2x*SL_B
+                    sLLkPr = -(_q2_a + SL_a + 2)*lq2x - iq2x*(_q2_B + SL_B)
                 else:
                     sLLkPr = -(_q2_a + 1)*lq2x - iq2x*(_q2_B)
 
@@ -262,9 +253,6 @@ class singleRecptvFld:
                 #     print "BL  %(BL).2f    BL2  %(BL2).2f" % {"BL" : BL, "BL2" : BL2}
 
                 aL  = nSpks
-                if epc == 0:
-                    _l0_B = 0
-                    _l0_a = 0
                 l0_a_ = aL + _l0_a
                 l0_B_ = BL + _l0_B
 
@@ -274,11 +262,6 @@ class singleRecptvFld:
                 smp_prms[oo.ky_p_l0, iter, 0] = l0
                 smp_hyps[oo.ky_h_l0_a, iter, 0] = l0_a_
                 smp_hyps[oo.ky_h_l0_B, iter, 0] = l0_B_
-
-            #tt2 = _tm.time()
-            #print "time %.3f" % (tt2-tt1)
-            #_plt.savefig("%(dir)s/likelihood%(i)d" % {"dir" : outdir, "i" : i})
-            #_plt.close()
 
             frm   = 30
 
@@ -323,9 +306,9 @@ class singleRecptvFld:
             t1 = oo.intvs[epc+1]
             sts    = _N.where(oo.dat[t0:t1, 1] == 1)[0]
 
-            mnUs[epc-ep1]   = _N.mean(oo.dat[t0:t1, 2])
-            mnSq2s[epc-ep1] = _N.mean(oo.dat[t0:t1, 3])
-            mnL0s[epc-ep1]  = _N.mean(oo.dat[t0:t1, 4])
+            mnUs[epc-ep1]   = _N.mean(oo.datprms[t0:t1, 0])
+            mnSq2s[epc-ep1] = _N.mean(oo.datprms[t0:t1, 1])
+            mnL0s[epc-ep1]  = _N.mean(oo.datprms[t0:t1, 2])
 
         fig.add_subplot(3, 1, 1)
         _plt.plot(mnUs)

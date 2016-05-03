@@ -2,30 +2,6 @@
 import os
 import utilities as _U
 
-#  Let's assume space goes from [0, 3]
-
-Lx     = 0
-Hx     = 3
-
-UNIF   = 1
-NUNIF  = 2
-
-mvPat = NUNIF
-
-#  movement patterns
-#  non-uniform
-#  uniform
-
-N      = 4500
-M      = 2    # # of place fields
-
-##########  nonuniformity in movement
-#  for simplicity, we allow the mean of location to vary sinusoidally
-frqmx = 2.3
-Amx   = 0.4
-pT    = 0.85  # variability in sweep time
-
-RTs   = 30      # round trips
 Ns     = _N.empty(RTs, dtype=_N.int)
 if mvPat == NUNIF:
 
@@ -41,27 +17,16 @@ pths    = _N.empty(NT)
 x01    = _N.linspace(0, 1, len(pths))
 x01    = x01.reshape((1, NT))
 ##########  nonstationary center width
-frqsx = _N.array([[1.3], [0.8]])     # frequency of variation
-asx   = _N.array([[0.1], [0.1]])     # amplitude of variation
-msx   = _N.array([[0.15], [0.19]])   # mean value
 #  sxt  should be (M x NT)
 sxt   = msx*(1 + asx*_N.cos(2*_N.pi*frqsx*x01))
 sx    = sxt**2     #  var of firing rate function
 
-
 ##########  nonstationary center height l0
-frql0 = _N.array([[0.8], [0.7]])
-al0   = _N.array([[0.15], [0.15]])
-ml0   = _N.array([[15.], [13.]])
-l0    = ml0*(1 + al0*_N.cos(2*_N.pi*frql0*x01))
 #  f is NT x M
+l0    = ml0*(1 + al0*_N.cos(2*_N.pi*frql0*x01))
 f     = l0/_N.sqrt(2*_N.pi*sx)
 
-
 ##########  nonstationary center location
-frq   = _N.array([[0.8], [0.7]])
-aCL   = _N.array([[0.2], [0.4]])   #  mean of location
-mCL   = _N.array([[0.4], [1.8]])   #  mean of location
 ctr  = mCL*(1 + aCL*_N.sin(2*_N.pi*frq*x01))
 
 if mvPat == NUNIF:
@@ -124,7 +89,7 @@ while not bFnd:
     iInd += 1
     fn = "../DATA/%(bfn)s%(iI)d.dat" % {"bfn" : bfn, "iI" : iInd}
     fnocc="../DATA/%(bfn)s%(iI)docc.png" % {"bfn" : bfn, "iI" : iInd}
-    fnprm = "../DATA/prms%(iI)d.dat" % {"bfn" : bfn, "iI" : iInd}
+    fnprm = "../DATA/%(bfn)s%(iI)d_prms.dat" % {"bfn" : bfn, "iI" : iInd}
 
     if not os.access(fn, os.F_OK):  # file exists
         bFnd = True
