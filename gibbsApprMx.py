@@ -127,7 +127,7 @@ class multiRecptvFld:
 
             t0 = oo.intvs[epc]
             t1 = oo.intvs[epc+1]
-            Asts    = _N.where(oo.dat[t0:t1, 1] == 1)[0]
+            Asts    = _N.where(oo.dat[t0:t1, 1] == 1)[0]   #  based at 0
             Ants    = _N.where(oo.dat[t0:t1, 1] == 0)[0]
 
             if gtdiffusion:
@@ -152,7 +152,7 @@ class multiRecptvFld:
                 rnds = _N.random.rand(nSpks)
                 for s in xrange(nSpks):
                     for m in xrange(M):
-                        pc[m] = l0DIVsq2PIq2[m] * _N.exp(-(0.5/q2[m])*_N.sum((f[m] - x[Asts[s]])**2))
+                        pc[m] = l0DIVsq2PIq2[m] * _N.exp(-(0.5/q2[m])*_N.sum((f[m] - x[Asts[s] + t0])**2))
                         
                     pc /= _N.sum(pc)
                     for m in xrange(M):
@@ -161,19 +161,12 @@ class multiRecptvFld:
                     mc  = _N.where((rnds[s] >= rat[:-1]) & (rnds[s] < rat[1:]))[0][0]
 
                     gz[iter, s, mc] = 1
-                if (iter % 20 == 0):
-                    print iter
-                    print _N.sum(gz[iter], axis=0)
-                    print f
-                    print l0
                         
                     #  for all 
                     
                 for m in xrange(M):
                     iiq2 = 1./q2[m]
                     sts  = Asts[_N.where(gz[iter, :, m] == 1)[0]]
-                    if (iter % 20 == 0):
-                        print "mean corrds cluster %(m)d:  %(c).6f  %(d)d" % {"m" : m, "c" : _N.mean(xt0t1[sts]), "d" : len(sts)}
                     nSpksM   = len(sts)
 
                     #  prior described by hyper-parameters.
@@ -289,7 +282,7 @@ class multiRecptvFld:
             #print "here"
             fig = _plt.figure(figsize=(8, 4))
             for m in xrange(M):
-                print smp_prms[oo.ky_p_f, frm:, m]
+                #print smp_prms[oo.ky_p_f, frm:, m]
                 for ip in xrange(3):  # params
                     L     = _N.min(smp_prms[ip, frm:, m]);   H     = _N.max(smp_prms[ip, frm:, m])
                     cnts, bns = _N.histogram(smp_prms[ip, frm:, m], bins=_N.linspace(L, H, 50))
@@ -311,14 +304,13 @@ class multiRecptvFld:
 
                     col = 6*m+ip
                     vl  = bns[ib]
-                    """
+
                     if   ip == oo.ky_h_l0_a: _l0_a[m] = oo.hypPstMd[epc, col] = vl
                     elif ip == oo.ky_h_l0_B: _l0_B[m] = oo.hypPstMd[epc, col] = vl
                     elif ip == oo.ky_h_f_u:  _f_u[m]  = oo.hypPstMd[epc, col] = vl
                     elif ip == oo.ky_h_f_q2: _f_q2[m] = oo.hypPstMd[epc, col] = vl
                     elif ip == oo.ky_h_q2_a: _q2_a[m] = oo.hypPstMd[epc, col] = vl
                     elif ip == oo.ky_h_q2_B: _q2_B[m] = oo.hypPstMd[epc, col] = vl
-                    """
         if savePosterior:
             _N.savetxt(resFN("posParams.dat", dir=oo.outdir), smp_prms[:, :, 0].T, fmt="%.4f %.4f %.4f")
             _N.savetxt(resFN("posHypParams.dat", dir=oo.outdir), smp_hyps[:, :, 0].T, fmt="%.4f %.4f %.4f %.4f %.4f %.4f")
