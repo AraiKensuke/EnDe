@@ -10,6 +10,9 @@ from ig_prmLib import ig_prmsUV
 import numpy as _N
 import matplotlib.pyplot as _plt
 from EnDedirs import resFN, datFN
+import pickle
+
+
 
 class multiRecptvFld:
     ky_p_l0 = 0;    ky_p_f  = 1;    ky_p_q2 = 2
@@ -25,7 +28,6 @@ class multiRecptvFld:
     #  sizes of arrays
     Nupx = 500      #   # points to sample position with  (uniform lam(x)p(x))
     fss = 100       #  sampling at various values of f
-    #q2ss = 200      #  sampling at various values of q2
     q2ss = 300      #  sampling at various values of q2
 
     intvs = None    #  
@@ -46,6 +48,8 @@ class multiRecptvFld:
         #     os.mkdir(bFN)
 
         oo.dat    = _N.loadtxt("%s.dat" % datFN(fn, create=False))
+        oo.datprms= _N.loadtxt("%s_prms.dat" % datFN(fn, create=False))
+
         intvs     = _N.loadtxt("%s.dat" % datFN(intvfn, create=False))
 
         oo.intvs  = _N.array(intvs*oo.dat.shape[0], dtype=_N.int)
@@ -75,6 +79,8 @@ class multiRecptvFld:
         oo.hypPstMd  = _N.zeros((oo.epochs, (2+2+2)*M))   # the hyper params
         twpi     = 2*_N.pi
 
+        pcklme   = {}
+
         #  Gibbs sampling
         #  parameters l0, f, q2
 
@@ -85,14 +91,8 @@ class multiRecptvFld:
 
         ######################################  INITIAL VALUE OF PARAMS
         l0       = _N.array([1.,]*M)
-        #l0[0] = 50.
-        #l0[1] = 40.
         q2       = _N.array([0.0144]*M)
-        #q2[0] = 0.09
-        #q2[1] = 0.09
         f        = _N.array([1.1]*M)
-        #f[0] = 1.8
-        #f[1] = 0.4
 
         ######################################  GRID for calculating
         ####  #  points in sum.  
@@ -103,7 +103,7 @@ class multiRecptvFld:
 
         #  numerical grid
         ux = _N.linspace(0, 3, oo.Nupx, endpoint=False)   # uniform x position
-        q2x    = _N.exp(_N.linspace(_N.log(0.00001), _N.log(50), oo.q2ss))  #  5 orders of
+        q2x    = _N.exp(_N.linspace(_N.log(0.00001), _N.log(100), oo.q2ss))  #  5 orders of
         d_q2x  = _N.diff(q2x)
         q2x_m1 = _N.array(q2x[0:-1])
         lq2x    = _N.log(q2x)
@@ -122,6 +122,9 @@ class multiRecptvFld:
         pc       = _N.zeros(M)
 
         for epc in xrange(ep1, ep2):
+            f = 3*_N.random.rand(M)
+            q2 = 3*_N.random.rand(M)*0.1
+            l0 = 3*_N.random.rand(M)
             #print q2
             print "epoch %d" % epc
 
@@ -145,25 +148,41 @@ class multiRecptvFld:
 
             dSilenceX = (NSexp/float(oo.Nupx))*3
 
-            l0DIVsq2PIq2 = _N.empty(M)
+            xAS  = x[Asts + t0]   #  position @ spikes
+            xASr = xAS.reshape((1, nSpks))
+            econt = _N.empty((M, nSpks))
+            rat   = _N.zeros((M+1, nSpks))
+
             for iter in xrange(ITERS):
+                if (iter % 20) == 0:    print iter
+
+                fr         = f.reshape((M, 1))
+                iq2        = 1./q2
+                iq2r       = iq2.reshape((M, 1))
+                try:
+                    pkFR       = _N.log(l0/_N.sqrt(twpi*q2))
+                except Warning:
+                    print "WARNING"
+                    print l0
+                    print q2
+                pkFRr      = pkFR.reshape((M, 1))
+                rnds       = _N.random.rand(nSpks)
+
+                cont       = pkFRr - 0.5*(fr - xASr)*(fr - xASr)*iq2r
+
+                mcontr     = _N.max(cont, axis=0).reshape((1, nSpks))  
+                cont       -= mcontr
+                _N.exp(cont, out=econt)
                 for m in xrange(M):
-                    l0DIVsq2PIq2[m] = l0[m]/_N.sqrt(twpi*q2[m])
-                rnds = _N.random.rand(nSpks)
-                for s in xrange(nSpks):
-                    for m in xrange(M):
-                        pc[m] = l0DIVsq2PIq2[m] * _N.exp(-(0.5/q2[m])*_N.sum((f[m] - x[Asts[s] + t0])**2))
-                        
-                    pc /= _N.sum(pc)
-                    for m in xrange(M):
-                        rat[m+1] = rat[m] + pc[m]
+                    rat[m+1] = rat[m] + econt[m]
 
-                    mc  = _N.where((rnds[s] >= rat[:-1]) & (rnds[s] < rat[1:]))[0][0]
+                rat /= rat[M]
 
-                    gz[iter, s, mc] = 1
-                        
-                    #  for all 
-                    
+                M1 = rat[1:] >= rnds
+                M2 = rat[0:-1] <= rnds
+
+                gz[iter] = (M1&M2).T
+                
                 for m in xrange(M):
                     iiq2 = 1./q2[m]
                     sts  = Asts[_N.where(gz[iter, :, m] == 1)[0]]
@@ -175,7 +194,8 @@ class multiRecptvFld:
                     #  likelihood
 
                     ###############  CONDITIONAL f
-                    q2pr = _f_q2[m] + q2rate
+                    q2pr = _f_q2[m] if (_f_q2[m] > q2rate) else q2rate
+
                     if nSpksM > 0:  #  spiking portion likelihood x prior
                         fs  = (1./nSpksM)*_N.sum(xt0t1[sts])
                         fq2 = q2[m]/nSpksM
@@ -186,7 +206,7 @@ class multiRecptvFld:
                         Sg2 = q2pr
 
                     Sg    = _N.sqrt(Sg2)
-                    fx    = _N.linspace(U - Sg*100, U + Sg*100, oo.fss)
+                    fx    = _N.linspace(U - Sg*150, U + Sg*150, oo.fss)
                     fxr     = fx.reshape((oo.fss, 1))
 
                     fxrux = -0.5*(fxr-ux)**2
@@ -237,15 +257,6 @@ class multiRecptvFld:
                     condPos = _N.exp(sat)
                     q2_a_, q2_B_ = ig_prmsUV(q2x, condPos, d_q2x, q2x_m1, ITER=1)
 
-                    #print condPos
-                    # if iter == 90:
-                    #     print "q2_a_  %(1).3e   q2_B_  %(2).3e" % {"1" : q2_a_, "2" : q2_B_}
-                    #     print "SL_a   %(1).3e   SL_B   %(2).3e" % {"1" : SL_a, "2" : SL_B}
-
-                    #     fig = _plt.figure()
-                    #     _plt.hist(xt0t1[sts], bins=_N.linspace(0, 3, 61))
-                    #     #_plt.plot(q2x, condPos)
-                    #     #_plt.xlim(0, 0.1)
                     q2[m] = _ss.invgamma.rvs(q2_a_ + 1, scale=q2_B_)  #  check
                     #print ((1./nSpks)*_N.sum((xt0t1[sts]-f)*(xt0t1[sts]-f)))
 
@@ -269,14 +280,18 @@ class multiRecptvFld:
                     l0_a_ = aL + _l0_a[m]
                     l0_B_ = BL + _l0_B[m]
 
-                    l0[m] = _ss.gamma.rvs(l0_a_ - 1, scale=(1/l0_B_))  #  check
+                    #print "l0_a_ %(a).3e   l0_B_ %(B).3e" % {"a" : l0_a_, "B" : l0_B_}
+
+                    if (l0_B_ > 0) and (l0_a_ > 1):
+                        l0[m] = _ss.gamma.rvs(l0_a_ - 1, scale=(1/l0_B_))  #  check
+
                     ###  l0 / _N.sqrt(twpi*q2) is f*dt used in createData2
 
                     smp_prms[oo.ky_p_l0, iter, m] = l0[m]
                     smp_hyps[oo.ky_h_l0_a, iter, m] = l0_a_
                     smp_hyps[oo.ky_h_l0_B, iter, m] = l0_B_
 
-            frm   = 30
+            frm   = int(0.6*ITERS)  #  have to test for stationarity
 
             #print "f[0]  %(1).3f    f[1]  %(2).3f" % {"1" : f[0], "2" : f[1]}
             #print "here"
@@ -287,7 +302,7 @@ class multiRecptvFld:
                     L     = _N.min(smp_prms[ip, frm:, m]);   H     = _N.max(smp_prms[ip, frm:, m])
                     cnts, bns = _N.histogram(smp_prms[ip, frm:, m], bins=_N.linspace(L, H, 50))
                     if ip == oo.ky_p_f:
-                        fig.add_subplot(1, 2, m+1)
+                        fig.add_subplot(1, M, m+1)
                         _plt.hist(smp_prms[ip, frm:, m], bins=_N.linspace(L, H, 50))
                     ib  = _N.where(cnts == _N.max(cnts))[0][0]
 
@@ -295,6 +310,7 @@ class multiRecptvFld:
                     if   ip == oo.ky_p_l0: l0[m] = oo.prmPstMd[epc, col] = bns[ib]
                     elif ip == oo.ky_p_f:  f[m]  = oo.prmPstMd[epc, col] = bns[ib]
                     elif ip == oo.ky_p_q2: q2[m] = oo.prmPstMd[epc, col] = bns[ib]
+            pcklme["cp%d" % epc] = _N.array(smp_prms)
 
             for m in xrange(M):
                 for ip in xrange(6):  # hyper params
@@ -314,6 +330,12 @@ class multiRecptvFld:
         if savePosterior:
             _N.savetxt(resFN("posParams.dat", dir=oo.outdir), smp_prms[:, :, 0].T, fmt="%.4f %.4f %.4f")
             _N.savetxt(resFN("posHypParams.dat", dir=oo.outdir), smp_hyps[:, :, 0].T, fmt="%.4f %.4f %.4f %.4f %.4f %.4f")
+
+        pcklme["md"] = _N.array(oo.prmPstMd)
+        dmp = open(resFN("posteriors.dump", dir=oo.outdir), "wb")
+        pickle.dump(pcklme, dmp, -1)
+        dmp.close()
+
         _N.savetxt(resFN("posModes.dat", dir=oo.outdir), oo.prmPstMd, fmt=("%.4f %.4f %.4f " * M))
         _N.savetxt(resFN("hypModes.dat", dir=oo.outdir), oo.hypPstMd, fmt=("%.4f %.4f %.4f %.4f %.4f %.4f" * M))
 
@@ -347,3 +369,4 @@ class multiRecptvFld:
         _plt.plot(oo.prmPstMd[:, oo.ky_p_q2])
             
         _plt.savefig(resFN("cmpModesGT", dir=oo.outdir))
+
