@@ -67,7 +67,7 @@ class multiRecptvFld:
         #  priors  prefixed w/ _
         _f_u   = _N.zeros(M);    _f_q2  = _N.ones(M) #  wide
         #  inverse gamma
-        _q2_a  = _N.zeros(M)*1e-4;    _q2_B  = _N.zeros(M)*1e-3
+        _q2_a  = _N.ones(M)*1e-4;    _q2_B  = _N.ones(M)*1e-3
         #_plt.plot(q2x, q2x**(-_q2_a-1)*_N.exp(-_q2_B / q2x))
         _l0_a = _N.ones(M);     _l0_B  = _N.zeros(M)*(1/30.)
 
@@ -154,7 +154,7 @@ class multiRecptvFld:
             rat   = _N.zeros((M+1, nSpks))
 
             for iter in xrange(ITERS):
-                if (iter % 20) == 0:    print iter
+                if (iter % 100) == 0:    print iter
 
                 fr         = f.reshape((M, 1))
                 iq2        = 1./q2
@@ -238,6 +238,9 @@ class multiRecptvFld:
                     s = -((l0[m]*oo.dt)/sqrt_2pi_q2x)*q2_exp_px     #  function of q2
                     #print "s  %.3e" % s
 
+                    _Dq2_a = _q2_a[m] if _q2_a[m] < 200 else 200
+                    _Dq2_B = (_q2_B[m]/(_q2_a[m]+1))*(_Dq2_a+1)
+
                     if nSpksM > 0:
                         #print  _N.sum((xt0t1[sts]-f)*(xt0t1[sts]-f))/(nSpks-1)
 
@@ -276,9 +279,16 @@ class multiRecptvFld:
                     # if iter == 50:
                     #     print "BL  %(BL).2f    BL2  %(BL2).2f" % {"BL" : BL, "BL2" : BL2}
 
+                    #_Dl0_a = _l0_a[m] if _l0_a[m] < 400 else 400
+                    _Dl0_a = _l0_a[m] if _l0_a[m] < 25 else 25
+                    _Dl0_B = (_l0_B[m]/_l0_a[m]) * _Dl0_a
+                    
+                    #  a'/B' = a/B
+                    #  B' = (B/a)a'
+
                     aL  = nSpksM
-                    l0_a_ = aL + _l0_a[m]
-                    l0_B_ = BL + _l0_B[m]
+                    l0_a_ = aL + _Dl0_a
+                    l0_B_ = BL + _Dl0_B
 
                     #print "l0_a_ %(a).3e   l0_B_ %(B).3e" % {"a" : l0_a_, "B" : l0_B_}
 
@@ -291,7 +301,9 @@ class multiRecptvFld:
                     smp_hyps[oo.ky_h_l0_a, iter, m] = l0_a_
                     smp_hyps[oo.ky_h_l0_B, iter, m] = l0_B_
 
+
             frm   = int(0.6*ITERS)  #  have to test for stationarity
+            #print _N.sum(_N.mean(gz[frm:], axis=0), axis=0)
 
             #print "f[0]  %(1).3f    f[1]  %(2).3f" % {"1" : f[0], "2" : f[1]}
             #print "here"
@@ -327,6 +339,25 @@ class multiRecptvFld:
                     elif ip == oo.ky_h_f_q2: _f_q2[m] = oo.hypPstMd[epc, col] = vl
                     elif ip == oo.ky_h_q2_a: _q2_a[m] = oo.hypPstMd[epc, col] = vl
                     elif ip == oo.ky_h_q2_B: _q2_B[m] = oo.hypPstMd[epc, col] = vl
+
+            ###  hack here.  If we don't reset the prior for 
+            ###  what happens when a cluster is unused?
+            ###  l0 -> 0, and at the same time, the variance increases.
+            ###  the prior then gets pushed to large values, but
+            ###  then it becomes difficult to bring it back to small
+            ###  values once that cluster becomes used again.  So
+            ###  we would like unused clusters to have l0->0, but keep the
+            ###  variance small.  That's why we will reset a cluster
+            occ   =  _N.mean(gz[ITERS-1], axis=0)
+            print occ
+
+            for m in xrange(M):
+                if (occ[m] == 0) and (l0[m] / _N.sqrt(twpi*q2[m]) < 1):
+                    print "resetting"
+                    _q2_a[m] = 1e-4
+                    _q2_B[m] = 1e-3
+
+
         if savePosterior:
             _N.savetxt(resFN("posParams.dat", dir=oo.outdir), smp_prms[:, :, 0].T, fmt="%.4f %.4f %.4f")
             _N.savetxt(resFN("posHypParams.dat", dir=oo.outdir), smp_hyps[:, :, 0].T, fmt="%.4f %.4f %.4f %.4f %.4f %.4f")

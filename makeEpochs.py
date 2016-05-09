@@ -1,19 +1,20 @@
 #  in terms of relative length
-firstT   = 3
+firstT   = 2
 minT     = 0.5
 maxT     = 1.5
 
-epochs   = 6
+epochs   = 9
 
 intvs = _N.empty(epochs+1)
 
+eqI   = True
 t     = 0
 intvs[0] = 0
 for epc in xrange(epochs):
     if epc == 0:
         t += firstT
     else:
-        t += minT + (maxT - minT)*_N.random.rand()
+        t += firstT if eqI else (minT + (maxT - minT)*_N.random.rand())
     intvs[epc+1] = t
 
 intvs /= intvs[-1]

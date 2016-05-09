@@ -10,6 +10,7 @@ from ig_prmLib import ig_prmsUV
 import numpy as _N
 import matplotlib.pyplot as _plt
 from EnDedirs import resFN, datFN
+import pickle
 
 class singleRecptvFld:
     ky_p_l0 = 0;    ky_p_f  = 1;    ky_p_q2 = 2
@@ -73,6 +74,8 @@ class singleRecptvFld:
         oo.prmPstMd = _N.zeros((oo.epochs, 3))   # mode of the params
         oo.hypPstMd  = _N.zeros((oo.epochs, 2+2+2))   # the hyper params
         twpi     = 2*_N.pi
+        
+        pcklme   = {}
 
         #  Gibbs sampling
         #  parameters l0, f, q2
@@ -150,7 +153,8 @@ class singleRecptvFld:
                 #  likelihood
 
                 ###############  CONDITIONAL f
-                q2pr = _f_q2 + q2rate
+                #q2pr = _f_q2 + q2rate
+                q2pr = _f_q2 if (_f_q2 > q2rate) else q2rate
                 if nSpks > 0:  #  spiking portion likelihood x prior
                     fs  = (1./nSpks)*_N.sum(xt0t1[sts])
                     fq2 = q2/nSpks
@@ -204,6 +208,10 @@ class singleRecptvFld:
                 q2_exp_px   = _N.sum(q2_intgrd*px, axis=1) * dSilenceX
                 s = -((l0*oo.dt)/sqrt_2pi_q2x)*q2_exp_px     #  function of q2
 
+                ##  adjust the prior to reflect how much we think PF can change
+                _Dq2_a = _q2_a if _q2_a < 200 else 200
+                _Dq2_B = (_q2_B/(_q2_a+1))*(_Dq2_a+1)
+                
                 if nSpks > 0:
                     #print  _N.sum((xt0t1[sts]-f)*(xt0t1[sts]-f))/(nSpks-1)
 
@@ -214,9 +222,10 @@ class singleRecptvFld:
                     SL_a = 0.5*nSpks - 1   #  spiking part of likelihood
                     SL_B = _N.sum(xI)  #  spiking part of likelihood
                     #  spiking prior x prior
-                    sLLkPr = -(_q2_a + SL_a + 2)*lq2x - iq2x*(_q2_B + SL_B)
+
+                    sLLkPr = -(_Dq2_a + SL_a + 2)*lq2x - iq2x*(_Dq2_B + SL_B)
                 else:
-                    sLLkPr = -(_q2_a + 1)*lq2x - iq2x*(_q2_B)
+                    sLLkPr = -(_Dq2_a + 1)*lq2x - iq2x*(_Dq2_B)
 
                 sat = sLLkPr + s
                 sat -= _N.max(sat)
@@ -273,6 +282,8 @@ class singleRecptvFld:
                 if   ip == oo.ky_p_l0: l0 = oo.prmPstMd[epc, ip] = bns[ib]
                 elif ip == oo.ky_p_f:  f  = oo.prmPstMd[epc, ip] = bns[ib]
                 elif ip == oo.ky_p_q2: q2 = oo.prmPstMd[epc, ip] = bns[ib]
+            pcklme["cp%d" % epc] = _N.array(smp_prms)
+
 
             for ip in xrange(6):  # hyper params
                 L     = _N.min(smp_hyps[ip, frm:, 0]);   H     = _N.max(smp_hyps[ip, frm:, 0])
@@ -288,6 +299,12 @@ class singleRecptvFld:
         if savePosterior:
             _N.savetxt(resFN("posParams.dat", dir=oo.outdir), smp_prms[:, :, 0].T, fmt="%.4f %.4f %.4f")
             _N.savetxt(resFN("posHypParams.dat", dir=oo.outdir), smp_hyps[:, :, 0].T, fmt="%.4f %.4f %.4f %.4f %.4f %.4f")
+
+        pcklme["md"] = _N.array(oo.prmPstMd)
+        dmp = open(resFN("posteriors.dump", dir=oo.outdir), "wb")
+        pickle.dump(pcklme, dmp, -1)
+        dmp.close()
+        
         _N.savetxt(resFN("posModes.dat", dir=oo.outdir), oo.prmPstMd, fmt="%.4f %.4f %.4f")
         _N.savetxt(resFN("hypModes.dat", dir=oo.outdir), oo.hypPstMd, fmt="%.4f %.4f %.4f %.4f %.4f %.4f")
 
@@ -321,3 +338,4 @@ class singleRecptvFld:
         _plt.plot(oo.prmPstMd[:, oo.ky_p_q2])
             
         _plt.savefig(resFN("cmpModesGT", dir=oo.outdir))
+

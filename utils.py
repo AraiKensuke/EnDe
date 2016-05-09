@@ -1,5 +1,60 @@
 import numpy as _N
 import matplotlib.pyplot as _plt
+from filter import gauKer
+
+def createSmoothedPath(cps, N, ts):
+    """
+    cps = [[x1, dy1], [x2, dy2], [x3, dy3], ...]
+    specify points when curve changes value.  
+    N   = how many points to use
+    ts  = time scale for smoothing
+    """
+    if cps is None:
+        return _N.zeros(N)
+    Ne  = 3*N
+    pth = _N.zeros(Ne)
+
+    NC  = cps.shape[0]
+
+    gk  = gauKer(int(ts*N))
+    gk  /= _N.sum(gk)
+
+    pth[0:N] = cps[0, 1]
+    for p in xrange(cps.shape[0]):
+        t0 = cps[p, 0]
+        t1 = cps[p+1, 0] if (p < NC - 1) else 2
+
+        pth[N+(N*t0):N+int(N*t1)] = cps[p, 1]
+
+    spth = _N.convolve(pth, gk, mode="same")
+    return _N.array(spth[N:2*N])
+
+def createSmoothedPath(cps, N, ts):
+    """
+    cps = [[x1, dy1], [x2, dy2], [x3, dy3], ...]
+    specify points when curve changes value.  
+    N   = how many points to use
+    ts  = time scale for smoothing
+    """
+    if cps is None:
+        return _N.zeros(N)
+    Ne  = 3*N
+    pth = _N.zeros(Ne)
+
+    NC  = cps.shape[0]
+
+    gk  = gauKer(int(ts*N))
+    gk  /= _N.sum(gk)
+
+    pth[0:N] = cps[0, 1]
+    for p in xrange(cps.shape[0]):
+        t0 = cps[p, 0]
+        t1 = cps[p+1, 0] if (p < NC - 1) else 2
+
+        pth[N+(N*t0):N+int(N*t1)] = cps[p, 1]
+
+    spth = _N.convolve(pth, gk, mode="same")
+    return _N.array(spth[N:2*N])
 
 def generateMvt(N, vAmp=1, constV=False, pLR=0.5, nLf=None, nRh=None, Fv=0.9995, sv=0.00007):
     """
