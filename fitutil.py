@@ -42,14 +42,21 @@ def colorclusters(smkpos, labs, MS):
             fig.add_subplot(2, 2, k+1)
             _plt.scatter(smkpos[inds, 0], smkpos[inds, k+1], color=myclrs[m], s=9)
 
-def sepHash(_x, BINS=20, blksz=20, xlo=-6, xhi=6):
+def sepHash(_x, BINS=50, blksz=20, xlo=-6, xhi=6):
     ##########################
     bins    = _N.linspace(xlo, xhi, BINS+1)
     
     cumcnts = _N.zeros(BINS)
     #####################   separate hash / nonhash indices
     nonhash = []
+
+    totalMks = _x.shape[0]
+    print totalMks
+    minInBin = int((totalMks / float(BINS)) * 0.05)  
+    # only look in bins where at least minInBin marks observed.
     for ch in xrange(1, 5):
+        cnts0, bns0 = _N.histogram(_x[:, 0], bins=bins)
+        minBins       = _N.where(cnts0 > minInBin)[0]
         done    = False
         inds  = _N.array([i[0] for i in sorted(enumerate(_x[:, ch]), key=lambda x:x[1], reverse=True)])
 
@@ -60,14 +67,14 @@ def sepHash(_x, BINS=20, blksz=20, xlo=-6, xhi=6):
             blk += 1
             cnts, bns = _N.histogram(_x[inds[blk*blksz:(blk+1)*blksz], 0], bins=bins)
             cumcnts += cnts
-            if len(_N.where(cumcnts < 2)[0]) <= 3:
+            if len(_N.where(cumcnts[minBins] < 2)[0]) == 0:
                 done = True
                 nonhash.extend(inds[0:(blk+1)*blksz])
 
     unonhash = _N.unique(nonhash)  #  not hash spikes
     hashsp   = _N.setdiff1d(inds, unonhash)  #  inds is contiguous but reordered all
 
-    return unonhash, hashsp
+    return unonhash, hashsp, _N.max(_x[hashsp, 1:], axis=0)
 
 def kmBIC(ctrs, labs, X):
     """
@@ -104,6 +111,52 @@ def kmBIC(ctrs, labs, X):
 
     return(BIC), m
 
+
+def emMKPOS(nhmks, hmks, TR=5, minK=2, maxK=15):
+    TR = 5
+    minK=2
+    maxK=15
+
+    iNH = -1
+    sNH = ["nh", "h"]
+
+    bestLabs = []
+
+    # nhid, hid = sepHash(mkpos)
+
+    # nhmks     = mkpos[nhid]
+    # hmks      = mkpos[hid]
+
+    for mks in [nhmks, hmks]:
+        iNH += 1
+        labs, bics, bestLab, nClstrs = _oT.EMwfBICs(mks, minK=minK, maxK=maxK, TR=TR)
+        bestLab = _N.array(labs[nClstrs-minK, 0], dtype=_N.int)
+
+        #    if mks == nhmks:
+
+        ##  non-hash, do spatial clustering
+        startCl = 0 
+        bestLabMP = _N.array(bestLab)
+        maxK = 3 if (iNH == 1) else 10
+        minK = 2 if (iNH == 1) else 3
+
+        for nc in xrange(nClstrs):
+            inThisClstr = _N.where(bestLab == nc)[0]
+            pos = mks[inThisClstr, 0]
+
+            pos = pos.reshape(len(inThisClstr), 1)
+
+            if len(inThisClstr) > maxK:
+                plabs, pbics, pbestLab, pClstrs = _oT.EMposBICs(pos, minK=1, maxK=maxK, TR=3)
+                pClstrs = contiguous_pack2(pbestLab)
+                cmp = _N.where(pbics == _N.min(pbics))[0]
+            else:
+                pbestLab = _N.zeros(len(inThisClstr), dtype=_N.int)
+                pClstrs  = 1
+            bestLabMP[inThisClstr] = pbestLab + startCl
+            startCl += pClstrs
+        bestLabs.append(_N.array(bestLabMP))
+    return bestLabs[0], bestLabs[1]
 
 def emMKPOS(nhmks, hmks, TR=5, minK=2, maxK=15):
     TR = 5
@@ -188,7 +241,7 @@ def emMKPOS_sep(nhmks, hmks, TR=5, minK=2, maxK=15):
             if splitSpace == _single_:
                 maxK = 7
 
-            print "neurons for iNH=%(nh)d   %(nc)d" % {"nh" : iNH, "nc" : nClstrs}
+            print "neurons for iNH=%(nh)d   nclusters %(nc)d" % {"nh" : iNH, "nc" : nClstrs}
             for nc in xrange(nClstrs):
                 inThisClstr = _N.where(bestLab == nc)[0]
                 pbestLab = _N.ones(len(inThisClstr), dtype=_N.int) * -1   #  poslabs
@@ -258,10 +311,6 @@ def emMKPOS_sep2(nhmks, hmks, TR=5, minK=2, maxK=15):
     """
     EM for wf cluster, heuristic density for position
     """
-    TR = 5
-    minK=2
-    maxK=15
-
     iNH = -1
     sNH = ["nh", "h"]
 
@@ -272,73 +321,78 @@ def emMKPOS_sep2(nhmks, hmks, TR=5, minK=2, maxK=15):
 
     sd   = 0.01
     isd2 = 1./(sd**2)
-    xp   = _N.linspace(-6, 6, 241)
+    #xp   = _N.linspace(-6, 6, 241)
+    xp   = _N.linspace(0, 3, 61)
     rxp  = xp.reshape(1, xp.shape[0])
 
     for mks in [nhmks, hmks]:
-
-        iNH += 1
-        if iNH == 0:
-            gk = gauKer(5)  #  0.05*5   = 0.25 
-            gk /= _N.sum(gk)
-        if iNH == 1:
-            gk = gauKer(20)  #  0.05*20   = 1
-            gk /= _N.sum(gk)
-
-
-        labs, bics, bestLab, nClstrs = _oT.EMwfBICs(mks, minK=minK, maxK=maxK, TR=TR)
-        bestLab = _N.array(labs[nClstrs-minK, 0], dtype=_N.int)
+        if mks is not None:
+            iNH += 1
+            if iNH == 0:  # spatial clusters
+                gk = gauKer(2)  #  0.05*2   = 0.1
+                gk /= _N.sum(gk)
+            if iNH == 1:
+                gk = gauKer(20)  #  0.05*20   = 1
+                gk /= _N.sum(gk)
 
 
-        #    if mks == nhmks:
+            labs, bics, bestLab, nClstrs = _oT.EMwfBICs(mks, minK=minK, maxK=maxK, TR=TR)
+            bestLab = _N.array(labs[nClstrs-minK, 0], dtype=_N.int)
 
-        ##  non-hash, do spatial clustering
 
-        startCl = 0 
-        bestLabMP = _N.array(bestLab)
-
-        print "neurons for iNH=%(nh)d   %(nc)d" % {"nh" : iNH, "nc" : nClstrs}
-        for nc in xrange(nClstrs):
-            inThisClstr = _N.where(bestLab == nc)[0]
-            pbestLab = _N.ones(len(inThisClstr), dtype=_N.int) * -1   #  poslabs
-            pos = mks[inThisClstr, 0]
             #    if mks == nhmks:
 
             ##  non-hash, do spatial clustering
-            rpos = pos.reshape(pos.shape[0], 1)
 
-            dens = _N.sum(_N.exp(-0.5*isd2*(rpos-rxp)**2), axis=0)
+            startCl = 0 
+            bestLabMP = _N.array(bestLab)
 
-            fdens = _N.convolve(dens, gk, mode="same")
-            dfdens= _N.diff(fdens)
-            brdrs = _N.where((dfdens[0:-1] < 0) & (dfdens[1:] > 0))[0]
+            print "neurons for iNH=%(nh)d   %(nc)d" % {"nh" : iNH, "nc" : nClstrs}
+            for nc in xrange(nClstrs):
+                inThisClstr = _N.where(bestLab == nc)[0]
+                pbestLab = _N.ones(len(inThisClstr), dtype=_N.int) * -1   #  poslabs
+                pos = mks[inThisClstr, 0]
+                #    if mks == nhmks:
 
-            lbrdrs = []
-            if brdrs[0] > 0:
-                lbrdrs.append(0)
-            lbrdrs.extend(brdrs)
-            if brdrs[-1] < 240:
-                lbrdrs.append(240)
+                ##  non-hash, do spatial clustering
+                rpos = pos.reshape(pos.shape[0], 1)
 
-            M = len(lbrdrs) - 1
-            inds = _N.empty(len(pos), dtype=_N.int)
+                dens = _N.sum(_N.exp(-0.5*isd2*(rpos-rxp)**2), axis=0)
 
-            for m in xrange(len(lbrdrs) - 1):
-                these = _N.where((pos >= xp[lbrdrs[m]]) & (pos <= xp[lbrdrs[m+1]]))[0]
-                inds[these] = m
+                fdens = _N.convolve(dens, gk, mode="same")
+                dfdens= _N.diff(fdens)
+                brdrs = _N.where((dfdens[0:-1] < 0) & (dfdens[1:] > 0))[0]
 
-            #  if a cluster is very small and isolated, keep it.  If small but very wide, put it with another cluster
+                lbrdrs = []
+                if brdrs[0] > 0:
+                    lbrdrs.append(0)
+                lbrdrs.extend(brdrs)
+                #if brdrs[-1] < 240:
+                #    lbrdrs.append(240)
+                if brdrs[-1] < 60:
+                    lbrdrs.append(60)
 
-            for m in xrange(len(lbrdrs) - 1):
-                these = _N.where((pos >= xp[lbrdrs[m]]) & (pos <= xp[lbrdrs[m+1]]))[0]
-                inds[these] = m
+                M = len(lbrdrs) - 1
+                inds = _N.empty(len(pos), dtype=_N.int)
 
-            inds += startCl  #  only the ones used for init
-            startCl += len(lbrdrs)-1
-            bestLabMP[inThisClstr] = inds
-        startClstrs[iNH] = startCl
+                for m in xrange(len(lbrdrs) - 1):
+                    these = _N.where((pos >= xp[lbrdrs[m]]) & (pos <= xp[lbrdrs[m+1]]))[0]
+                    inds[these] = m
 
-        bestLabs.append(_N.array(bestLabMP))
+                #  if a cluster is very small and isolated, keep it.  If small but very wide, put it with another cluster
+
+                for m in xrange(len(lbrdrs) - 1):
+                    these = _N.where((pos >= xp[lbrdrs[m]]) & (pos <= xp[lbrdrs[m+1]]))[0]
+                    inds[these] = m
+
+                inds += startCl  #  only the ones used for init
+                startCl += len(lbrdrs)-1
+                bestLabMP[inThisClstr] = inds
+            startClstrs[iNH] = startCl
+
+            bestLabs.append(_N.array(bestLabMP))
+        else:
+            bestLabs.append(None)
     return bestLabs[0], bestLabs[1], startClstrs
 
 
@@ -532,25 +586,26 @@ def emMKPOS_sep3(nhmks, hmks, TR=5, minK=2, maxK=15):
     return bestLabs[0], bestLabs[1], startClstrs
 
 def sepHashEM(mks):
-    print "sepHashEM"
-    bics = _N.empty(2)
+    bics = _N.empty(2);    gmm = None
     
     #  If hash in ALL channels, consider it hash
     hashes = []
 
+    gmms = []
     if mks.shape[0] > 500:
-        for sh in xrange(1, mks.shape[1]):
+        for sh in xrange(1, mks.shape[1]):   # tetrode channel
             rmks = mks[:, sh].reshape(mks.shape[0], 1)
-            for ncmp in xrange(1, 3):
+            for ncmp in [1, 2]:
                 gmm = mixture.GMM(n_components=ncmp)
                 gmm.fit(rmks)
                 bics[ncmp-1] = gmm.bic(rmks)
+                gmms.append(gmm)
             if bics[1] > bics[0]: # double
                 ncmps = 1
             else:
                 ncmps = 2
 
-            if ncmps > 1:
+            if ncmps > 1:  #  is this 2 component meaningful?
                 gmm = mixture.GMM(n_components=ncmp)
                 gmm.fit(rmks)
 
@@ -560,20 +615,20 @@ def sepHashEM(mks):
                 #print "len l0 %(0)d   l1 %(1)d" % {"0" : len(l0), "1" : len(l1)}
                 hI = l1 if _N.mean(mks[l1, sh]) < _N.mean(mks[l0, sh]) else l0
                 nhI = l0 if _N.mean(mks[l1, sh]) < _N.mean(mks[l0, sh]) else l1
-                if float(len(nhI)) / float(len(hI)) < 0.333:
+                if (float(len(nhI)) / float(len(hI)) < 0.333):
                     hashes.append(hI)
 
-        if len(hashes) == 0:
+        if len(hashes) == 0:#< (mks.shape[1] - 1):    
             # no hashes
-            return _N.array([]), _N.arange(mks.shape[0])
-        else:
-            if len(hashes) == 1:
-                h = hashes[0]
-            else:
+            return _N.array([]), _N.arange(mks.shape[0]), None
+        else:   #  
+            if len(hashes) == 1:    #  1 channel w/2 cmp. The rest 1 cmp.
+               h = hashes[0]
+            else:  #  multiple channels w/2 cmp.  must be hash in all channels
                 h = _N.intersect1d(hashes[0], hashes[1])
                 for i in xrange(2, len(hashes)):
                     h = _N.intersect1d(h, hashes[i])
-
+                
             hsh    = h
             nonh    = _N.setdiff1d(_N.arange(mks.shape[0]), hsh)
             # fig = _plt.figure(figsize=(8, 10))
@@ -591,7 +646,8 @@ def sepHashEM(mks):
 
             #_plt.savefig("sephash_%s" % tetlist[it])
             #_plt.close()
-            return nonh, hsh
+            return nonh, hsh, gmms
     else:
-        return _N.array([]), _N.arange(mks.shape[0])
+        return _N.array([]), _N.arange(mks.shape[0]), None
+
 

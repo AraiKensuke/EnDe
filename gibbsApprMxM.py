@@ -11,8 +11,11 @@ import numpy as _N
 import matplotlib.pyplot as _plt
 from EnDedirs import resFN, datFN
 import pickle
+import fitutil as _fu
 
-
+__BOTH_MK_POS__ = 0
+__ONLY_POS__    = 1
+__ONLY_MK__     = 2
 
 class MarkAndRF:
     ky_p_l0 = 0;    ky_p_f  = 1;    ky_p_q2 = 2
@@ -41,6 +44,8 @@ class MarkAndRF:
     epochs   = None
 
     outdir   = None
+    
+    iOnlyPosOrMk = __BOTH_MK_POS__
 
     def __init__(self, outdir, fn, intvfn):
         oo     = self
@@ -66,54 +71,12 @@ class MarkAndRF:
         gtdiffusion:  use ground truth center of place field in calculating variance of center.  Meaning of diffPerMin different
         """
         oo = self
-
-        #  PRIORS
-        #  priors  prefixed w/ _
-        _f_u   = _N.zeros(M);    _f_q2  = _N.ones(M) #  wide
-        #  inverse gamma
-        _q2_a  = _N.ones(M)*1e-4;    _q2_B  = _N.ones(M)*1e-3
-        #_plt.plot(q2x, q2x**(-_q2_a-1)*_N.exp(-_q2_B / q2x))
-        _l0_a = _N.ones(M);     _l0_B  = _N.zeros(M)*(1/30.)
-
-        #  
-        _u_u   = _N.zeros((M, K));  
-        _u_Sg = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*0.1
-        _Sg_nu = _N.ones((M, 1));  
-        _Sg_PSI = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*0.1
+        twpi     = 2*_N.pi
+        pcklme   = {}
 
         ep2 = oo.epochs if (ep2 == None) else ep2
         oo.epochs = ep2-ep1
-        #####  MODES  - find from the sampling
-        oo.prmPstMd = _N.zeros((oo.epochs, (3+K+K*K)*M))   # mode of the params
-        oo.hypPstMd  = _N.zeros((oo.epochs, (2+2+2 + K+K*K + 1+K*K)*M))   # the hyper params
-        twpi     = 2*_N.pi
 
-        pcklme   = {}
-
-
-        #  Gibbs sampling
-        #  parameters l0, f, q2
-
-        ######################################  GIBBS samples, need for MAP estimate
-        smp_sp_prms = _N.zeros((3, ITERS, M))  
-        smp_mk_prms = [_N.zeros((K, ITERS, M)), _N.zeros((K, K, ITERS, M))]
-        smp_sp_hyps = _N.zeros((6, ITERS, M))  
-        smp_mk_hyps = [_N.zeros((K, ITERS, M)), _N.zeros((K, K, ITERS, M)),
-                       _N.zeros((1, ITERS, M)), _N.zeros((K, K, ITERS, M))]
-
-        ######################################  INITIAL VALUE OF PARAMS
-        l0       = _N.array([8.,]*M)
-        q2       = _N.array([0.04]*M)
-        #f        = _N.array([1.1]*M)
-        f        = _N.array([0.6, 2.3])
-        ######################################  MARK PARAMS
-        #u       = _N.zeros((M, K))   #  center
-        u       = _N.array([[5, 4.5],
-                            [1.5, 2.5]])   #  center
-
-        #Sg      = _N.tile(_N.identity(K), M).T.reshape((M, K, K))
-        Sg = _N.array([[[0.1,0.08],[0.08, 0.1]],
-                       [[0.1,0.08],[0.08, 0.1]]])
 
         ######################################  GRID for calculating
         ####  #  points in sum.  
@@ -140,30 +103,116 @@ class MarkAndRF:
         q2rate = oo.diffPerEpoch**2  #  unit of minutes  
         ######################################  PRECOMPUTED
         posbins  = _N.linspace(0, 3, oo.Nupx+1)
-        rat      = _N.zeros(M+1)
-        pc       = _N.zeros(M)
-
-
-        ######  the hyperparameters for u need to be saved
-        u_u_     = _N.zeros((M, K))
-        u_Sg_    = _N.zeros((M, K, K))
-        Sg_nu_   = _N.zeros((M, 1))
-        Sg_PSI_  = _N.zeros((M, K, K))
 
         for epc in xrange(ep1, ep2):
-            #f = 3*_N.random.rand(M)
-
-            #q2 = 3*_N.random.rand(M)*0.1
-            #l0 = 3*_N.random.rand(M)
             #print q2
-            print "epoch %d" % epc
 
-            Nms   = _N.empty((M, 1, 1), dtype=_N.int)
+            print "epoch %d" % epc
 
             t0 = oo.intvs[epc]
             t1 = oo.intvs[epc+1]
+
             Asts    = _N.where(oo.dat[t0:t1, 1] == 1)[0]   #  based at 0
             Ants    = _N.where(oo.dat[t0:t1, 1] == 0)[0]
+
+            n1   = len(Asts)
+            n0   = 0
+
+            if epc == ep1:   ###  initialize
+                _x   = _N.empty((n1-n0, K+1))
+                _x[:, 0]    = x[Asts+t0]
+                _x[:, 1:]   = mks[Asts+t0]
+                #_plt.scatter(_x[:, 0], _x[:, 1])
+
+                unonhash, hashsp, gmms = _fu.sepHashEM(_x)
+                #unonhash, hashsp, hashThr = _fu.sepHash(_x)
+                if (len(unonhash) > 0) and (len(hashsp) > 0):
+                    labS, labH, clstrs = _fu.emMKPOS_sep(_x[unonhash], _x[hashsp])
+                elif len(unonhash) == 0:
+                    labS, labH, clstrs = _fu.emMKPOS_sep(None, _x[hashsp], TR=1)
+                else:
+                    labS, labH, clstrs = _fu.emMKPOS_sep(_x[unonhash], None, TR=1)
+
+                MF     = clstrs[0] + clstrs[1]
+                M = int(MF * 1.2) + 1   #  20% more clusters
+
+                #  PRIORS
+                #  priors  prefixed w/ _
+                _f_u   = _N.zeros(M);    _f_q2  = _N.ones(M) #  wide
+                #  inverse gamma
+                _q2_a  = _N.ones(M)*1e-4;    _q2_B  = _N.ones(M)*1e-3
+                #_plt.plot(q2x, q2x**(-_q2_a-1)*_N.exp(-_q2_B / q2x))
+                _l0_a = _N.ones(M);     _l0_B  = _N.zeros(M)*(1/30.)
+
+                #  
+                _u_u   = _N.zeros((M, K));  
+                _u_Sg = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*0.1
+                _Sg_nu = _N.ones((M, 1));  
+                _Sg_PSI = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*0.1
+
+                #####  MODES  - find from the sampling
+                oo.prmPstMd = _N.zeros((oo.epochs, (3+K+K*K)*M))   # mode of the params
+                oo.hypPstMd  = _N.zeros((oo.epochs, (2+2+2 + K+K*K + 1+K*K)*M))   # the hyper params
+
+                #  Gibbs sampling
+                #  parameters l0, f, q2
+
+                ######################################  GIBBS samples, need for MAP estimate
+                smp_sp_prms = _N.zeros((3, ITERS, M))  
+                smp_mk_prms = [_N.zeros((K, ITERS, M)), _N.zeros((K, K, ITERS, M))]
+                smp_sp_hyps = _N.zeros((6, ITERS, M))  
+                smp_mk_hyps = [_N.zeros((K, ITERS, M)), _N.zeros((K, K, ITERS, M)),
+                               _N.zeros((1, ITERS, M)), _N.zeros((K, K, ITERS, M))]
+
+                ######################################  INITIAL VALUE OF PARAMS
+                l0       = _N.array([11.,]*M)
+                q2       = _N.array([0.04]*M)
+                #f        = _N.array([1.1]*M)
+                f        = _N.empty(M)
+                #f        = _N.array([0.6, 2.3])
+                ######################################  MARK PARAMS
+                u       = _N.zeros((M, K))   #  center
+                # u       = _N.array([[5, 4.5],
+                #                     [1.5, 2.5]])   #  center
+
+                Sg      = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*0.1
+
+                ######  the hyperparameters for u need to be saved
+                u_u_     = _N.zeros((M, K))
+                u_Sg_    = _N.zeros((M, K, K))
+                Sg_nu_   = _N.zeros((M, 1))
+                Sg_PSI_  = _N.zeros((M, K, K))
+
+                rat      = _N.zeros(M+1)
+                pc       = _N.zeros(M)
+
+                ##################
+                lab        = _N.array(labS.tolist() + (labH + clstrs[0]).tolist())
+                tmpx          = _N.empty((n1-n0, K+1))
+
+                strt = 0
+                if len(unonhash) > 0:
+                    tmpx[0:len(unonhash)] = _x[unonhash]
+                    strt = len(unonhash)
+                if len(hashsp) > 0:
+                    tmpx[strt:]  = _x[hashsp]
+
+                #  now assign the cluster we've found to Gaussian mixtures
+                covAll = _N.cov(tmpx.T)
+                dcovMag= _N.diagonal(covAll)*0.005
+
+                for im in xrange(M):  #  if lab < 0, these marks not used for init
+                    if im < MF:
+                        kinds = _N.where(lab == im)[0]  #  inds
+                        f[im]  = _N.mean(x[Asts[kinds]+t0], axis=0)
+                        u[im]  = _N.mean(mks[Asts[kinds]+t0], axis=0)
+                        q2[im] = 0.05
+                        Sg[im] = _N.identity(K)*0.1
+                    else:
+                        f[im]  = _N.random.rand()*3
+                        u[im]  = _N.random.rand(K)
+                        q2[im] = 0.05
+                        Sg[im] = _N.identity(K)*0.1
 
             if gtdiffusion:
                 #  tell me how much diffusion to expect per min.
@@ -193,9 +242,9 @@ class MarkAndRF:
 
             _iSg_Mu = _N.einsum("mjk,mk->mj", _N.linalg.inv(_u_Sg), _u_u)
 
+            clusSz = _N.zeros(M, dtype=_N.int)
             for iter in xrange(ITERS):
-                print "iter  %d" % iter
-                #if (iter % 100) == 0:    
+                if (iter % 100) == 0:    print "iter  %d" % iter
 
                 ur         = u.reshape((1, M, K))
                 fr         = f.reshape((M, 1))    # centers
@@ -224,41 +273,28 @@ class MarkAndRF:
                 #print qdrMKS
                 #print ((fr - xASr)*(fr - xASr))
                 #print "aaaaaaaaaaaaaaaaaaa"
-                cont       = pkFRr + mkNrms - 0.5*((fr - xASr)*(fr - xASr)*iq2r + qdrMKS)
-                #cont       = mkNrms - 0.5*((fr - xASr)*(fr - xASr)*iq2r - qdrMKS)
-                #cont       = pkFRr  - 0.5*((fr - xASr)*(fr - xASr)*iq2r)
+                if oo.iOnlyPosOrMk == __BOTH_MK_POS__:
+                    cont       = pkFRr + mkNrms - 0.5*((fr - xASr)*(fr - xASr)*iq2r + qdrMKS)
+                elif oo.iOnlyPosOrMk == __ONLY_POS__:
+                    cont       = pkFRr - 0.5*(fr - xASr)*(fr - xASr)*iq2r
+                elif oo.iOnlyPosOrMk == __ONLY_MK__:
+                    cont       = mkNrms - 0.5*qdrMKS
+
                 mcontr     = _N.max(cont, axis=0).reshape((1, nSpks))  
                 cont       -= mcontr
                 _N.exp(cont, out=econt)
 
-                """
-                quadratic of marks
-                """
-                # mk         = _N.random.rand(nSpks, 1, K)
-                # u          = _N.random.rand(1, M, K)
-                # #  x-f    N x M x K
-                # dxf       = x-f
-
-                # iq2       = _N.zeros((M, K, K))
-                # for m in xrange(M):
-                #     _N.fill_diagonal(iq2[m], m+1)
-
-                # ans  = _N.empty((M, N))
-
-                # ansE = _N.empty((M, N))
-                # for i in xrange(ITERS):
-                #     _N.einsum("nmj,mjk,nmk->mn", dxf, iq2, dxf, out=ansE)
-                """
-                """
                 for m in xrange(M):
                     rat[m+1] = rat[m] + econt[m]
 
                 rat /= rat[M]
                 print f
+                print u
                 print q2
                 print Sg
-                print u
-                print rat
+                print l0
+
+                # print rat
 
                 M1 = rat[1:] >= rnds
                 M2 = rat[0:-1] <= rnds
@@ -272,6 +308,7 @@ class MarkAndRF:
                     minds = _N.where(gz[iter, :, m] == 1)[0]
                     sts  = Asts[minds]
                     nSpksM   = len(sts)
+                    clusSz[m] = nSpksM
 
                     #  prior described by hyper-parameters.
                     #  prior described by function
@@ -289,7 +326,8 @@ class MarkAndRF:
                         clstx    = mks[sts]
                         mcs[m]       = _N.mean(clstx, axis=0)
                         u_u_[m] = _N.einsum("jk,k->j", u_Sg_[m], _iSg_Mu[m] + nSpksM*_N.dot(iSg[m], mcs[m]))
-                        u[m] = _N.random.multivariate_normal(u_u_[m], u_Sg_[m])
+                        if (oo.iOnlyPosOrMk == __ONLY_MK__) or (oo.iOnlyPosOrMk == __BOTH_MK_POS__):
+                            u[m] = _N.random.multivariate_normal(u_u_[m], u_Sg_[m])
 
                         # hyp
                         ########  POSITION
@@ -340,21 +378,23 @@ class MarkAndRF:
                     norm    = 1./_N.sum(condPosF)
                     f_u_    = norm*_N.sum(fx*condPosF)
                     f_q2_   = norm*_N.sum(condPosF*(fx-f_u_)*(fx-f_u_))
-                    f[m]    = _N.sqrt(f_q2_)*_N.random.randn() + f_u_
+                    if (oo.iOnlyPosOrMk == __ONLY_POS__) or (oo.iOnlyPosOrMk == __BOTH_MK_POS__):
+                        f[m]    = _N.sqrt(f_q2_)*_N.random.randn() + f_u_
                     smp_sp_prms[oo.ky_p_f, iter, m] = f[m]
                     smp_sp_hyps[oo.ky_h_f_u, iter, m] = f_u_
                     smp_sp_hyps[oo.ky_h_f_q2, iter, m] = f_q2_
 
                     #############  VARIANCE, COVARIANCE
-                    # if nSpksM >= 1:
-                    #     ##  dof of posterior distribution of cluster covariance
-                    #     Sg_nu_[m] = _Sg_nu[m, 0] + nSpksM
-                    #     ##  dof of posterior distribution of cluster covariance
-                    #     ur = u[m].reshape((1, K))
-                    #     #print "******"
-                    #     #print _N.dot((clstx - ur).T, (clstx-ur))
-                    #     Sg_PSI_[m] = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
-                    #     Sg[m] = s_u.sample_invwishart(Sg_PSI_[m], Sg_nu_[m])
+                    if nSpksM >= 1:
+                        ##  dof of posterior distribution of cluster covariance
+                        Sg_nu_[m] = _Sg_nu[m, 0] + nSpksM
+                        ##  dof of posterior distribution of cluster covariance
+                        ur = u[m].reshape((1, K))
+                        #print "******"
+                        #print _N.dot((clstx - ur).T, (clstx-ur))
+                        Sg_PSI_[m] = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
+                        if (oo.iOnlyPosOrMk == __ONLY_MK__) or (oo.iOnlyPosOrMk == __BOTH_MK_POS__):
+                            Sg[m] = s_u.sample_invwishart(Sg_PSI_[m], Sg_nu_[m])
                     # #print Sg_PSI_
                     ##############  SAMPLE COVARIANCES
 
@@ -393,8 +433,9 @@ class MarkAndRF:
                     sat -= _N.max(sat)
                     condPos = _N.exp(sat)
                     q2_a_, q2_B_ = ig_prmsUV(q2x, condPos, d_q2x, q2x_m1, ITER=1)
+                    if (oo.iOnlyPosOrMk == __ONLY_POS__) or (oo.iOnlyPosOrMk == __BOTH_MK_POS__):
 
-                    #q2[m] = _ss.invgamma.rvs(q2_a_ + 1, scale=q2_B_)  #  check
+                        q2[m] = _ss.invgamma.rvs(q2_a_ + 1, scale=q2_B_)  #  check
                     #print ((1./nSpks)*_N.sum((xt0t1[sts]-f)*(xt0t1[sts]-f)))
 
                     smp_sp_prms[oo.ky_p_q2, iter, m]   = q2[m]

@@ -42,15 +42,15 @@ def sample_invwishart(lmbda,dof):
         x = np.diag(np.sqrt(stats.chi2.rvs(dof-(np.arange(n)))))
         x[np.triu_indices_from(x,1)] = np.random.randn(n*(n-1)/2)
     R = np.linalg.qr(x,'r')
-    #try:
-    T = scipy.linalg.solve_triangular(R.T,chol.T).T
+    try:
+        T = scipy.linalg.solve_triangular(R.T,chol.T).T
     #  if dof too small, we get problems
-    # except ValueError:  # R.T is 5 x 3, not 5 x 5
-    #     print R.T
-    #     print chol.T
-    #     print lmbda
-    #     print dof
-    #     raise
+    except ValueError:  # R.T is 5 x 3, not 5 x 5
+        print R.T
+        print chol.T
+        print lmbda
+        print dof
+        raise
     return np.dot(T,T.T)
 
 def sample_wishart(sigma, dof):

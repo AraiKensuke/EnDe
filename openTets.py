@@ -68,7 +68,7 @@ def openTets(fn, tets, t0=None, t1=None, lm=None, detectHash=True, chooseSpikes=
 
         if detectHash:
             #  separate the hash
-            nhid, hid = _fu.sepHashEM(posmarks)
+            nhid, hid, gmms = _fu.sepHashEM(posmarks)
 
             nhmks     = posmarks[nhid]
             hmks      = posmarks[hid]
@@ -79,7 +79,7 @@ def openTets(fn, tets, t0=None, t1=None, lm=None, detectHash=True, chooseSpikes=
             allmarks.append(posmarks)
 
     if detectHash:
-        return allnhmks, allhmks, lm
+        return allnhmks, allhmks, lm, gmms
     else:
         return allmarks, lm
 

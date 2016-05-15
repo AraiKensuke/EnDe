@@ -29,32 +29,41 @@ def createSmoothedPath(cps, N, ts):
     spth = _N.convolve(pth, gk, mode="same")
     return _N.array(spth[N:2*N])
 
-def createSmoothedPath(cps, N, ts):
+def createSmoothedPathK(cps, N, K, ts, LoHis):
     """
-    cps = [[x1, dy1], [x2, dy2], [x3, dy3], ...]
+    cps = [[x1, y1], [x2, y2], [x3, y3], ...], yi in [0, 1]
     specify points when curve changes value.  
     N   = how many points to use
+    K   = dims
+    LoHis= upper and lower lim for each channel   K x 2
     ts  = time scale for smoothing
     """
     if cps is None:
         return _N.zeros(N)
     Ne  = 3*N
-    pth = _N.zeros(Ne)
+    pth = _N.zeros((Ne, K))
 
     NC  = cps.shape[0]
 
     gk  = gauKer(int(ts*N))
     gk  /= _N.sum(gk)
 
-    pth[0:N] = cps[0, 1]
-    for p in xrange(cps.shape[0]):
-        t0 = cps[p, 0]
-        t1 = cps[p+1, 0] if (p < NC - 1) else 2
+    print LoHis
+    Amps = _N.diff(LoHis, axis=1).reshape(K)
+    print Amps
+    for k in xrange(K):
+        pth[0:N, k] = LoHis[k, 0] + Amps[k]*cps[0, 1]
+        for p in xrange(1, cps.shape[0]-1):
+            cps[p, 0] += _N.random.randn()*0.02
+        for p in xrange(cps.shape[0]):
+            t0 = cps[p, 0]
+            t1 = cps[p+1, 0] if (p < NC - 1) else 2
 
-        pth[N+(N*t0):N+int(N*t1)] = cps[p, 1]
+            pth[N+(N*t0):N+int(N*t1), k] = LoHis[k, 0] + Amps[k]*cps[p, 1]
 
-    spth = _N.convolve(pth, gk, mode="same")
-    return _N.array(spth[N:2*N])
+        spth = _N.convolve(pth[:, k], gk, mode="same")
+        pth[:, k] = spth
+    return _N.array(pth[N:2*N])
 
 def generateMvt(N, vAmp=1, constV=False, pLR=0.5, nLf=None, nRh=None, Fv=0.9995, sv=0.00007):
     """
