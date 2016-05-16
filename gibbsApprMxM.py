@@ -11,11 +11,7 @@ import numpy as _N
 import matplotlib.pyplot as _plt
 from EnDedirs import resFN, datFN
 import pickle
-import fitutil as _fu
-
-__BOTH_MK_POS__ = 0
-__ONLY_POS__    = 1
-__ONLY_MK__     = 2
+from fitutil import  emMKPOS_sep, sepHashEM
 
 class MarkAndRF:
     ky_p_l0 = 0;    ky_p_f  = 1;    ky_p_q2 = 2
@@ -44,9 +40,8 @@ class MarkAndRF:
     epochs   = None
 
     outdir   = None
+    polyFit  = True
     
-    iOnlyPosOrMk = __BOTH_MK_POS__
-
     def __init__(self, outdir, fn, intvfn):
         oo     = self
         ######################################  DATA input, define intervals
@@ -105,8 +100,6 @@ class MarkAndRF:
         posbins  = _N.linspace(0, 3, oo.Nupx+1)
 
         for epc in xrange(ep1, ep2):
-            #print q2
-
             print "epoch %d" % epc
 
             t0 = oo.intvs[epc]
@@ -122,16 +115,14 @@ class MarkAndRF:
                 _x   = _N.empty((n1-n0, K+1))
                 _x[:, 0]    = x[Asts+t0]
                 _x[:, 1:]   = mks[Asts+t0]
-                #_plt.scatter(_x[:, 0], _x[:, 1])
 
-                unonhash, hashsp, gmms = _fu.sepHashEM(_x)
-                #unonhash, hashsp, hashThr = _fu.sepHash(_x)
+                unonhash, hashsp, gmms = sepHashEM(_x)
                 if (len(unonhash) > 0) and (len(hashsp) > 0):
-                    labS, labH, clstrs = _fu.emMKPOS_sep(_x[unonhash], _x[hashsp])
+                    labS, labH, clstrs = emMKPOS_sep(_x[unonhash], _x[hashsp])
                 elif len(unonhash) == 0:
-                    labS, labH, clstrs = _fu.emMKPOS_sep(None, _x[hashsp], TR=1)
+                    labS, labH, clstrs = emMKPOS_sep(None, _x[hashsp], TR=1)
                 else:
-                    labS, labH, clstrs = _fu.emMKPOS_sep(_x[unonhash], None, TR=1)
+                    labS, labH, clstrs = emMKPOS_sep(_x[unonhash], None, TR=1)
 
                 MF     = clstrs[0] + clstrs[1]
                 M = int(MF * 1.2) + 1   #  20% more clusters
@@ -151,8 +142,12 @@ class MarkAndRF:
                 _Sg_PSI = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*0.1
 
                 #####  MODES  - find from the sampling
-                oo.prmPstMd = _N.zeros((oo.epochs, (3+K+K*K)*M))   # mode of the params
-                oo.hypPstMd  = _N.zeros((oo.epochs, (2+2+2 + K+K*K + 1+K*K)*M))   # the hyper params
+                oo.sp_prmPstMd = _N.zeros((oo.epochs, 3*M))   # mode of params
+                oo.sp_hypPstMd  = _N.zeros((oo.epochs, (2+2+2)*M)) # hyperparam
+                oo.mk_prmPstMd = [_N.zeros((oo.epochs, M, K)),
+                                  _N.zeros((oo.epochs, M, K, K))]
+                                  # mode of params
+                oo.mk_hypPstMd  = _N.zeros((oo.epochs, (2+2+2)*M)) # hyperparam
 
                 #  Gibbs sampling
                 #  parameters l0, f, q2
@@ -187,8 +182,8 @@ class MarkAndRF:
                 pc       = _N.zeros(M)
 
                 ##################
-                lab        = _N.array(labS.tolist() + (labH + clstrs[0]).tolist())
-                tmpx          = _N.empty((n1-n0, K+1))
+                lab      = _N.array(labS.tolist() + (labH + clstrs[0]).tolist())
+                tmpx     = _N.empty((n1-n0, K+1))
 
                 strt = 0
                 if len(unonhash) > 0:
@@ -201,7 +196,7 @@ class MarkAndRF:
                 covAll = _N.cov(tmpx.T)
                 dcovMag= _N.diagonal(covAll)*0.005
 
-                for im in xrange(M):  #  if lab < 0, these marks not used for init
+                for im in xrange(M):  #if lab < 0, these marks not used for init
                     if im < MF:
                         kinds = _N.where(lab == im)[0]  #  inds
                         f[im]  = _N.mean(x[Asts[kinds]+t0], axis=0)
@@ -265,20 +260,9 @@ class MarkAndRF:
 
                 pkFRr      = pkFR.reshape((M, 1))
                 dmu        = (mASr - ur)
-                #print "^^^^^^^^^^^^^^^"
-                #print dmu
 
                 _N.einsum("nmj,mjk,nmk->mn", dmu, iSg, dmu, out=qdrMKS)
-                #print "-------------------"
-                #print qdrMKS
-                #print ((fr - xASr)*(fr - xASr))
-                #print "aaaaaaaaaaaaaaaaaaa"
-                if oo.iOnlyPosOrMk == __BOTH_MK_POS__:
-                    cont       = pkFRr + mkNrms - 0.5*((fr - xASr)*(fr - xASr)*iq2r + qdrMKS)
-                elif oo.iOnlyPosOrMk == __ONLY_POS__:
-                    cont       = pkFRr - 0.5*(fr - xASr)*(fr - xASr)*iq2r
-                elif oo.iOnlyPosOrMk == __ONLY_MK__:
-                    cont       = mkNrms - 0.5*qdrMKS
+                cont       = pkFRr + mkNrms - 0.5*((fr - xASr)*(fr - xASr)*iq2r + qdrMKS)
 
                 mcontr     = _N.max(cont, axis=0).reshape((1, nSpks))  
                 cont       -= mcontr
@@ -288,11 +272,13 @@ class MarkAndRF:
                     rat[m+1] = rat[m] + econt[m]
 
                 rat /= rat[M]
+                """
                 print f
                 print u
                 print q2
                 print Sg
                 print l0
+                """
 
                 # print rat
 
@@ -326,8 +312,7 @@ class MarkAndRF:
                         clstx    = mks[sts]
                         mcs[m]       = _N.mean(clstx, axis=0)
                         u_u_[m] = _N.einsum("jk,k->j", u_Sg_[m], _iSg_Mu[m] + nSpksM*_N.dot(iSg[m], mcs[m]))
-                        if (oo.iOnlyPosOrMk == __ONLY_MK__) or (oo.iOnlyPosOrMk == __BOTH_MK_POS__):
-                            u[m] = _N.random.multivariate_normal(u_u_[m], u_Sg_[m])
+                        u[m] = _N.random.multivariate_normal(u_u_[m], u_Sg_[m])
 
                         # hyp
                         ########  POSITION
@@ -338,7 +323,6 @@ class MarkAndRF:
 
                     smp_mk_prms[oo.ky_p_u][:, iter, m] = u[m]
                     print ".   %d" % nSpksM
-                    #print mcs[m]
                     smp_mk_hyps[oo.ky_h_u_u][:, iter, m] = u_u_[m]
                     smp_mk_hyps[oo.ky_h_u_Sg][:, :, iter, m] = u_Sg_[m]
 
@@ -378,8 +362,7 @@ class MarkAndRF:
                     norm    = 1./_N.sum(condPosF)
                     f_u_    = norm*_N.sum(fx*condPosF)
                     f_q2_   = norm*_N.sum(condPosF*(fx-f_u_)*(fx-f_u_))
-                    if (oo.iOnlyPosOrMk == __ONLY_POS__) or (oo.iOnlyPosOrMk == __BOTH_MK_POS__):
-                        f[m]    = _N.sqrt(f_q2_)*_N.random.randn() + f_u_
+                    f[m]    = _N.sqrt(f_q2_)*_N.random.randn() + f_u_
                     smp_sp_prms[oo.ky_p_f, iter, m] = f[m]
                     smp_sp_hyps[oo.ky_h_f_u, iter, m] = f_u_
                     smp_sp_hyps[oo.ky_h_f_q2, iter, m] = f_q2_
@@ -390,11 +373,8 @@ class MarkAndRF:
                         Sg_nu_[m] = _Sg_nu[m, 0] + nSpksM
                         ##  dof of posterior distribution of cluster covariance
                         ur = u[m].reshape((1, K))
-                        #print "******"
-                        #print _N.dot((clstx - ur).T, (clstx-ur))
                         Sg_PSI_[m] = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
-                        if (oo.iOnlyPosOrMk == __ONLY_MK__) or (oo.iOnlyPosOrMk == __BOTH_MK_POS__):
-                            Sg[m] = s_u.sample_invwishart(Sg_PSI_[m], Sg_nu_[m])
+                        Sg[m] = s_u.sample_invwishart(Sg_PSI_[m], Sg_nu_[m])
                     # #print Sg_PSI_
                     ##############  SAMPLE COVARIANCES
 
@@ -410,7 +390,6 @@ class MarkAndRF:
                     q2_exp_px   = _N.sum(q2_intgrd*px, axis=1) * dSilenceX
 
                     s = -((l0[m]*oo.dt)/sqrt_2pi_q2x)*q2_exp_px     #  function of q2
-                    #print "s  %.3e" % s
 
                     _Dq2_a = _q2_a[m] if _q2_a[m] < 200 else 200
                     _Dq2_B = (_q2_B[m]/(_q2_a[m]+1))*(_Dq2_a+1)
@@ -433,9 +412,7 @@ class MarkAndRF:
                     sat -= _N.max(sat)
                     condPos = _N.exp(sat)
                     q2_a_, q2_B_ = ig_prmsUV(q2x, condPos, d_q2x, q2x_m1, ITER=1)
-                    if (oo.iOnlyPosOrMk == __ONLY_POS__) or (oo.iOnlyPosOrMk == __BOTH_MK_POS__):
-
-                        q2[m] = _ss.invgamma.rvs(q2_a_ + 1, scale=q2_B_)  #  check
+                    q2[m] = _ss.invgamma.rvs(q2_a_ + 1, scale=q2_B_)  #  check
                     #print ((1./nSpks)*_N.sum((xt0t1[sts]-f)*(xt0t1[sts]-f)))
 
                     smp_sp_prms[oo.ky_p_q2, iter, m]   = q2[m]
@@ -451,8 +428,6 @@ class MarkAndRF:
                     l0_intgrd   = _N.exp(-0.5*(f[m] - ux)*(f[m]-ux) * iiq2)  
                     l0_exp_px   = _N.sum(l0_intgrd*px) * dSilenceX
                     BL  = (oo.dt/_N.sqrt(twpi*q2[m]))*l0_exp_px
-                    # if iter == 50:
-                    #     print "BL  %(BL).2f    BL2  %(BL2).2f" % {"BL" : BL, "BL2" : BL2}
 
                     #_Dl0_a = _l0_a[m] if _l0_a[m] < 400 else 400
                     _Dl0_a = _l0_a[m] if _l0_a[m] < 25 else 25
@@ -484,22 +459,61 @@ class MarkAndRF:
                 print smp_mk_prms[oo.ky_p_Sg][:, :, ITERS-1, m]
 
             frm   = int(0.6*ITERS)  #  have to test for stationarity
-            #print _N.sum(_N.mean(gz[frm:], axis=0), axis=0)
 
-            #print "f[0]  %(1).3f    f[1]  %(2).3f" % {"1" : f[0], "2" : f[1]}
-            #print "here"
-            fig = _plt.figure(figsize=(8, 4))
+            occ   =  _N.mean(gz[ITERS-1], axis=0)
+
+
+            l_trlsNearMAP = []
             for m in xrange(M):
-                #print smp_sp_prms[oo.ky_p_f, frm:, m]
+                trlsNearMAP = _N.arange(0, ITERS-frm)
                 for ip in xrange(3):  # params
                     L     = _N.min(smp_sp_prms[ip, frm:, m]);   H     = _N.max(smp_sp_prms[ip, frm:, m])
                     cnts, bns = _N.histogram(smp_sp_prms[ip, frm:, m], bins=_N.linspace(L, H, 50))
-                    if ip == oo.ky_p_f:
-                        fig.add_subplot(1, M, m+1)
-                        _plt.hist(smp_sp_prms[ip, frm:, m], bins=_N.linspace(L, H, 50))
-                    ib  = _N.where(cnts == _N.max(cnts))[0][0]
+                    ###  take the iters that gave 25% top counts
+                    ###  intersect them for each param.
+                    ###  
+                    col = 3*m+ip
 
+                    if oo.polyFit:
+                        xfit = 0.5*(bns[0:-1] + bns[1:])
+                        yfit = cnts
+                        ac = _N.polyfit(xfit, yfit, 2)  #a[0]*x^2 + a[1]*x + a[2]
+                        if ac[0] < 0:  #  found a maximum
+                            xMAP = -ac[1] / (2*ac[0])
 
+                            yPnF = ac[0]*xfit**2+ac[1]*xfit+ac[2]
+                            yMAP = ac[0]*xMAP**2+ac[1]*xMAP+ac[2]
+                            xLo  = xfit[_N.where(yPnF > yMAP*0.75)[0][0]]
+                            xHi  = xfit[_N.where(yPnF > yMAP*0.75)[0][-1]]
+
+                            if occ[m] > 0:
+                                these=_N.where((smp_sp_prms[ip, frm:, m] > xLo) & (smp_sp_prms[ip, frm:, m] < xHi))[0]
+                                trlsNearMAP = _N.intersect1d(these, trlsNearMAP)
+                        else:
+                            ib  = _N.where(cnts == _N.max(cnts))[0][0]
+                            xMAP  = bns[ib]                        
+                    else:
+                        ib  = _N.where(cnts == _N.max(cnts))[0][0]
+                        xMAP  = bns[ib]
+
+                    if   ip == oo.ky_p_l0: 
+                        l0[m] = oo.sp_prmPstMd[epc, col] = xMAP
+                    elif ip == oo.ky_p_f:  
+                        f[m]  = oo.sp_prmPstMd[epc, col] = xMAP
+                    elif ip == oo.ky_p_q2: 
+                        q2[m] = oo.sp_prmPstMd[epc, col] = xMAP
+
+                trlsNearMAP += frm
+                l_trlsNearMAP.append(trlsNearMAP)
+                print trlsNearMAP
+
+            for m in xrange(M):
+                if occ[m] > 0:
+                    print "mth %d cluster" % m
+                    print l_trlsNearMAP[m]
+
+            pcklme["cp%d" % epc] = _N.array(smp_sp_prms)
+            #trlsNearMAP = _N.array(list(set(trlsNearMAP_D)))+frm   #  use these trials to pick out posterior params for MARK part
 
             for m in xrange(M):
                 for ip in xrange(6):  # hyper params
@@ -510,12 +524,24 @@ class MarkAndRF:
                     col = 6*m+ip
                     vl  = bns[ib]
 
-                    if   ip == oo.ky_h_l0_a: _l0_a[m] = oo.hypPstMd[epc, col] = vl
-                    elif ip == oo.ky_h_l0_B: _l0_B[m] = oo.hypPstMd[epc, col] = vl
-                    elif ip == oo.ky_h_f_u:  _f_u[m]  = oo.hypPstMd[epc, col] = vl
-                    elif ip == oo.ky_h_f_q2: _f_q2[m] = oo.hypPstMd[epc, col] = vl
-                    elif ip == oo.ky_h_q2_a: _q2_a[m] = oo.hypPstMd[epc, col] = vl
-                    elif ip == oo.ky_h_q2_B: _q2_B[m] = oo.hypPstMd[epc, col] = vl
+                    if   ip == oo.ky_h_l0_a: 
+                        _l0_a[m] = oo.sp_hypPstMd[epc, col] = vl
+                    elif ip == oo.ky_h_l0_B: 
+                        _l0_B[m] = oo.sp_hypPstMd[epc, col] = vl
+                    elif ip == oo.ky_h_f_u:  _f_u[m]  = oo.sp_hypPstMd[epc, col] = vl
+                    elif ip == oo.ky_h_f_q2: _f_q2[m] = oo.sp_hypPstMd[epc, col] = vl
+                    elif ip == oo.ky_h_q2_a: _q2_a[m] = oo.sp_hypPstMd[epc, col] = vl
+                    elif ip == oo.ky_h_q2_B: _q2_B[m] = oo.sp_hypPstMd[epc, col] = vl
+
+
+            ##  params and hyper parms for mark
+            for m in xrange(M):
+                u[m] = _N.mean(smp_mk_prms[0][:, l_trlsNearMAP[m], m], axis=1)
+                Sg[m] = _N.mean(smp_mk_prms[1][:, :, l_trlsNearMAP[m], m], axis=2)
+                if occ[m] > 0:
+                    print "for cluster %d" % m
+                    print u[m]
+                    print Sg[m]
 
             ###  hack here.  If we don't reset the prior for 
             ###  what happens when a cluster is unused?
@@ -525,7 +551,6 @@ class MarkAndRF:
             ###  values once that cluster becomes used again.  So
             ###  we would like unused clusters to have l0->0, but keep the
             ###  variance small.  That's why we will reset a cluster
-            occ   =  _N.mean(gz[ITERS-1], axis=0)
             print occ
 
             for m in xrange(M):
@@ -539,13 +564,13 @@ class MarkAndRF:
             _N.savetxt(resFN("posParams.dat", dir=oo.outdir), smp_sp_prms.T, fmt=("%.4f %.4f %.4f " * M))
             #_N.savetxt(resFN("posHypParams.dat", dir=oo.outdir), smp_sp_hyps[:, :, 0].T, fmt="%.4f %.4f %.4f %.4f %.4f %.4f")
 
-        pcklme["md"] = _N.array(oo.prmPstMd)
+        pcklme["md"] = _N.array(oo.sp_prmPstMd)
         dmp = open(resFN("posteriors.dump", dir=oo.outdir), "wb")
         pickle.dump(pcklme, dmp, -1)
         dmp.close()
 
-        _N.savetxt(resFN("posModes.dat", dir=oo.outdir), oo.prmPstMd, fmt=("%.4f %.4f %.4f " * M))
-        _N.savetxt(resFN("hypModes.dat", dir=oo.outdir), oo.hypPstMd, fmt=("%.4f %.4f %.4f %.4f %.4f %.4f" * M))
+        _N.savetxt(resFN("posModes.dat", dir=oo.outdir), oo.sp_prmPstMd, fmt=("%.4f %.4f %.4f " * M))
+        _N.savetxt(resFN("hypModes.dat", dir=oo.outdir), oo.sp_hypPstMd, fmt=("%.4f %.4f %.4f %.4f %.4f %.4f" * M))
 
         
     def figs(self, ep1=0, ep2=None):
@@ -568,13 +593,12 @@ class MarkAndRF:
 
         fig.add_subplot(3, 1, 1)
         _plt.plot(mnUs)
-        _plt.plot(oo.prmPstMd[:, oo.ky_p_f])
+        _plt.plot(oo.sp_prmPstMd[:, oo.ky_p_f])
         fig.add_subplot(3, 1, 2)
         _plt.plot(mnL0s)
-        _plt.plot(oo.prmPstMd[:, oo.ky_p_l0])
+        _plt.plot(oo.sp_prmPstMd[:, oo.ky_p_l0])
         fig.add_subplot(3, 1, 3)
         _plt.plot(mnSq2s)
-        _plt.plot(oo.prmPstMd[:, oo.ky_p_q2])
+        _plt.plot(oo.sp_prmPstMd[:, oo.ky_p_q2])
             
         _plt.savefig(resFN("cmpModesGT", dir=oo.outdir))
-

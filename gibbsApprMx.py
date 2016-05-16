@@ -37,6 +37,7 @@ class multiRecptvFld:
     epochs   = None
 
     outdir   = None
+    polyFit  = True
 
     def __init__(self, outdir, fn, intvfn):
         oo     = self
@@ -187,7 +188,7 @@ class multiRecptvFld:
                 for m in xrange(M):
                     iiq2 = 1./q2[m]
                     sts  = Asts[_N.where(gz[iter, :, m] == 1)[0]]
-                    print sts
+                    #print sts
                     nSpksM   = len(sts)
 
                     #  prior described by hyper-parameters.
@@ -316,32 +317,55 @@ class multiRecptvFld:
                 for ip in xrange(3):  # params
                     L     = _N.min(smp_prms[ip, frm:, m]);   H     = _N.max(smp_prms[ip, frm:, m])
                     cnts, bns = _N.histogram(smp_prms[ip, frm:, m], bins=_N.linspace(L, H, 50))
-                    if ip == oo.ky_p_f:
-                        fig.add_subplot(1, M, m+1)
-                        _plt.hist(smp_prms[ip, frm:, m], bins=_N.linspace(L, H, 50))
-                    ib  = _N.where(cnts == _N.max(cnts))[0][0]
+
+                    if oo.polyFit:
+                        xfit = 0.5*(bns[0:-1] + bns[1:])
+                        yfit = cnts
+                        ac = _N.polyfit(xfit, yfit, 2)  #a[0]*x^2 + a[1]*x + a[2]
+                        if ac[0] < 0:  #  found a maximum
+                            xMAP = -ac[1] / (2*ac[0])
+                        else:
+                            ib  = _N.where(cnts == _N.max(cnts))[0][0]
+                            xMAP  = bns[ib]
+                    else:
+                        ib  = _N.where(cnts == _N.max(cnts))[0][0]
+                        xMAP  = bns[ib]
 
                     col = 3*m+ip
-                    if   ip == oo.ky_p_l0: l0[m] = oo.prmPstMd[epc, col] = bns[ib]
-                    elif ip == oo.ky_p_f:  f[m]  = oo.prmPstMd[epc, col] = bns[ib]
-                    elif ip == oo.ky_p_q2: q2[m] = oo.prmPstMd[epc, col] = bns[ib]
+                    if   ip == oo.ky_p_l0: l0[m] = oo.prmPstMd[epc, col] = xMAP
+                    elif ip == oo.ky_p_f:  f[m]  = oo.prmPstMd[epc, col] = xMAP
+                    elif ip == oo.ky_p_q2: q2[m] = oo.prmPstMd[epc, col] = xMAP
             pcklme["cp%d" % epc] = _N.array(smp_prms)
 
             for m in xrange(M):
                 for ip in xrange(6):  # hyper params
                     L     = _N.min(smp_hyps[ip, frm:, m]);   H     = _N.max(smp_hyps[ip, frm:, m])
                     cnts, bns = _N.histogram(smp_hyps[ip, frm:, m], bins=_N.linspace(L, H, 50))
-                    ib  = _N.where(cnts == _N.max(cnts))[0][0]
+
+                    if oo.polyFit:
+                        xfit = 0.5*(bns[0:-1] + bns[1:])
+                        yfit = cnts
+                        ac = _N.polyfit(xfit, yfit, 2)  #a[0]*x^2 + a[1]*x + a[2]
+                        #y  = a[0]x^2 + a[1]x + a[2]
+                        #y' = 2a[0]x + a[1]
+                        #y''= 2a[0]    if a[0]
+                        if ac[0] < 0:  #  found a maximum
+                            xMAP = -ac[1] / (2*ac[0])
+                        else:
+                            ib  = _N.where(cnts == _N.max(cnts))[0][0]
+                            xMAP  = bns[ib]
+                    else:
+                        ib  = _N.where(cnts == _N.max(cnts))[0][0]
+                        xMAP  = bns[ib]
 
                     col = 6*m+ip
-                    vl  = bns[ib]
 
-                    if   ip == oo.ky_h_l0_a: _l0_a[m] = oo.hypPstMd[epc, col] = vl
-                    elif ip == oo.ky_h_l0_B: _l0_B[m] = oo.hypPstMd[epc, col] = vl
-                    elif ip == oo.ky_h_f_u:  _f_u[m]  = oo.hypPstMd[epc, col] = vl
-                    elif ip == oo.ky_h_f_q2: _f_q2[m] = oo.hypPstMd[epc, col] = vl
-                    elif ip == oo.ky_h_q2_a: _q2_a[m] = oo.hypPstMd[epc, col] = vl
-                    elif ip == oo.ky_h_q2_B: _q2_B[m] = oo.hypPstMd[epc, col] = vl
+                    if   ip == oo.ky_h_l0_a: _l0_a[m] = oo.hypPstMd[epc, col] = xMAP
+                    elif ip == oo.ky_h_l0_B: _l0_B[m] = oo.hypPstMd[epc, col] = xMAP
+                    elif ip == oo.ky_h_f_u:  _f_u[m]  = oo.hypPstMd[epc, col] = xMAP
+                    elif ip == oo.ky_h_f_q2: _f_q2[m] = oo.hypPstMd[epc, col] = xMAP
+                    elif ip == oo.ky_h_q2_a: _q2_a[m] = oo.hypPstMd[epc, col] = xMAP
+                    elif ip == oo.ky_h_q2_B: _q2_B[m] = oo.hypPstMd[epc, col] = xMAP
 
             ###  hack here.  If we don't reset the prior for 
             ###  what happens when a cluster is unused?
@@ -359,8 +383,6 @@ class multiRecptvFld:
                     print "resetting"
                     _q2_a[m] = 1e-4
                     _q2_B[m] = 1e-3
-
-                
 
         if savePosterior:
             _N.savetxt(resFN("posParams.dat", dir=oo.outdir), smp_prms[:, :, 0].T, fmt="%.4f %.4f %.4f")
