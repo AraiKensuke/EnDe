@@ -12,7 +12,7 @@ import matplotlib.pyplot as _plt
 from EnDedirs import resFN, datFN
 import pickle
 from fitutil import  emMKPOS_sep, sepHashEM
-from posteriorUtil import MAPvalues
+from posteriorUtil import MAPvalues2
 from filter import gauKer
 
 class MarkAndRF:
@@ -63,7 +63,7 @@ class MarkAndRF:
         
         NT     = oo.dat.shape[0]
 
-    def gibbs(self, ITERS, K, ep1=0, ep2=None, savePosterior=True, gtdiffusion=False):
+    def gibbs(self, ITERS, K, ep1=0, ep2=None, savePosterior=True, gtdiffusion=False, Mdbg=None):
         """
         gtdiffusion:  use ground truth center of place field in calculating variance of center.  Meaning of diffPerMin different
         """
@@ -131,7 +131,9 @@ class MarkAndRF:
                     labS, labH, clstrs = emMKPOS_sep(_x[unonhash], None, TR=1)
 
                 MF     = clstrs[0] + clstrs[1]
-                M = int(MF * 1.2) + 1   #  20% more clusters
+                M = int(MF * 1.2) + 2   #  20% more clusters
+                print "cluters:  %d" % M
+
 
                 #  PRIORS
                 #  priors  prefixed w/ _
@@ -139,7 +141,7 @@ class MarkAndRF:
                 #  inverse gamma
                 _q2_a  = _N.ones(M)*1e-4;    _q2_B  = _N.ones(M)*1e-3
                 #_plt.plot(q2x, q2x**(-_q2_a-1)*_N.exp(-_q2_B / q2x))
-                _l0_a = _N.ones(M);     _l0_B  = _N.zeros(M)*(1/30.)
+                _l0_a = _N.ones(M)*1.1;     _l0_B  = _N.ones(M)*(1/30.)
 
                 #  
                 _u_u   = _N.zeros((M, K));  
@@ -245,20 +247,11 @@ class MarkAndRF:
             qdrMKS = _N.empty((M, nSpks))
             ################################  GIBBS ITERS ITERS ITERS
 
-            try:
-                _iSg_Mu = _N.einsum("mjk,mk->mj", _N.linalg.inv(_u_Sg), _u_u)
-                print "_iSg_Mu"
-                print _iSg_Mu
-            except _N.linalg.linalg.LinAlgError:
-                print "_iSg_Mu"
-                print _u_Sg
-                print _u_u
-                raise
+            #  linalgerror
+            #_iSg_Mu = _N.einsum("mjk,mk->mj", _N.linalg.inv(_u_Sg), _u_u)
 
             clusSz = _N.zeros(M, dtype=_N.int)
             for iter in xrange(ITERS):
-                if (iter == 3) and (epc == 1):
-                    return
                 if (iter % 100) == 0:    print "iter  %d" % iter
 
                 ur         = u.reshape((1, M, K))
@@ -282,7 +275,9 @@ class MarkAndRF:
                 dmu        = (mASr - ur)
 
                 _N.einsum("nmj,mjk,nmk->mn", dmu, iSg, dmu, out=qdrMKS)
-                cont       = pkFRr + mkNrms - 0.5*((fr - xASr)*(fr - xASr)*iq2r + qdrMKS)
+                qdrSPC     = (fr - xASr)*(fr - xASr)*iq2r
+                cont       = pkFRr + mkNrms - 0.5*(qdrSPC + qdrMKS)
+                
 
                 mcontr     = _N.max(cont, axis=0).reshape((1, nSpks))  
                 cont       -= mcontr
@@ -308,7 +303,7 @@ class MarkAndRF:
                 gz[iter] = (M1&M2).T
 
                 ###############  FOR EACH CLUSTER
-                print "^^^^^^^^^^^^^^"
+
                 for m in xrange(M):
                     iiq2 = 1./q2[m]
                     minds = _N.where(gz[iter, :, m] == 1)[0]
@@ -330,13 +325,17 @@ class MarkAndRF:
 
 
                     if nSpksM > 0:
-                        u_Sg_[m] = _N.linalg.inv(_N.linalg.inv(_u_Sg[m]) + nSpksM*iSg[m])
+                        try:
+                            u_Sg_[m] = _N.linalg.inv(_N.linalg.inv(_u_Sg[m]) + nSpksM*iSg[m])
+                        except _N.linalg.linalg.LinAlgError:
+                            print m
+                            print _u_Sg[m]
+                            print iSg[m]
+                            raise
                         clstx    = mks[sts]
-                        if epc > 0:
-                            print "cls %d" % m
-                            print clstx[0:5]
+
                         mcs[m]       = _N.mean(clstx, axis=0)
-                        u_u_[m] = _N.einsum("jk,k->j", u_Sg_[m], _iSg_Mu[m] + nSpksM*_N.dot(iSg[m], mcs[m]))
+                        u_u_[m] = _N.einsum("jk,k->j", u_Sg_[m], _N.dot(_N.linalg.inv(_u_Sg[m]), _u_u[m]) + nSpksM*_N.dot(iSg[m], mcs[m]))
                         u[m] = _N.random.multivariate_normal(u_u_[m], u_Sg_[m])
 
                         # hyp
@@ -348,20 +347,6 @@ class MarkAndRF:
 
                     smp_mk_prms[oo.ky_p_u][:, iter, m] = u[m]
                     #print ".   %d" % nSpksM
-                    if iter % 50 == 0:
-                        print "u  hyps"
-                        print mcs[m]
-                        print _u_u[m]
-                        print u_u_[m]
-                        print u_Sg_[m]
-                        print (u_Sg_[m] - u_Sg_[m].T)
-                        print u[m]
-                        print "hey bye"
-                        print (_N.dot(_u_Sg[m], _iSg_Mu[m]))
-                        if nSpksM > 0:
-                            print (_N.dot(_N.linalg.inv(nSpksM*iSg[m]), nSpksM*_N.dot(iSg[m], mcs[m])))
-                        print (_N.dot(_N.linalg.inv(_N.linalg.inv(_u_Sg[m]) + nSpksM*iSg[m]), _iSg_Mu[m] + nSpksM*_N.dot(iSg[m], mcs[m])))
-                        print "hobohobo"
                     smp_mk_hyps[oo.ky_h_u_u][:, iter, m] = u_u_[m]
                     smp_mk_hyps[oo.ky_h_u_Sg][:, :, iter, m] = u_Sg_[m]
 
@@ -413,26 +398,7 @@ class MarkAndRF:
                         ##  dof of posterior distribution of cluster covariance
                         ur = u[m].reshape((1, K))
                         Sg_PSI_[m] = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
-                        try:
-                            Sg[m] = s_u.sample_invwishart(Sg_PSI_[m], Sg_nu_[m])
-                            if iter % 50 == 0:
-                                print "Sg"
-                                print Sg[m]
-                                print "Sg"
-                        except _N.linalg.LinAlgError:
-                            print "raised at m is %d" % m
-                            print Sg_PSI_[m]
-                            print _Sg_PSI[m]
-                            print Sg_nu_[m]
-                            print _Sg_nu[m, 0]
-                            raise
-                        if epc >= 1:
-                            print "m is %d" % m
-                            print ur
-                            print _N.dot((clstx - ur).T, (clstx-ur))
-                            print Sg_PSI_[m]
-                            print _Sg_PSI[m]
-                            print _Sg_nu[m, 0]
+                        Sg[m] = s_u.sample_invwishart(Sg_PSI_[m], Sg_nu_[m])
 
                     # #print Sg_PSI_
                     ##############  SAMPLE COVARIANCES
@@ -440,10 +406,6 @@ class MarkAndRF:
                     ##  dof of posterior distribution of cluster covariance
 
                     smp_mk_prms[oo.ky_p_Sg][:, :, iter, m] = Sg[m]
-                    if iter % 50 == 0:
-                        print "Sg hyps"
-                        print Sg_nu_[m]
-                        print Sg_PSI_[m]
                     smp_mk_hyps[oo.ky_h_Sg_nu][0, iter, m] = Sg_nu_[m]
                     smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, iter, m] = Sg_PSI_[m]
 
@@ -492,8 +454,8 @@ class MarkAndRF:
                     l0_exp_px   = _N.sum(l0_intgrd*px) * dSilenceX
                     BL  = (oo.dt/_N.sqrt(twpi*q2[m]))*l0_exp_px
 
-                    #_Dl0_a = _l0_a[m] if _l0_a[m] < 400 else 400
-                    _Dl0_a = _l0_a[m] if _l0_a[m] < 25 else 25
+                    _Dl0_a = _l0_a[m] if _l0_a[m] < 400 else 400
+                    #_Dl0_a = _l0_a[m] if _l0_a[m] < 25 else 25
                     _Dl0_B = (_l0_B[m]/_l0_a[m]) * _Dl0_a
                     
                     #  a'/B' = a/B
@@ -505,37 +467,48 @@ class MarkAndRF:
 
                     #print "l0_a_ %(a).3e   l0_B_ %(B).3e" % {"a" : l0_a_, "B" : l0_B_}
 
-                    if (l0_B_ > 0) and (l0_a_ > 1):
-                        l0[m] = _ss.gamma.rvs(l0_a_ - 1, scale=(1/l0_B_))  #  check
+                    #if (l0_B_ > 0) and (l0_a_ > 1):
+                    l0[m] = _ss.gamma.rvs(l0_a_ - 1, scale=(1/l0_B_))  #  check
+                    #else:
+                    #    print "cluster %(c)d   nSpksM %(n)d   %(B).4f  %(a).4f" % {"c" : m, "n" : nSpksM, "B" : l0_B_, "a" : l0_a_}
 
                     ###  l0 / _N.sqrt(twpi*q2) is f*dt used in createData2
 
                     smp_sp_prms[oo.ky_p_l0, iter, m] = l0[m]
+
                     smp_sp_hyps[oo.ky_h_l0_a, iter, m] = l0_a_
                     smp_sp_hyps[oo.ky_h_l0_B, iter, m] = l0_B_
 
-            print "^^^^^^^^^^^^^^^"
-            for m in xrange(M):
-                print "mean %d"% m
-                print smp_mk_prms[oo.ky_p_u][:, ITERS-1, m]
-                print "cov %d"% m
-                print smp_mk_prms[oo.ky_p_Sg][:, :, ITERS-1, m]
-
+            for im in xrange(M):
+                print "for m %d" % im
+                print smp_sp_hyps[oo.ky_h_f_u, ::20, im]
             frm   = int(0.6*ITERS)  #  have to test for stationarity
 
             occ   =  _N.mean(gz[ITERS-1], axis=0)
 
+            oo.smp_sp_hyps = smp_sp_hyps
+            oo.smp_sp_prms = smp_sp_prms
+            oo.smp_mk_hyps = smp_mk_hyps
+            oo.smp_mk_prms = smp_mk_prms
+
             l_trlsNearMAP = []
-            MAPvalues(epc, smp_sp_prms, oo.sp_prmPstMd, frm, ITERS, M, 3, occ, gkMAP, l_trlsNearMAP)
-            MAPvalues(epc, smp_sp_hyps, oo.sp_hypPstMd, frm, ITERS, M, 6, occ, gkMAP, None)
+            MAPvalues2(epc, smp_sp_prms, oo.sp_prmPstMd, frm, ITERS, M, 3, occ, gkMAP, l_trlsNearMAP)
+            MAPvalues2(epc, smp_sp_hyps, oo.sp_hypPstMd, frm, ITERS, M, 6, occ, gkMAP, None)
+            _f_u[:]       = oo.sp_hypPstMd[epc, oo.ky_h_f_u::6]
+            _f_q2[:]      = oo.sp_hypPstMd[epc, oo.ky_h_f_q2::6]
+            _q2_a[:]      = oo.sp_hypPstMd[epc, oo.ky_h_q2_a::6]
+            _q2_B[:]      = oo.sp_hypPstMd[epc, oo.ky_h_q2_B::6]
+            _l0_a[:]      = oo.sp_hypPstMd[epc, oo.ky_h_l0_a::6]
+            _l0_B[:]      = oo.sp_hypPstMd[epc, oo.ky_h_l0_B::6]
+            # print _f_u
+            # print _f_q2
+            # print _q2_a
+            # print _q2_B
+            # print _l0_a
+            # print _l0_B
 
-            print l_trlsNearMAP
+            #print l_trlsNearMAP
             
-            for m in xrange(M):
-                if occ[m] > 0:
-                    print "mth %d cluster" % m
-                    print l_trlsNearMAP[m]
-
             pcklme["cp%d" % epc] = _N.array(smp_sp_prms)
             #trlsNearMAP = _N.array(list(set(trlsNearMAP_D)))+frm   #  use these trials to pick out posterior params for MARK part
 
@@ -558,6 +531,8 @@ class MarkAndRF:
             ##  params and hyper parms for mark
             for m in xrange(M):
                 MAPtrls = l_trlsNearMAP[m]
+                print "MAPtrls"
+                print MAPtrls
                 u[m] = _N.mean(smp_mk_prms[0][:, MAPtrls, m], axis=1)
                 Sg[m] = _N.mean(smp_mk_prms[1][:, :, MAPtrls, m], axis=2)
                 oo.mk_prmPstMd[oo.ky_p_u][epc, m] = u[m]
@@ -571,20 +546,8 @@ class MarkAndRF:
                 oo.mk_hypPstMd[oo.ky_h_Sg_nu][epc, m] = _Sg_nu[m]
                 oo.mk_hypPstMd[oo.ky_h_Sg_PSI][epc, m]= _Sg_PSI[m]
 
-                if occ[m] > 0:
-                    print "for cluster %d" % m
-                    print _u_u[m]
-                    print _u_Sg[m]
-                    print _Sg_nu[m]
-                    print _Sg_PSI[m]
-                    print "^^^^^^^^^^"
-                else:
-                    _u_Sg[m]  = _N.identity(K) * 5.
-                    _Sg_PSI[m] = _N.identity(K) * 5.
-                    print "^^^^^^^^^^"
-
             print occ
-            """
+
             ###  hack here.  If we don't reset the prior for 
             ###  what happens when a cluster is unused?
             ###  l0 -> 0, and at the same time, the variance increases.
@@ -593,18 +556,38 @@ class MarkAndRF:
             ###  values once that cluster becomes used again.  So
             ###  we would like unused clusters to have l0->0, but keep the
             ###  variance small.  That's why we will reset a cluster
-            print occ
 
             for m in xrange(M):
                 if (occ[m] == 0) and (l0[m] / _N.sqrt(twpi*q2[m]) < 1):
-                    print "resetting"
+                    print "resetting  cluster %d" % m
                     _q2_a[m] = 1e-4
                     _q2_B[m] = 1e-3
+                    _f_u[m] = _N.random.rand()*3
+                    _f_q2[m] = 1e-1
 
+            rsmp_sp_prms = smp_sp_prms.swapaxes(1, 0).reshape(ITERS, 3*M, order="F")
 
-        if savePosterior:
-            _N.savetxt(resFN("posParams.dat", dir=oo.outdir), smp_sp_prms.T, fmt=("%.4f %.4f %.4f " * M))
+            _N.savetxt(resFN("posParams_%d.dat" % epc, dir=oo.outdir), rsmp_sp_prms, fmt=("%.4f %.4f %.4f " * M))
             #_N.savetxt(resFN("posHypParams.dat", dir=oo.outdir), smp_sp_hyps[:, :, 0].T, fmt="%.4f %.4f %.4f %.4f %.4f %.4f")
+
+        # print "hey here are the hyperparams"
+        # print _f_u
+        # print _f_q2
+        # print _q2_a
+        # print _q2_B
+        # print _l0_a
+        # print _l0_B
+        # print "hey done with the hyperparams"
+        # print "hey here are the hyperparams"
+        # print _u_u
+        # print "---"
+        # print _u_Sg
+        # print "---"
+        # print _Sg_nu
+        # print "---"
+        # print _Sg_PSI
+        # print "hey done with the hyperparams"
+
 
         pcklme["md"] = _N.array(oo.sp_prmPstMd)
         dmp = open(resFN("posteriors.dump", dir=oo.outdir), "wb")
@@ -612,8 +595,8 @@ class MarkAndRF:
         dmp.close()
 
         _N.savetxt(resFN("posModes.dat", dir=oo.outdir), oo.sp_prmPstMd, fmt=("%.4f %.4f %.4f " * M))
-        _N.savetxt(resFN("hypModes.dat", dir=oo.outdir), oo.sp_hypPstMd, fmt=("%.4f %.4f %.4f %.4f %.4f %.4f" * M))
-            """
+        #_N.savetxt(resFN("hypModes.dat", dir=oo.outdir), oo.sp_hypPstMd, fmt=("%.4f %.4f %.4f %.4f %.4f %.4f" * M))
+
         
     def figs(self, ep1=0, ep2=None):
         oo  = self
