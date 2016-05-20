@@ -1,11 +1,11 @@
 import mvn
-from EnDedirs import resFN
+from EnDedirs import resFN, datFN
 import numpy as _N
 import matplotlib.pyplot as _plt
 import scipy.cluster.vq as scv
 import mcmcFigs as mF
 
-def show_posmarks(dec, setname, ylim=None, win=None, singles=False):
+def show_posmarks(dec, setname, ylim=None, win=None, singles=False, baseFN=None):
     MTHR = 0.001   #  how much smaller is mixture compared to maximum
 
     for nt in xrange(dec.nTets):
@@ -25,7 +25,8 @@ def show_posmarks(dec, setname, ylim=None, win=None, singles=False):
                     y.append(dec.marks[l, nt][0][k-1])
             """
 
-            _plt.scatter(dec.tr_pos[nt], dec.tr_marks[nt][:, k-1], color="black", s=2)
+            if dec.marksObserved[nt] > 0:
+                _plt.scatter(dec.tr_pos[nt], dec.tr_marks[nt][:, k-1], color="black", s=2)
             #_plt.scatter(dec.mvNrm[nt].us[:, 0], dec.mvNrm[nt].us[:, k], color="red", s=30)
             mThr = MTHR * _N.max(dec.mvNrm[nt].ms)
 
@@ -46,18 +47,18 @@ def show_posmarks(dec, setname, ylim=None, win=None, singles=False):
 
             if singles:
                 _plt.suptitle("k=%(k)d  t0=%(2).2fs : t1=%(3).2fs" % {"2" : (dec.tt0/1000.), "3" : (dec.tt1/1000.), "k" : k})
-                fn= "look" if (dec.usetets is None) else "look_tet%s" % dec.usetets[nt]
+                fn= baseFN if (dec.usetets is None) else "%(bf)s_tet%(t)s" % {"bf" : baseFN, "t" : dec.usetets[nt]}
 
                 mF.arbitraryAxes(ax)
                 mF.setLabelTicks(_plt, xlabel="position", ylabel="mark", xtickFntSz=14, ytickFntSz=14, xlabFntSz=16, ylabFntSz=16)
                 fig.subplots_adjust(left=0.2, bottom=0.2, top=0.85)
-                _plt.savefig(resFN("%(k)d_%(1)s_win=%(w)d.eps" % {"1" : fn, "w" : win, "k" : k}, dir=setname), transparent=True)
+                _plt.savefig(resFN("%(1)s_win=%(w)d.png" % {"1" : fn, "w" : win}, dir=setname), transparent=True)
                 _plt.close()
 
 
         if not singles:
             _plt.suptitle("t0=%(2)d,t1=%(3)d" % {"2" : dec.tt0, "3" : dec.tt1})
-            fn= "look" if (dec.usetets is None) else "look_tet%s" % dec.usetets[nt]
+            fn= baseFN if (dec.usetets is None) else "%(bf)s_tet%(t)s" % {"bf" : baseFN, "t" : dec.usetets[nt]}
             _plt.savefig(resFN("%(1)s_win=%(w)d.png" % {"1" : fn, "w" : win}, dir=setname, create=True), transparent=True)
             _plt.close()
 
@@ -92,7 +93,7 @@ def show_posmarksCNTR(dec, setname, mvNrm, ylim=None, win=None, singles=False, s
                 ylim[1] += 0.1*yAMP
 
 
-            if showScatter:
+            if showScatter and dec.marksObserved[nt] > 0:
                 _plt.scatter(dec.tr_pos[nt][::scatskip], dec.tr_marks[nt][::scatskip, k-1], color="grey", s=1)
             img = mvNrm.evalAll(1000, k-1, ylim=ylim)
             _plt.imshow(img, origin="lower", extent=(-6, 6, ylim[0], ylim[1]), cmap=_plt.get_cmap("Reds"))
@@ -103,9 +104,8 @@ def show_posmarksCNTR(dec, setname, mvNrm, ylim=None, win=None, singles=False, s
                 mF.arbitraryAxes(ax)
                 mF.setLabelTicks(_plt, xlabel="position", ylabel="mark", xtickFntSz=14, ytickFntSz=14, xlabFntSz=16, ylabFntSz=16)
                 fig.subplots_adjust(left=0.2, bottom=0.2, top=0.85)
-                _plt.savefig(resFN("%(k)d_%(1)s_win=%(w)d.eps" % {"1" : fn, "w" : win, "k" : k}, dir=setname), transparent=True)
+                _plt.savefig(resFN("%(1)s_win=%(w)d.png" % {"1" : fn, "w" : win}, dir=setname), transparent=True)
                 _plt.close()
-
 
         if not singles:
             _plt.suptitle("t0=%(2)d,t1=%(3)d" % {"2" : dec.tt0, "3" : dec.tt1})
@@ -190,3 +190,52 @@ def showTrajectory(dec, t0, t1, ep, setname, dir):
     fig.subplots_adjust(bottom=0.15, left=0.15)
     _plt.savefig(resFN("decode_%(uts)s_%(mth)s_win=%(e)d.eps" % {"e" : (ep/2), "mth" : dec.decmth, "uts" : dec.utets_str, "dir" : dir}, dir=setname, create=True))
     _plt.close()
+
+
+
+def timeline(bfn, datfn, itvfn):
+    d = _N.loadtxt(datFN("%s.dat" % datfn))
+    itv = _N.loadtxt(datFN("%s.dat" % itvfn))
+    N = d.shape[0]
+    epochs = itv.shape[0]-1
+
+    sts = _N.where(d[:, 1] == 1)[0]
+
+    fig = _plt.figure(figsize=(10, 12))
+    #######################
+    _plt.subplot2grid((4, 3), (0, 0), colspan=3)
+    _plt.scatter(sts, d[sts, 0], s=2, color="black")
+    _plt.yticks([0, 1, 2, 3], fontsize=18)
+    _plt.ylabel("position", fontsize=20)
+    for ep in xrange(epochs):
+        _plt.axvline(x=(itv[ep+1]*N), color="red", ls="--")
+    _plt.xlim(0, N)
+    #######################
+    _plt.subplot2grid((4, 3), (1, 0), colspan=3)
+    _plt.scatter(sts, d[sts, 2], s=2, color="black")
+    _plt.ylabel("mk dim 1", fontsize=20)
+    for ep in xrange(epochs):
+        _plt.axvline(x=(itv[ep+1]*N), color="red", ls="--")
+    _plt.xlim(0, N)
+    #######################
+    _plt.subplot2grid((4, 3), (2, 0), colspan=3)
+    _plt.scatter(sts, d[sts, 3], s=2, color="black")
+    _plt.ylabel("mk dim 2", fontsize=20)
+    for ep in xrange(epochs):
+        _plt.axvline(x=(itv[ep+1]*N), color="red", ls="--")
+    _plt.xlim(0, N)
+    _plt.subplot2grid((4, 3), (3, 0), colspan=1)
+    _plt.scatter(d[sts, 2], d[sts, 3], s=2, color="black")
+    _plt.xlabel("mk1")
+    _plt.ylabel("mk2")
+    _plt.subplot2grid((4, 3), (3, 1), colspan=1)
+    _plt.scatter(d[sts, 0], d[sts, 2], s=2, color="black")
+    _plt.xlabel("pos")
+    _plt.ylabel("mk1")
+    _plt.subplot2grid((4, 3), (3, 2), colspan=1)
+    _plt.scatter(d[sts, 0], d[sts, 3], s=2, color="black")
+    _plt.xlabel("pos")
+    _plt.ylabel("mk2")
+
+    epochs = len(itv)-1
+    _plt.savefig(resFN("timeline", dir=bfn))

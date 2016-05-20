@@ -105,7 +105,7 @@ class MarkAndRF:
         posbins  = _N.linspace(0, 3, oo.Nupx+1)
 
         for epc in xrange(ep1, ep2):
-            print "epoch %d" % epc
+            print "^^^^^^^^^^^^^^^^^^^^^^^^    epoch %d" % epc
 
             t0 = oo.intvs[epc]
             t1 = oo.intvs[epc+1]
@@ -131,13 +131,13 @@ class MarkAndRF:
                     labS, labH, clstrs = emMKPOS_sep(_x[unonhash], None, TR=1)
 
                 MF     = clstrs[0] + clstrs[1]
-                M = int(MF * 1.2) + 2   #  20% more clusters
+                M = int(MF * 1.5) + 2   #  20% more clusters
                 print "cluters:  %d" % M
 
 
                 #  PRIORS
                 #  priors  prefixed w/ _
-                _f_u   = _N.zeros(M);    _f_q2  = _N.ones(M) #  wide
+                _f_u   = _N.zeros(M);    _f_q2  = _N.ones(M)*4 #  wide
                 #  inverse gamma
                 _q2_a  = _N.ones(M)*1e-4;    _q2_B  = _N.ones(M)*1e-3
                 #_plt.plot(q2x, q2x**(-_q2_a-1)*_N.exp(-_q2_B / q2x))
@@ -145,8 +145,8 @@ class MarkAndRF:
 
                 #  
                 _u_u   = _N.zeros((M, K));  
-                _u_Sg = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*0.1
-                _u_iSg = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*0.1
+                _u_Sg = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*4
+                _u_iSg = _N.linalg.inv(_u_Sg)
                 _Sg_nu = _N.ones((M, 1));  
                 _Sg_PSI = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*0.1
 
@@ -186,9 +186,9 @@ class MarkAndRF:
 
                 ######  the hyperparameters for u need to be saved
                 u_u_     = _N.zeros((M, K))
-                u_Sg_    = _N.zeros((M, K, K))
+                u_Sg_    = _N.array(_u_Sg)
                 Sg_nu_   = _N.zeros((M, 1))
-                Sg_PSI_  = _N.zeros((M, K, K))
+                Sg_PSI_  = _N.array(_Sg_PSI)
 
                 rat      = _N.zeros(M+1)
                 pc       = _N.zeros(M)
@@ -251,6 +251,14 @@ class MarkAndRF:
             #_iSg_Mu = _N.einsum("mjk,mk->mj", _N.linalg.inv(_u_Sg), _u_u)
 
             clusSz = _N.zeros(M, dtype=_N.int)
+            #print "---prior covariance"
+            #print _u_Sg
+            #print "---prior covariance"
+
+            print "q2_a, q2_B is" 
+            print _q2_a
+            print _q2_B
+
             for iter in xrange(ITERS):
                 if (iter % 100) == 0:    print "iter  %d" % iter
 
@@ -260,11 +268,21 @@ class MarkAndRF:
                 iSg        = _N.linalg.inv(Sg)
                 iq2r       = iq2.reshape((M, 1))  
                 try:
-                    pkFR       = _N.log(l0/_N.sqrt(twpi*q2))
-                except Warning:
+                    ##  warnings because l0 is 0
+                    isN = _N.where(q2 <= 0)[0]
+                    if len(isN) > 0:
+                        q2[isN] = 0.3
+
+                    is0 = _N.where(l0 <= 0)[0]
+                    if len(is0) > 0:
+                        l0[is0] = 0.001
+
+                    pkFR       = _N.log(l0) - 0.5*_N.log(_N.sqrt(twpi*q2))
+                except RuntimeWarning:
                     print "WARNING"
                     print l0
                     print q2
+
 
                 mkNrms = _N.log(1/_N.sqrt(twpi*_N.linalg.det(Sg)))
                 mkNrms = mkNrms.reshape((M, 1))
@@ -275,7 +293,17 @@ class MarkAndRF:
                 dmu        = (mASr - ur)
 
                 _N.einsum("nmj,mjk,nmk->mn", dmu, iSg, dmu, out=qdrMKS)
-                qdrSPC     = (fr - xASr)*(fr - xASr)*iq2r
+                qdrSPC     = (fr - xASr)*(fr - xASr)*iq2r  #  M x nSpks
+
+
+                nNrstMKS_d = _N.min(qdrMKS, axis=0)
+                nNrstSPC_d = _N.min(qdrSPC, axis=0)
+                if (epc == 1) and (iter == 0):
+                    print "SPACE"
+                    print nNrstMKS_d
+                    print "MKS"
+                    print nNrstSPC_d
+
                 cont       = pkFRr + mkNrms - 0.5*(qdrSPC + qdrMKS)
                 
 
@@ -398,7 +426,7 @@ class MarkAndRF:
                         ##  dof of posterior distribution of cluster covariance
                         ur = u[m].reshape((1, K))
                         Sg_PSI_[m] = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
-                        Sg[m] = s_u.sample_invwishart(Sg_PSI_[m], Sg_nu_[m])
+                        Sg[m] = s_u.sample_invwishart(Sg_PSI_[m], Sg_nu_[m, 0])
 
                     # #print Sg_PSI_
                     ##############  SAMPLE COVARIANCES
@@ -479,12 +507,19 @@ class MarkAndRF:
                     smp_sp_hyps[oo.ky_h_l0_a, iter, m] = l0_a_
                     smp_sp_hyps[oo.ky_h_l0_B, iter, m] = l0_B_
 
-            for im in xrange(M):
-                print "for m %d" % im
-                print smp_sp_hyps[oo.ky_h_f_u, ::20, im]
+            print "l0 is"
+            print l0
+            print "f is" 
+            print f
+            print "q2 is" 
+            print q2
+            print "Sg is" 
+            print Sg
+            
             frm   = int(0.6*ITERS)  #  have to test for stationarity
 
-            occ   =  _N.mean(gz[ITERS-1], axis=0)
+            if nSpks > 0:
+                occ   =  _N.mean(gz[ITERS-1], axis=0)
 
             oo.smp_sp_hyps = smp_sp_hyps
             oo.smp_sp_prms = smp_sp_prms
@@ -493,6 +528,9 @@ class MarkAndRF:
 
             l_trlsNearMAP = []
             MAPvalues2(epc, smp_sp_prms, oo.sp_prmPstMd, frm, ITERS, M, 3, occ, gkMAP, l_trlsNearMAP)
+            l0[:]         = oo.sp_prmPstMd[epc, oo.ky_p_l0::3]
+            f[:]          = oo.sp_prmPstMd[epc, oo.ky_p_f::3]
+            q2[:]         = oo.sp_prmPstMd[epc, oo.ky_p_q2::3]
             MAPvalues2(epc, smp_sp_hyps, oo.sp_hypPstMd, frm, ITERS, M, 6, occ, gkMAP, None)
             _f_u[:]       = oo.sp_hypPstMd[epc, oo.ky_h_f_u::6]
             _f_q2[:]      = oo.sp_hypPstMd[epc, oo.ky_h_f_q2::6]
@@ -501,7 +539,9 @@ class MarkAndRF:
             _l0_a[:]      = oo.sp_hypPstMd[epc, oo.ky_h_l0_a::6]
             _l0_B[:]      = oo.sp_hypPstMd[epc, oo.ky_h_l0_B::6]
             # print _f_u
-            # print _f_q2
+            print "_f_q2"
+            print _f_q2
+            print "_f_q2"
             # print _q2_a
             # print _q2_B
             # print _l0_a
@@ -531,8 +571,7 @@ class MarkAndRF:
             ##  params and hyper parms for mark
             for m in xrange(M):
                 MAPtrls = l_trlsNearMAP[m]
-                print "MAPtrls"
-                print MAPtrls
+                #print MAPtrls
                 u[m] = _N.mean(smp_mk_prms[0][:, MAPtrls, m], axis=1)
                 Sg[m] = _N.mean(smp_mk_prms[1][:, :, MAPtrls, m], axis=2)
                 oo.mk_prmPstMd[oo.ky_p_u][epc, m] = u[m]
@@ -545,6 +584,9 @@ class MarkAndRF:
                 oo.mk_hypPstMd[oo.ky_h_u_Sg][epc, m]  = _u_Sg[m]
                 oo.mk_hypPstMd[oo.ky_h_Sg_nu][epc, m] = _Sg_nu[m]
                 oo.mk_hypPstMd[oo.ky_h_Sg_PSI][epc, m]= _Sg_PSI[m]
+                print _u_Sg[m]
+            u[:]         = oo.mk_prmPstMd[oo.ky_p_u][epc]
+            Sg[:]        = oo.mk_prmPstMd[oo.ky_p_Sg][epc]
 
             print occ
 
@@ -557,36 +599,31 @@ class MarkAndRF:
             ###  we would like unused clusters to have l0->0, but keep the
             ###  variance small.  That's why we will reset a cluster
 
+            sq25  = 5*_N.sqrt(q2)
             for m in xrange(M):
-                if (occ[m] == 0) and (l0[m] / _N.sqrt(twpi*q2[m]) < 1):
+                #  Sg and q2 are treated differently.  Even if no spikes are
+                #  observed, q2 is updated, while Sg is not.  
+                #  This is because NO spikes in physical space AND trajectory
+                #  information contains information about the place field.
+                #  However, in mark space, not observing any marks tells you
+                #  nothing about the mark distribution.  That is why f, q2
+                #  are updated when there are no spikes, but u and Sg are not.
+                if (occ[m] == 0) and ((l0[m] / _N.sqrt(twpi*q2[m]) < 1) or \
+                                      ((f[m] < 0) and (-1*f[m] > sq25[m])) or \
+                                      ((f[m] > 0) and (f[m] > sq25[m]))):
                     print "resetting  cluster %d" % m
                     _q2_a[m] = 1e-4
                     _q2_B[m] = 1e-3
                     _f_u[m] = _N.random.rand()*3
-                    _f_q2[m] = 1e-1
+                    _f_q2[m] = 4
+                    _u_u[m]   = 3
+                    _u_Sg[m] = _N.identity(K)*4
+
 
             rsmp_sp_prms = smp_sp_prms.swapaxes(1, 0).reshape(ITERS, 3*M, order="F")
 
             _N.savetxt(resFN("posParams_%d.dat" % epc, dir=oo.outdir), rsmp_sp_prms, fmt=("%.4f %.4f %.4f " * M))
             #_N.savetxt(resFN("posHypParams.dat", dir=oo.outdir), smp_sp_hyps[:, :, 0].T, fmt="%.4f %.4f %.4f %.4f %.4f %.4f")
-
-        # print "hey here are the hyperparams"
-        # print _f_u
-        # print _f_q2
-        # print _q2_a
-        # print _q2_B
-        # print _l0_a
-        # print _l0_B
-        # print "hey done with the hyperparams"
-        # print "hey here are the hyperparams"
-        # print _u_u
-        # print "---"
-        # print _u_Sg
-        # print "---"
-        # print _Sg_nu
-        # print "---"
-        # print _Sg_PSI
-        # print "hey done with the hyperparams"
 
 
         pcklme["md"] = _N.array(oo.sp_prmPstMd)
