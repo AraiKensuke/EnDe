@@ -11,9 +11,11 @@ import numpy as _N
 import matplotlib.pyplot as _plt
 from EnDedirs import resFN, datFN
 import pickle
-from fitutil import  emMKPOS_sep, sepHashEM
+from fitutil import  emMKPOS_sep, sepHashEM, sepHash
 from posteriorUtil import MAPvalues2
 from filter import gauKer
+
+import clrs 
 
 class MarkAndRF:
     ky_p_l0 = 0;    ky_p_f  = 1;    ky_p_q2 = 2
@@ -122,13 +124,43 @@ class MarkAndRF:
                 _x[:, 1:]   = mks[Asts+t0]
 
 
-                unonhash, hashsp, gmms = sepHashEM(_x)
+                #unonhash, hashsp, gmms = sepHashEM(_x)
+                unonhash, hashsp, gmms = sepHash(_x, BINS=10, blksz=5, xlo=0, xhi=3)
+
+                # fig = _plt.figure(figsize=(5, 10))
+                # fig.add_subplot(3, 1, 1)
+                # _plt.scatter(_x[hashsp, 1], _x[hashsp, 2], color="red")
+                # _plt.scatter(_x[unonhash, 1], _x[unonhash, 2], color="black")
+                # fig.add_subplot(3, 1, 2)
+                # _plt.scatter(_x[hashsp, 0], _x[hashsp, 1], color="red")
+                # _plt.scatter(_x[unonhash, 0], _x[unonhash, 1], color="black")
+                # fig.add_subplot(3, 1, 3)
+                # _plt.scatter(_x[hashsp, 0], _x[hashsp, 2], color="red")
+                # _plt.scatter(_x[unonhash, 0], _x[unonhash, 2], color="black")
+
+
                 if (len(unonhash) > 0) and (len(hashsp) > 0):
                     labS, labH, clstrs = emMKPOS_sep(_x[unonhash], _x[hashsp])
                 elif len(unonhash) == 0:
-                    labS, labH, clstrs = emMKPOS_sep(None, _x[hashsp], TR=1)
+                    labS, labH, clstrs = emMKPOS_sep(None, _x[hashsp], TR=3)
                 else:
-                    labS, labH, clstrs = emMKPOS_sep(_x[unonhash], None, TR=1)
+                    labS, labH, clstrs = emMKPOS_sep(_x[unonhash], None, TR=3)
+
+                #fig = _plt.figure(figsize=(7, 10))
+                #fig.add_subplot(2, 1, 1)
+
+                flatlabels = _N.ones(n1-n0, dtype=_N.int)*-1
+                cls = clrs.get_colors(clstrs[0] + clstrs[1])
+                for i in xrange(clstrs[0]):
+                    these = _N.where(labS == i)[0]
+                    
+                    flatlabels[unonhash[these]] = i
+                    #_plt.scatter(_x[unonhash[these], 0], _x[unonhash[these], 1], color=cls[i])
+                for i in xrange(clstrs[1]):
+                    these = _N.where(labH == i)[0]
+
+                    flatlabels[hashsp[these]] = i + clstrs[0]
+                    #_plt.scatter(_x[hashsp[these], 0], _x[hashsp[these], 1], color=cls[i+clstrs[0]])
 
                 MF     = clstrs[0] + clstrs[1]
                 M = int(MF * 1.5) + 2   #  20% more clusters
@@ -204,22 +236,28 @@ class MarkAndRF:
                 if len(hashsp) > 0:
                     tmpx[strt:]  = _x[hashsp]
 
-                #  now assign the cluster we've found to Gaussian mixtures
-                covAll = _N.cov(tmpx.T)
-                dcovMag= _N.diagonal(covAll)*0.005
-
                 for im in xrange(M):  #if lab < 0, these marks not used for init
                     if im < MF:
-                        kinds = _N.where(lab == im)[0]  #  inds
+                        kinds = _N.where(flatlabels == im)[0]  #  inds
                         f[im]  = _N.mean(x[Asts[kinds]+t0], axis=0)
                         u[im]  = _N.mean(mks[Asts[kinds]+t0], axis=0)
                         q2[im] = 0.05
                         Sg[im] = _N.identity(K)*0.1
+                        l0[im] = 10
+
                     else:
                         f[im]  = _N.random.rand()*3
                         u[im]  = _N.random.rand(K)
                         q2[im] = 0.05
                         Sg[im] = _N.identity(K)*0.1
+                        l0[im] = 2
+
+                oo.sp_prmPstMd[0, oo.ky_p_l0::3] = l0
+                oo.sp_prmPstMd[0, oo.ky_p_f::3] = f
+                oo.sp_prmPstMd[0, oo.ky_p_q2::3] = q2
+                oo.mk_prmPstMd[oo.ky_p_u][0] = u
+                oo.mk_prmPstMd[oo.ky_p_Sg][0] = Sg
+
 
             if gtdiffusion:
                 #  tell me how much diffusion to expect per min.
@@ -427,6 +465,11 @@ class MarkAndRF:
                         ur = u[m].reshape((1, K))
                         Sg_PSI_[m] = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
                         Sg[m] = s_u.sample_invwishart(Sg_PSI_[m], Sg_nu_[m, 0])
+                        if (_N.sum(_N.isnan(Sg[m])) > 0) or (_N.sum(_N.isinf(Sg[m])) > 0):
+                            print "Problem  %d" % m
+                            print Sg_PSI_[m]
+                            print Sg_nu_[m, 0]
+                            print nSpksM
 
                     # #print Sg_PSI_
                     ##############  SAMPLE COVARIANCES
@@ -571,6 +614,8 @@ class MarkAndRF:
             ##  params and hyper parms for mark
             for m in xrange(M):
                 MAPtrls = l_trlsNearMAP[m]
+                if len(MAPtrls) == 0:  #  none of them.  causes nan in mean
+                    MAPtrls = _N.arange(frm, ITERS, 10)
                 #print MAPtrls
                 u[m] = _N.mean(smp_mk_prms[0][:, MAPtrls, m], axis=1)
                 Sg[m] = _N.mean(smp_mk_prms[1][:, :, MAPtrls, m], axis=2)

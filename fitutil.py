@@ -51,12 +51,15 @@ def sepHash(_x, BINS=50, blksz=20, xlo=-6, xhi=6):
     nonhash = []
 
     totalMks = _x.shape[0]
-    print totalMks
-    minInBin = int((totalMks / float(BINS)) * 0.05)  
+
     # only look in bins where at least minInBin marks observed.
-    for ch in xrange(1, 5):
+    #for ch in xrange(1, 5):
+    for ch in xrange(1, 3):
         cnts0, bns0 = _N.histogram(_x[:, 0], bins=bins)
-        minBins       = _N.where(cnts0 > minInBin)[0]
+        mncnt       = _N.mean(cnts0)
+        minBins       = _N.where(cnts0 > 0.5*mncnt)[0]   # only compare these
+        mincnt      = _N.array(cnts0 * 0.02, dtype=_N.int)
+        mincnt[_N.where(mincnt == 0)[0]] = 1    #  set it to at least 1
         done    = False
         inds  = _N.array([i[0] for i in sorted(enumerate(_x[:, ch]), key=lambda x:x[1], reverse=True)])
 
@@ -64,10 +67,14 @@ def sepHash(_x, BINS=50, blksz=20, xlo=-6, xhi=6):
         cumcnts[:] = 0
 
         while not done:
+            """
+            Start from large spikes with large mark.  cumcnts will be 0 in all 
+            minBins.  Keep lowering mark until there are no more empty minBins
+            """
             blk += 1
             cnts, bns = _N.histogram(_x[inds[blk*blksz:(blk+1)*blksz], 0], bins=bins)
             cumcnts += cnts
-            if len(_N.where(cumcnts[minBins] < 2)[0]) == 0:
+            if len(_N.where(cumcnts[minBins] < mincnt[minBins])[0]) == 0:
                 done = True
                 nonhash.extend(inds[0:(blk+1)*blksz])
 
