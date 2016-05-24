@@ -65,7 +65,7 @@ class MarkAndRF:
         
         NT     = oo.dat.shape[0]
 
-    def gibbs(self, ITERS, K, ep1=0, ep2=None, savePosterior=True, gtdiffusion=False, Mdbg=None):
+    def gibbs(self, ITERS, K, ep1=0, ep2=None, savePosterior=True, gtdiffusion=False, Mdbg=None, doSepHash=True):
         """
         gtdiffusion:  use ground truth center of place field in calculating variance of center.  Meaning of diffPerMin different
         """
@@ -99,6 +99,7 @@ class MarkAndRF:
         sqrt_2pi_q2x   = _N.sqrt(twpi*q2x)
         l_sqrt_2pi_q2x = _N.log(sqrt_2pi_q2x)
 
+        freeClstr = None
         x      = oo.dat[:, 0]
         mks    = oo.dat[:, 2:]
 
@@ -123,20 +124,26 @@ class MarkAndRF:
                 _x[:, 0]    = x[Asts+t0]
                 _x[:, 1:]   = mks[Asts+t0]
 
+                if not doSepHash:
+                    unonhash = _N.arange(len(Asts))
+                    hashsp   = _N.array([])
+                    hashthresh = _N.min(_x[:, 1:], axis=0)
+                else:
+                    unonhash, hashsp, hashthresh = sepHash(_x, BINS=10, blksz=5, xlo=0, xhi=3)
+                #  hashthresh is dim 2
+                
 
-                #unonhash, hashsp, gmms = sepHashEM(_x)
-                unonhash, hashsp, gmms = sepHash(_x, BINS=10, blksz=5, xlo=0, xhi=3)
 
-                # fig = _plt.figure(figsize=(5, 10))
-                # fig.add_subplot(3, 1, 1)
-                # _plt.scatter(_x[hashsp, 1], _x[hashsp, 2], color="red")
-                # _plt.scatter(_x[unonhash, 1], _x[unonhash, 2], color="black")
-                # fig.add_subplot(3, 1, 2)
-                # _plt.scatter(_x[hashsp, 0], _x[hashsp, 1], color="red")
-                # _plt.scatter(_x[unonhash, 0], _x[unonhash, 1], color="black")
-                # fig.add_subplot(3, 1, 3)
-                # _plt.scatter(_x[hashsp, 0], _x[hashsp, 2], color="red")
-                # _plt.scatter(_x[unonhash, 0], _x[unonhash, 2], color="black")
+                    fig = _plt.figure(figsize=(5, 10))
+                    fig.add_subplot(3, 1, 1)
+                    _plt.scatter(_x[hashsp, 1], _x[hashsp, 2], color="red")
+                    _plt.scatter(_x[unonhash, 1], _x[unonhash, 2], color="black")
+                    fig.add_subplot(3, 1, 2)
+                    _plt.scatter(_x[hashsp, 0], _x[hashsp, 1], color="red")
+                    _plt.scatter(_x[unonhash, 0], _x[unonhash, 1], color="black")
+                    fig.add_subplot(3, 1, 3)
+                    _plt.scatter(_x[hashsp, 0], _x[hashsp, 2], color="red")
+                    _plt.scatter(_x[unonhash, 0], _x[unonhash, 2], color="black")
 
 
                 if (len(unonhash) > 0) and (len(hashsp) > 0):
@@ -165,6 +172,10 @@ class MarkAndRF:
                 MF     = clstrs[0] + clstrs[1]
                 M = int(MF * 1.5) + 2   #  20% more clusters
                 print "cluters:  %d" % M
+
+                freeClstr = _N.empty(M, dtype=_N.bool)   #  Actual cluster
+                freeClstr[:] = False
+
 
 
                 #  PRIORS
@@ -334,17 +345,78 @@ class MarkAndRF:
                 qdrSPC     = (fr - xASr)*(fr - xASr)*iq2r  #  M x nSpks
 
 
-                nNrstMKS_d = _N.min(qdrMKS, axis=0)
-                nNrstSPC_d = _N.min(qdrSPC, axis=0)
-                if (epc == 1) and (iter == 0):
-                    print "SPACE"
-                    print nNrstMKS_d
+                ###  how far is closest cluster to each newly observed mark
+
+                realCl = _N.where(freeClstr == False)[0]
+                nNrstMKS_d = _N.min(qdrMKS[realCl], axis=0)  #  dim len(sts)
+                nNrstSPC_d = _N.min(qdrSPC[realCl], axis=0)
+
+                #  mAS = mks[Asts+t0] 
+                #  xAS = x[Asts + t0]   #  position @ spikes
+                
+                if (epc > 0) and (iter == 0):
+                    # print "---------------qdrSPC"
+                    # print qdrSPC
+                    # print "---------------qdrSPC"
+                    # fig = _plt.figure()
+                    # fig.add_subplot(2, 1, 1)
+                    # _plt.hist(nNrstMKS_d, bins=30)
+                    # fig.add_subplot(2, 1, 2)
+                    # _plt.hist(nNrstSPC_d, bins=30)
+
+                    # fig = _plt.figure()
+                    # fig.add_subplot(1, 1, 1)
+                    # _plt.hist(x[Asts+t0], bins=30)
+
+
+
+                    abvthrEachCh = mks[Asts+t0] > hashthresh
+                    abvthrAtLeast1Ch = _N.sum(abvthrEachCh, axis=1) > 0
+
                     print "MKS"
-                    print nNrstSPC_d
+                    farMKS = _N.where((nNrstMKS_d > 3) & abvthrAtLeast1Ch)[0]
+                    print "SPACE"
+                    farSPC  = _N.where((nNrstSPC_d > 3))[0]
+                    print "len(farSPC) is %d" % len(farSPC)
+                    print "len(farMK) is %d" % len(farMKS)
+
+
+                    iused = 0  #  use up to 3
+                    bDone = False
+                    #fig = _plt.figure()
+                    #_plt.scatter(x[Asts + t0], mks[Asts+t0, 0], color="black", s=3)
+
+                    # for m in xrange(M):
+                    #     if (freeClstr[m] and not bDone):
+                    #         these     = (Asts+t0)[farMKS]
+                    #         f[m]      = _N.mean(x[these], axis=0)
+                    #         u[m]      = _N.mean(mks[these], axis=0)
+                    #         print "far markise"
+                    #         #_plt.scatter(x[these], mks[these, 0], color="red", s=3)
+                    #         print f[m]
+                    #         print u[m]
+                    #         freeClstr[m] = False
+                    #         bDone     = True
+
+                    # #fig = _plt.figure()
+                    # bDone = False
+                    # #_plt.scatter(x[Asts + t0], mks[Asts+t0, 0], color="black", s=3)
+                    # for m in xrange(M):
+                    #     if (freeClstr[m] and not bDone):
+                    #         these     = (Asts+t0)[farSPC]
+                    #         f[m]      = _N.mean(x[these], axis=0)
+                    #         u[m]      = _N.mean(mks[these], axis=0)
+                    #         #_plt.scatter(x[these], mks[these, 0], color="red", s=3)
+                    #         print "far spatial"
+                    #         print f[m]
+                    #         print u[m]
+
+                    #         freeClstr[m] = False
+                    #         bDone     = True
+                        
 
                 cont       = pkFRr + mkNrms - 0.5*(qdrSPC + qdrMKS)
                 
-
                 mcontr     = _N.max(cont, axis=0).reshape((1, nSpks))  
                 cont       -= mcontr
                 _N.exp(cont, out=econt)
@@ -458,7 +530,7 @@ class MarkAndRF:
                     smp_sp_hyps[oo.ky_h_f_q2, iter, m] = f_q2_
 
                     #############  VARIANCE, COVARIANCE
-                    if nSpksM >= 1:
+                    if nSpksM >= K:
                         ##  dof of posterior distribution of cluster covariance
                         Sg_nu_[m] = _Sg_nu[m, 0] + nSpksM
                         ##  dof of posterior distribution of cluster covariance
@@ -663,6 +735,9 @@ class MarkAndRF:
                     _f_q2[m] = 4
                     _u_u[m]   = 3
                     _u_Sg[m] = _N.identity(K)*4
+                    freeClstr[m] = True
+                else:
+                    freeClstr[m] = False
 
 
             rsmp_sp_prms = smp_sp_prms.swapaxes(1, 0).reshape(ITERS, 3*M, order="F")
