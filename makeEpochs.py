@@ -1,13 +1,13 @@
 #  in terms of relative length
-firstT   = 2
+firstT   = 3.1
 minT     = 0.5
 maxT     = 1.5
 
-epochs   = 9
+epochs   = 18
 
 intvs = _N.empty(epochs+1)
 
-eqI   = True
+eqI   = False
 t     = 0
 intvs[0] = 0
 for epc in xrange(epochs):

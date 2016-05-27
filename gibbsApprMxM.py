@@ -11,7 +11,7 @@ import numpy as _N
 import matplotlib.pyplot as _plt
 from EnDedirs import resFN, datFN
 import pickle
-from fitutil import  emMKPOS_sep, sepHashEM, sepHash
+from fitutil import  emMKPOS_sep1A, sepHashEM, sepHash
 from posteriorUtil import MAPvalues2
 from filter import gauKer
 
@@ -132,26 +132,23 @@ class MarkAndRF:
                     unonhash, hashsp, hashthresh = sepHash(_x, BINS=10, blksz=5, xlo=0, xhi=3)
                 #  hashthresh is dim 2
                 
-
-
-                    fig = _plt.figure(figsize=(5, 10))
-                    fig.add_subplot(3, 1, 1)
-                    _plt.scatter(_x[hashsp, 1], _x[hashsp, 2], color="red")
-                    _plt.scatter(_x[unonhash, 1], _x[unonhash, 2], color="black")
-                    fig.add_subplot(3, 1, 2)
-                    _plt.scatter(_x[hashsp, 0], _x[hashsp, 1], color="red")
-                    _plt.scatter(_x[unonhash, 0], _x[unonhash, 1], color="black")
-                    fig.add_subplot(3, 1, 3)
-                    _plt.scatter(_x[hashsp, 0], _x[hashsp, 2], color="red")
-                    _plt.scatter(_x[unonhash, 0], _x[unonhash, 2], color="black")
-
+                    # fig = _plt.figure(figsize=(5, 10))
+                    # fig.add_subplot(3, 1, 1)
+                    # _plt.scatter(_x[hashsp, 1], _x[hashsp, 2], color="red")
+                    # _plt.scatter(_x[unonhash, 1], _x[unonhash, 2], color="black")
+                    # fig.add_subplot(3, 1, 2)
+                    # _plt.scatter(_x[hashsp, 0], _x[hashsp, 1], color="red")
+                    # _plt.scatter(_x[unonhash, 0], _x[unonhash, 1], color="black")
+                    # fig.add_subplot(3, 1, 3)
+                    # _plt.scatter(_x[hashsp, 0], _x[hashsp, 2], color="red")
+                    # _plt.scatter(_x[unonhash, 0], _x[unonhash, 2], color="black")
 
                 if (len(unonhash) > 0) and (len(hashsp) > 0):
-                    labS, labH, clstrs = emMKPOS_sep(_x[unonhash], _x[hashsp])
+                    labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], _x[hashsp])
                 elif len(unonhash) == 0:
-                    labS, labH, clstrs = emMKPOS_sep(None, _x[hashsp], TR=3)
+                    labS, labH, clstrs = emMKPOS_sep1A(None, _x[hashsp], TR=3)
                 else:
-                    labS, labH, clstrs = emMKPOS_sep(_x[unonhash], None, TR=3)
+                    labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], None, TR=3)
 
                 #fig = _plt.figure(figsize=(7, 10))
                 #fig.add_subplot(2, 1, 1)
@@ -188,7 +185,7 @@ class MarkAndRF:
 
                 #  
                 _u_u   = _N.zeros((M, K));  
-                _u_Sg = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*4
+                _u_Sg = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*9
                 _u_iSg = _N.linalg.inv(_u_Sg)
                 _Sg_nu = _N.ones((M, 1));  
                 _Sg_PSI = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*0.1
@@ -332,7 +329,6 @@ class MarkAndRF:
                     print l0
                     print q2
 
-
                 mkNrms = _N.log(1/_N.sqrt(twpi*_N.linalg.det(Sg)))
                 mkNrms = mkNrms.reshape((M, 1))
 
@@ -348,8 +344,9 @@ class MarkAndRF:
                 ###  how far is closest cluster to each newly observed mark
 
                 realCl = _N.where(freeClstr == False)[0]
-                nNrstMKS_d = _N.min(qdrMKS[realCl], axis=0)  #  dim len(sts)
-                nNrstSPC_d = _N.min(qdrSPC[realCl], axis=0)
+                nNrstMKS_d = _N.sqrt(_N.min(qdrMKS[realCl], axis=0)/K)  #  dim len(sts)
+                nNrstSPC_d = _N.sqrt(_N.min(qdrSPC[realCl], axis=0))
+
 
                 #  mAS = mks[Asts+t0] 
                 #  xAS = x[Asts + t0]   #  position @ spikes
@@ -368,51 +365,71 @@ class MarkAndRF:
                     # fig.add_subplot(1, 1, 1)
                     # _plt.hist(x[Asts+t0], bins=30)
 
-
-
                     abvthrEachCh = mks[Asts+t0] > hashthresh
                     abvthrAtLeast1Ch = _N.sum(abvthrEachCh, axis=1) > 0
+                    abvthrInds   = _N.where(abvthrAtLeast1Ch)[0]
 
                     print "MKS"
-                    farMKS = _N.where((nNrstMKS_d > 3) & abvthrAtLeast1Ch)[0]
+                    farMKS = _N.where((nNrstMKS_d > 1) & abvthrAtLeast1Ch)[0]
                     print "SPACE"
-                    farSPC  = _N.where((nNrstSPC_d > 3))[0]
+                    farSPC  = _N.where((nNrstSPC_d > 2))[0]
                     print "len(farSPC) is %d" % len(farSPC)
                     print "len(farMK) is %d" % len(farMKS)
 
 
                     iused = 0  #  use up to 3
                     bDone = False
-                    #fig = _plt.figure()
-                    #_plt.scatter(x[Asts + t0], mks[Asts+t0, 0], color="black", s=3)
+                    fig = _plt.figure(figsize=(8, 5))
+                    fig.add_subplot(2, 1, 1)
+                    _plt.scatter(x[Asts + t0], mks[Asts+t0, 0], color="black", s=2)
+                    bDoMKS = (len(farMKS) > 0)
+                    bDoSPC = (len(farSPC) > 0)
 
-                    # for m in xrange(M):
-                    #     if (freeClstr[m] and not bDone):
-                    #         these     = (Asts+t0)[farMKS]
-                    #         f[m]      = _N.mean(x[these], axis=0)
-                    #         u[m]      = _N.mean(mks[these], axis=0)
-                    #         print "far markise"
-                    #         #_plt.scatter(x[these], mks[these, 0], color="red", s=3)
-                    #         print f[m]
-                    #         print u[m]
-                    #         freeClstr[m] = False
-                    #         bDone     = True
+                    for m in xrange(M):
+                        #if freeClstr[m] and (not bDone) and bDoMKS:
+                        if freeClstr[m]:
+                            these     = (Asts+t0)[abvthrInds]
+                            _f_u[m] = _N.mean(x[these], axis=0)
+                            _u_u[m]   = _N.mean(mks[these], axis=0)
+                            if (iused < 2) and bDoMKS:
+                                these     = (Asts+t0)[farMKS]
+                                f[m]      = _N.mean(x[these], axis=0)
+                                u[m]      = _N.mean(mks[these], axis=0)
+                                l0[m]     = _N.random.rand()*10
 
-                    # #fig = _plt.figure()
-                    # bDone = False
-                    # #_plt.scatter(x[Asts + t0], mks[Asts+t0, 0], color="black", s=3)
-                    # for m in xrange(M):
-                    #     if (freeClstr[m] and not bDone):
-                    #         these     = (Asts+t0)[farSPC]
-                    #         f[m]      = _N.mean(x[these], axis=0)
-                    #         u[m]      = _N.mean(mks[these], axis=0)
-                    #         #_plt.scatter(x[these], mks[these, 0], color="red", s=3)
-                    #         print "far spatial"
-                    #         print f[m]
-                    #         print u[m]
+                                # print "BEG far markise"
+                                # _plt.scatter(x[these], mks[these, 0], color="red", s=4)
+                                # print "f[m]=%(1)s   u[m]=%(2)s" % {"1" : str(f[m]), "2" : str(u[m])}
+                                freeClstr[m] = False
+                                iused += 1
+                        # else:
+                        #     print "NOTTTTTTT far markise"
+                        #     print "f[m]=%(1)s   u[m]=%(2)s" % {"1" : str(f[m]), "2" : str(u[m])}
 
-                    #         freeClstr[m] = False
-                    #         bDone     = True
+                    bDone = False
+                    # fig.add_subplot(2, 1, 2)
+                    # _plt.scatter(x[Asts + t0], mks[Asts+t0, 0], color="black", s=3)
+                    iused = 0
+                    for m in xrange(M):
+                        #if freeClstr[m] and (not bDone) and bDoSPC:
+                        if freeClstr[m]:
+                            these     = (Asts+t0)[abvthrInds]
+                            _f_u[m] = _N.mean(x[these], axis=0)
+                            _u_u[m]   = _N.mean(mks[these], axis=0)
+                            if (iused < 2) and bDoSPC:
+                                these     = (Asts+t0)[farSPC]
+                                f[m]      = _N.mean(x[these], axis=0)
+                                u[m]      = _N.mean(mks[these], axis=0)
+                                l0[m]     = _N.random.rand()*10
+                                # _plt.scatter(x[these], mks[these, 0], color="red", s=4)
+                                # print "BEG far spatial"
+                                # print "f[m]=%(1)s   u[m]=%(2)s" % {"1" : str(f[m]), "2" : str(u[m])}
+                                freeClstr[m] = False
+                                iused += 1
+
+                        # else:
+                        #     print "NOTTTTTTT far spatial"
+                        #     print "f[m]=%(1)s   u[m]=%(2)s" % {"1" : str(f[m]), "2" : str(u[m])}
                         
 
                 cont       = pkFRr + mkNrms - 0.5*(qdrSPC + qdrMKS)
@@ -460,7 +477,6 @@ class MarkAndRF:
                     mcs = _N.empty((M, K))   # cluster sample means
 
                     #u_Sg_[m] = _N.linalg.inv(_u_Sg[m] + nSpksM*iSg[m])
-
 
                     if nSpksM > 0:
                         try:
@@ -559,8 +575,8 @@ class MarkAndRF:
 
                     s = -((l0[m]*oo.dt)/sqrt_2pi_q2x)*q2_exp_px     #  function of q2
 
-                    _Dq2_a = _q2_a[m] if _q2_a[m] < 200 else 200
-                    _Dq2_B = (_q2_B[m]/(_q2_a[m]+1))*(_Dq2_a+1)
+                    _Dq2_a = _q2_a[m]# if _q2_a[m] < 200 else 200
+                    _Dq2_B = _q2_B[m]#(_q2_B[m]/(_q2_a[m]+1))*(_Dq2_a+1)
 
                     if nSpksM > 0:
                         #print  _N.sum((xt0t1[sts]-f)*(xt0t1[sts]-f))/(nSpks-1)
@@ -597,9 +613,9 @@ class MarkAndRF:
                     l0_exp_px   = _N.sum(l0_intgrd*px) * dSilenceX
                     BL  = (oo.dt/_N.sqrt(twpi*q2[m]))*l0_exp_px
 
-                    _Dl0_a = _l0_a[m] if _l0_a[m] < 400 else 400
+                    _Dl0_a = _l0_a[m]# if _l0_a[m] < 400 else 400
                     #_Dl0_a = _l0_a[m] if _l0_a[m] < 25 else 25
-                    _Dl0_B = (_l0_B[m]/_l0_a[m]) * _Dl0_a
+                    _Dl0_B = _l0_B[m]#(_l0_B[m]/_l0_a[m]) * _Dl0_a
                     
                     #  a'/B' = a/B
                     #  B' = (B/a)a'
@@ -634,7 +650,8 @@ class MarkAndRF:
             frm   = int(0.6*ITERS)  #  have to test for stationarity
 
             if nSpks > 0:
-                occ   =  _N.mean(gz[ITERS-1], axis=0)
+                #  ITERS x nSpks x M   
+                occ   = _N.mean(_N.mean(gz[frm:ITERS-1], axis=0), axis=0)
 
             oo.smp_sp_hyps = smp_sp_hyps
             oo.smp_sp_prms = smp_sp_prms
@@ -705,8 +722,6 @@ class MarkAndRF:
             u[:]         = oo.mk_prmPstMd[oo.ky_p_u][epc]
             Sg[:]        = oo.mk_prmPstMd[oo.ky_p_Sg][epc]
 
-            print occ
-
             ###  hack here.  If we don't reset the prior for 
             ###  what happens when a cluster is unused?
             ###  l0 -> 0, and at the same time, the variance increases.
@@ -717,6 +732,12 @@ class MarkAndRF:
             ###  variance small.  That's why we will reset a cluster
 
             sq25  = 5*_N.sqrt(q2)
+            occ = _N.mean(_N.sum(gz[frm:], axis=1), axis=0)  # avg. # of marks assigned to this cluster
+            socc = _N.sort(occ)
+            minAss = (0.5*(socc[-2]+socc[-1])*0.01)  #  if we're 100 times smaller than the average of the top 2, let's consider it empty
+
+            print occ
+            
             for m in xrange(M):
                 #  Sg and q2 are treated differently.  Even if no spikes are
                 #  observed, q2 is updated, while Sg is not.  
@@ -725,16 +746,15 @@ class MarkAndRF:
                 #  However, in mark space, not observing any marks tells you
                 #  nothing about the mark distribution.  That is why f, q2
                 #  are updated when there are no spikes, but u and Sg are not.
-                if (occ[m] == 0) and ((l0[m] / _N.sqrt(twpi*q2[m]) < 1) or \
+
+                if (occ[m] < minAss) and ((l0[m] / _N.sqrt(twpi*q2[m]) < 1) or \
                                       ((f[m] < 0) and (-1*f[m] > sq25[m])) or \
                                       ((f[m] > 0) and (f[m] > sq25[m]))):
                     print "resetting  cluster %d" % m
                     _q2_a[m] = 1e-4
                     _q2_B[m] = 1e-3
-                    _f_u[m] = _N.random.rand()*3
                     _f_q2[m] = 4
-                    _u_u[m]   = 3
-                    _u_Sg[m] = _N.identity(K)*4
+                    _u_Sg[m] = _N.identity(K)*9
                     freeClstr[m] = True
                 else:
                     freeClstr[m] = False

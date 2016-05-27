@@ -314,6 +314,61 @@ def emMKPOS_sep(nhmks, hmks, TR=5, minK=2, maxK=15):
             bestLabs.append(_N.array(bestLabMP))
     return bestLabs[0], bestLabs[1], startClstrs
 
+
+def emMKPOS_sep1A(nhmks, hmks, TR=5, minK=2, maxK=15):
+    TR = 2
+    minK=2
+    maxK=8
+
+    iNH = -1
+    sNH = ["nh", "h"]
+
+    bestLabs = []
+
+    minSz = 8
+    startClstrs = _N.empty(2, dtype=_N.int)
+    for mks in [nhmks, hmks]:
+        iNH += 1
+        startCl = 0 
+        bestLabMP = None
+        if mks is not None:
+            labs, bics, bestLab, nClstrs = _oT.EMwfBICs(mks, minK=minK, maxK=maxK, TR=TR)
+            bestLab = _N.array(labs[nClstrs-minK, 0], dtype=_N.int)
+
+            #    if mks == nhmks:
+
+            ##  non-hash, do spatial clustering
+
+            bestLabMP = _N.array(bestLab)
+            minK = 1
+            _maxK = 7
+
+            print "neurons for iNH=%(nh)d   nclusters %(nc)d" % {"nh" : iNH, "nc" : nClstrs}
+            for nc in xrange(nClstrs):
+                inThisClstr = _N.where(bestLab == nc)[0]
+                LiTC        = len(inThisClstr)
+                pbestLab = _N.ones(LiTC, dtype=_N.int) * -1   #  poslabs
+                pos = mks[inThisClstr, 0]
+                pos = pos.reshape(LiTC, 1)
+
+                #  1 spk / clstr maxK == LiTC   want a few more than 1 / clstr
+                #  maxK is at most _maxK unless LiTC
+                maxK = _maxK if LiTC > _maxK else LiTC-1
+
+                plabs, pbics, pbestLab, pClstrs = _oT.EMposBICs(pos, minK=minK, maxK=maxK, TR=2)
+                pClstrs = contiguous_pack2(pbestLab)
+
+                pbestLab[_N.where(pbestLab >= 0)[0]] += startCl  #  only the ones used for init
+                startCl += pClstrs
+                bestLabMP[inThisClstr] = pbestLab
+        startClstrs[iNH] = startCl
+        if bestLabMP is None:
+            bestLabs.append(_N.array([], dtype=_N.int))
+        else:
+            bestLabs.append(_N.array(bestLabMP))
+    return bestLabs[0], bestLabs[1], startClstrs
+
+
 def emMKPOS_sep2(nhmks, hmks, TR=5, minK=2, maxK=15):
     """
     EM for wf cluster, heuristic density for position

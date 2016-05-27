@@ -193,11 +193,13 @@ def showTrajectory(dec, t0, t1, ep, setname, dir):
 
 
 
-def timeline(bfn, datfn, itvfn):
+def timeline(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1):
     d = _N.loadtxt(datFN("%s.dat" % datfn))
     itv = _N.loadtxt(datFN("%s.dat" % itvfn))
     N = d.shape[0]
     epochs = itv.shape[0]-1
+    ch1 += 2
+    ch2 += 2
 
     sts = _N.where(d[:, 1] == 1)[0]
 
@@ -212,30 +214,31 @@ def timeline(bfn, datfn, itvfn):
     _plt.xlim(0, N)
     #######################
     _plt.subplot2grid((4, 3), (1, 0), colspan=3)
-    _plt.scatter(sts, d[sts, 2], s=2, color="black")
+    _plt.scatter(sts, d[sts, ch1], s=2, color="black")
     _plt.ylabel("mk dim 1", fontsize=20)
     for ep in xrange(epochs):
         _plt.axvline(x=(itv[ep+1]*N), color="red", ls="--")
     _plt.xlim(0, N)
     #######################
     _plt.subplot2grid((4, 3), (2, 0), colspan=3)
-    _plt.scatter(sts, d[sts, 3], s=2, color="black")
+    _plt.scatter(sts, d[sts, ch2], s=2, color="black")
     _plt.ylabel("mk dim 2", fontsize=20)
     for ep in xrange(epochs):
         _plt.axvline(x=(itv[ep+1]*N), color="red", ls="--")
     _plt.xlim(0, N)
     _plt.subplot2grid((4, 3), (3, 0), colspan=1)
-    _plt.scatter(d[sts, 2], d[sts, 3], s=2, color="black")
+    _plt.scatter(d[sts, ch1], d[sts, ch2], s=2, color="black")
     _plt.xlabel("mk1")
     _plt.ylabel("mk2")
     _plt.subplot2grid((4, 3), (3, 1), colspan=1)
-    _plt.scatter(d[sts, 0], d[sts, 2], s=2, color="black")
+    _plt.scatter(d[sts, 0], d[sts, ch1], s=2, color="black")
     _plt.xlabel("pos")
-    _plt.ylabel("mk1")
+    _plt.ylabel("mk%d" % (ch1-2))
     _plt.subplot2grid((4, 3), (3, 2), colspan=1)
-    _plt.scatter(d[sts, 0], d[sts, 3], s=2, color="black")
+    _plt.scatter(d[sts, 0], d[sts, ch2], s=2, color="black")
     _plt.xlabel("pos")
-    _plt.ylabel("mk2")
+    _plt.ylabel("mk%d" % (ch2-2))
 
     epochs = len(itv)-1
-    _plt.savefig(resFN("timeline", dir=bfn))
+    choutfn = "%(of)s_%(1)d,%(2)d" % {"of" : outfn, "1" : ch1, "2" : ch2}
+    _plt.savefig(resFN(choutfn, dir=bfn))
