@@ -10,3 +10,4 @@ def parseENDEFN(baseFN):
     m = p.match(FN)
     
     return m.group(1), m.group(2), m.group(3)
+

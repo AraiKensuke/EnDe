@@ -55,3 +55,13 @@ def Lambda(fld_x, tr_pos, all_pos, Bx, bx):
     Lam    /= (occ + Tot_occ*0.01)
 
     return Lam
+
+def evalAtFxdMks_new(fxdMks, l0, us, Sgs, iSgs, i2pidcovsr):
+    Nx, pmdim     = fxdMks.shape
+    fxdMksr= fxdMks.reshape(Nx, 1, pmdim)
+
+    cmps = i2pidcovsr*_N.exp(-0.5*_N.einsum("xmj,xmj->mx", fxdMksr-us, _N.einsum("mjk,xmk->xmj", iSgs, fxdMksr - us)))
+
+    zs = _N.sum(l0*cmps, axis=0)
+
+    return zs

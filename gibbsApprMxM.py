@@ -11,7 +11,7 @@ import numpy as _N
 import matplotlib.pyplot as _plt
 from EnDedirs import resFN, datFN
 import pickle
-from fitutil import  emMKPOS_sep1A, sepHashEM, sepHash
+from fitutil import  emMKPOS_sep1A, sepHashEM, sepHash, colorclusters
 from posteriorUtil import MAPvalues2
 from filter import gauKer
 
@@ -33,20 +33,24 @@ class MarkAndRF:
     twpi = 2*_N.pi
 
     #  sizes of arrays
-    Nupx = 500      #   # points to sample position with  (uniform lam(x)p(x))
+    Nupx = 300      #   # points to sample position with  (uniform lam(x)p(x))
     fss = 100       #  sampling at various values of f
-    q2ss = 300      #  sampling at various values of q2
+    q2ss = 150      #  sampling at various values of q2
 
     intvs = None    #  
     dat   = None
+
+    resetClus = True
 
     diffPerMin = 1.  #  diffusion per minute
     epochs   = None
 
     outdir   = None
     polyFit  = True
+    xLo      = -6
+    xHi      = 6
     
-    def __init__(self, outdir, fn, intvfn):
+    def __init__(self, outdir, fn, intvfn, xLo=0, xHi=3):
         oo     = self
         ######################################  DATA input, define intervals
         # bFN = fn[0:-4]
@@ -56,7 +60,7 @@ class MarkAndRF:
         #     os.mkdir(bFN)
 
         oo.dat    = _N.loadtxt("%s.dat" % datFN(fn, create=False))
-        oo.datprms= _N.loadtxt("%s_prms.dat" % datFN(fn, create=False))
+        #oo.datprms= _N.loadtxt("%s_prms.dat" % datFN(fn, create=False))
 
         intvs     = _N.loadtxt("%s.dat" % datFN(intvfn, create=False))
 
@@ -64,6 +68,8 @@ class MarkAndRF:
         oo.epochs    = oo.intvs.shape[0] - 1
         
         NT     = oo.dat.shape[0]
+        oo.xLo = xLo
+        oo.xHi = xHi
 
     def gibbs(self, ITERS, K, ep1=0, ep2=None, savePosterior=True, gtdiffusion=False, Mdbg=None, doSepHash=True):
         """
@@ -88,8 +94,8 @@ class MarkAndRF:
         ####  NSexp, Nupx, fss, q2ss
 
         #  numerical grid
-        ux = _N.linspace(0, 3, oo.Nupx, endpoint=False)   # uniform x position
-        q2x    = _N.exp(_N.linspace(_N.log(0.00001), _N.log(100), oo.q2ss))  #  5 orders of
+        ux = _N.linspace(oo.xLo, oo.xHi, oo.Nupx, endpoint=False)   # uniform x position
+        q2x    = _N.exp(_N.linspace(_N.log(0.0001), _N.log(100), oo.q2ss))  #  5 orders of
         d_q2x  = _N.diff(q2x)
         q2x_m1 = _N.array(q2x[0:-1])
         lq2x    = _N.log(q2x)
@@ -105,7 +111,7 @@ class MarkAndRF:
 
         q2rate = oo.diffPerEpoch**2  #  unit of minutes  
         ######################################  PRECOMPUTED
-        posbins  = _N.linspace(0, 3, oo.Nupx+1)
+        posbins  = _N.linspace(oo.xLo, oo.xHi, oo.Nupx+1)
 
         for epc in xrange(ep1, ep2):
             print "^^^^^^^^^^^^^^^^^^^^^^^^    epoch %d" % epc
@@ -146,9 +152,11 @@ class MarkAndRF:
                 if (len(unonhash) > 0) and (len(hashsp) > 0):
                     labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], _x[hashsp])
                 elif len(unonhash) == 0:
-                    labS, labH, clstrs = emMKPOS_sep1A(None, _x[hashsp], TR=3)
+                    labS, labH, clstrs = emMKPOS_sep1A(None, _x[hashsp], TR=5)
                 else:
-                    labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], None, TR=3)
+                    labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], None, TR=5)
+                colorclusters(_x[hashsp], labH, clstrs[1])
+                colorclusters(_x[unonhash], labS, clstrs[0])
 
                 #fig = _plt.figure(figsize=(7, 10))
                 #fig.add_subplot(2, 1, 1)
@@ -167,7 +175,7 @@ class MarkAndRF:
                     #_plt.scatter(_x[hashsp[these], 0], _x[hashsp[these], 1], color=cls[i+clstrs[0]])
 
                 MF     = clstrs[0] + clstrs[1]
-                M = int(MF * 1.5) + 2   #  20% more clusters
+                M = int(MF * 1.1) + 2   #  20% more clusters
                 print "cluters:  %d" % M
 
                 freeClstr = _N.empty(M, dtype=_N.bool)   #  Actual cluster
@@ -177,7 +185,8 @@ class MarkAndRF:
 
                 #  PRIORS
                 #  priors  prefixed w/ _
-                _f_u   = _N.zeros(M);    _f_q2  = _N.ones(M)*4 #  wide
+                #_f_u   = _N.zeros(M);    _f_q2  = _N.ones(M)*4 #  wide
+                _f_u   = _N.zeros(M);    _f_q2  = _N.ones(M)*1 #  wide
                 #  inverse gamma
                 _q2_a  = _N.ones(M)*1e-4;    _q2_B  = _N.ones(M)*1e-3
                 #_plt.plot(q2x, q2x**(-_q2_a-1)*_N.exp(-_q2_B / q2x))
@@ -185,7 +194,8 @@ class MarkAndRF:
 
                 #  
                 _u_u   = _N.zeros((M, K));  
-                _u_Sg = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*9
+                #_u_Sg = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*9
+                _u_Sg = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*1
                 _u_iSg = _N.linalg.inv(_u_Sg)
                 _Sg_nu = _N.ones((M, 1));  
                 _Sg_PSI = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*0.1
@@ -281,7 +291,7 @@ class MarkAndRF:
             gz   = _N.zeros((ITERS, nSpks, M), dtype=_N.bool)
             print "spikes %d" % nSpks
 
-            dSilenceX = (NSexp/float(oo.Nupx))*3
+            dSilenceX = (NSexp/float(oo.Nupx))*(oo.xHi-oo.xLo)
 
             xAS  = x[Asts + t0]   #  position @ spikes
             mAS  = mks[Asts + t0]   #  position @ spikes
@@ -301,11 +311,12 @@ class MarkAndRF:
             #print _u_Sg
             #print "---prior covariance"
 
-            print "q2_a, q2_B is" 
-            print _q2_a
-            print _q2_B
+            # print "q2_a, q2_B is" 
+            # print _q2_a
+            # print _q2_B
 
             for iter in xrange(ITERS):
+                tt1 = _tm.time()
                 if (iter % 100) == 0:    print "iter  %d" % iter
 
                 ur         = u.reshape((1, M, K))
@@ -391,11 +402,14 @@ class MarkAndRF:
                             these     = (Asts+t0)[abvthrInds]
                             _f_u[m] = _N.mean(x[these], axis=0)
                             _u_u[m]   = _N.mean(mks[these], axis=0)
+                            l0[m]     = _N.random.rand()*10
                             if (iused < 2) and bDoMKS:
                                 these     = (Asts+t0)[farMKS]
                                 f[m]      = _N.mean(x[these], axis=0)
                                 u[m]      = _N.mean(mks[these], axis=0)
-                                l0[m]     = _N.random.rand()*10
+                            else:
+                                f[m]      = _N.mean(x[these], axis=0)
+                                u[m]      = _N.mean(mks[these], axis=0)
 
                                 # print "BEG far markise"
                                 # _plt.scatter(x[these], mks[these, 0], color="red", s=4)
@@ -416,11 +430,15 @@ class MarkAndRF:
                             these     = (Asts+t0)[abvthrInds]
                             _f_u[m] = _N.mean(x[these], axis=0)
                             _u_u[m]   = _N.mean(mks[these], axis=0)
+                            l0[m]     = _N.random.rand()*10
                             if (iused < 2) and bDoSPC:
                                 these     = (Asts+t0)[farSPC]
                                 f[m]      = _N.mean(x[these], axis=0)
                                 u[m]      = _N.mean(mks[these], axis=0)
-                                l0[m]     = _N.random.rand()*10
+                            else:
+                                f[m]      = _N.mean(x[these], axis=0)
+                                u[m]      = _N.mean(mks[these], axis=0)
+
                                 # _plt.scatter(x[these], mks[these, 0], color="red", s=4)
                                 # print "BEG far spatial"
                                 # print "f[m]=%(1)s   u[m]=%(2)s" % {"1" : str(f[m]), "2" : str(u[m])}
@@ -443,11 +461,11 @@ class MarkAndRF:
 
                 rat /= rat[M]
                 """
-                print f
-                print u
-                print q2
-                print Sg
-                print l0
+                # print f
+                # print u
+                # print q2
+                # print Sg
+                # print l0
                 """
 
                 # print rat
@@ -460,6 +478,7 @@ class MarkAndRF:
                 ###############  FOR EACH CLUSTER
 
                 for m in xrange(M):
+                    ttc1 = _tm.time()
                     iiq2 = 1./q2[m]
                     minds = _N.where(gz[iter, :, m] == 1)[0]
                     sts  = Asts[minds] + t0
@@ -479,13 +498,13 @@ class MarkAndRF:
                     #u_Sg_[m] = _N.linalg.inv(_u_Sg[m] + nSpksM*iSg[m])
 
                     if nSpksM > 0:
-                        try:
-                            u_Sg_[m] = _N.linalg.inv(_N.linalg.inv(_u_Sg[m]) + nSpksM*iSg[m])
-                        except _N.linalg.linalg.LinAlgError:
-                            print m
-                            print _u_Sg[m]
-                            print iSg[m]
-                            raise
+                        #try:
+                        u_Sg_[m] = _N.linalg.inv(_N.linalg.inv(_u_Sg[m]) + nSpksM*iSg[m])
+                        # except _N.linalg.linalg.LinAlgError:
+                        #     print m
+                        #     print _u_Sg[m]
+                        #     print iSg[m]
+                        #     raise
                         clstx    = mks[sts]
 
                         mcs[m]       = _N.mean(clstx, axis=0)
@@ -504,13 +523,14 @@ class MarkAndRF:
                     smp_mk_hyps[oo.ky_h_u_u][:, iter, m] = u_u_[m]
                     smp_mk_hyps[oo.ky_h_u_Sg][:, :, iter, m] = u_Sg_[m]
 
+                    #ttc1a = _tm.time()
                     # dot(MATRIX, vector)   
                     """
                     ############################################
                     """
                     ###############  CONDITIONAL f
                     q2pr = _f_q2[m] if (_f_q2[m] > q2rate) else q2rate
-
+                    #ttc1b = _tm.time()
                     if nSpksM > 0:  #  spiking portion likelihood x prior
                         fs  = (1./nSpksM)*_N.sum(xt0t1[sts-t0])
                         fq2 = q2[m]/nSpksM
@@ -519,14 +539,17 @@ class MarkAndRF:
                     else:
                         U   = _f_u[m]
                         FQ2 = q2pr
-
+                    #ttc1c = _tm.time()
                     FQ    = _N.sqrt(FQ2)
-                    fx    = _N.linspace(U - FQ*150, U + FQ*150, oo.fss)
+                    fx    = _N.linspace(U - FQ*60, U + FQ*60, oo.fss)
                     fxr     = fx.reshape((oo.fss, 1))
-
-                    fxrux = -0.5*(fxr-ux)**2
-                    xI_f    = (xt0t1 - fxr)**2*0.5
-
+                    #ttc1d = _tm.time()
+                    fxrux = -0.5*(fxr-ux)*(fxr-ux)
+                    #_fxrux = -0.5*(fx-ux)*(fx-ux)
+                    #fxrux = _fxrux.reshape(oo
+                    #ttc1e = _tm.time()
+                    #xI_f    = (xt0t1 - fxr)*(xt0t1-fxr)*0.5
+                    #ttc1f = _tm.time()
                     f_intgrd  = _N.exp((fxrux*iiq2))   #  integrand
                     f_exp_px = _N.sum(f_intgrd*px, axis=1) * dSilenceX
                     #  f_exp_px is a function of f
@@ -545,6 +568,7 @@ class MarkAndRF:
                     smp_sp_hyps[oo.ky_h_f_u, iter, m] = f_u_
                     smp_sp_hyps[oo.ky_h_f_q2, iter, m] = f_q2_
 
+                    #ttc1g = _tm.time()
                     #############  VARIANCE, COVARIANCE
                     if nSpksM >= K:
                         ##  dof of posterior distribution of cluster covariance
@@ -553,11 +577,11 @@ class MarkAndRF:
                         ur = u[m].reshape((1, K))
                         Sg_PSI_[m] = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
                         Sg[m] = s_u.sample_invwishart(Sg_PSI_[m], Sg_nu_[m, 0])
-                        if (_N.sum(_N.isnan(Sg[m])) > 0) or (_N.sum(_N.isinf(Sg[m])) > 0):
-                            print "Problem  %d" % m
-                            print Sg_PSI_[m]
-                            print Sg_nu_[m, 0]
-                            print nSpksM
+                        # if (_N.sum(_N.isnan(Sg[m])) > 0) or (_N.sum(_N.isinf(Sg[m])) > 0):
+                        #     print "Problem  %d" % m
+                        #     print Sg_PSI_[m]
+                        #     print Sg_nu_[m, 0]
+                        #     print nSpksM
 
                     # #print Sg_PSI_
                     ##############  SAMPLE COVARIANCES
@@ -602,8 +626,10 @@ class MarkAndRF:
                     smp_sp_prms[oo.ky_p_q2, iter, m]   = q2[m]
                     smp_sp_hyps[oo.ky_h_q2_a, iter, m] = q2_a_
                     smp_sp_hyps[oo.ky_h_q2_B, iter, m] = q2_B_
-
+                    
+                    #ttc1h = _tm.time()
                     ###############  CONDITIONAL l0
+
                     #  _ss.gamma.rvs.  uses k, theta    k is 1/B  (B is our thing)
                     iiq2 = 1./q2[m]
                     # xI = (xt0t1-f)*(xt0t1-f)*0.5*iiq2
@@ -619,7 +645,6 @@ class MarkAndRF:
                     
                     #  a'/B' = a/B
                     #  B' = (B/a)a'
-
                     aL  = nSpksM
                     l0_a_ = aL + _Dl0_a
                     l0_B_ = BL + _Dl0_B
@@ -637,15 +662,20 @@ class MarkAndRF:
 
                     smp_sp_hyps[oo.ky_h_l0_a, iter, m] = l0_a_
                     smp_sp_hyps[oo.ky_h_l0_B, iter, m] = l0_B_
+                    ttc2 = _tm.time()
+                    #print "cls %(c)d  1) %(dt1).2f  2) %(dt2).2f  3) %(dt3).2f   4) %(dt4).2f  5) %(dt5).2f   6) %(dt6).2f  7) %(dt7).2f  8) %(dt8).2f  9) %(dt8).2f" % {"c" : m, "dt1" : (ttc1a-ttc1), "dt2" : (ttc1b-ttc1a),  "dt3" : (ttc1c-ttc1b), "dt4" : (ttc1d-ttc1c), "dt5" : (ttc1e-ttc1d), "dt6" : (ttc1f-ttc1e), "dt7" : (ttc1g-ttc1f), "dt8" : (ttc1g-ttc1f), "dt8" : (ttc2-ttc1g)}
+                    #print "cls %(c)d  %(dt).3f" % {"c" : m, "dt" : (ttc2-ttc1)}
 
-            print "l0 is"
-            print l0
-            print "f is" 
-            print f
-            print "q2 is" 
-            print q2
-            print "Sg is" 
-            print Sg
+            tt2 = _tm.time()
+            # print "iter time %.1f" % (tt2-tt1)
+            # print "l0 is"
+            # print l0
+            # print "f is" 
+            # print f
+            # print "q2 is" 
+            # print q2
+            # print "Sg is" 
+            # print Sg
             
             frm   = int(0.6*ITERS)  #  have to test for stationarity
 
@@ -671,9 +701,9 @@ class MarkAndRF:
             _l0_a[:]      = oo.sp_hypPstMd[epc, oo.ky_h_l0_a::6]
             _l0_B[:]      = oo.sp_hypPstMd[epc, oo.ky_h_l0_B::6]
             # print _f_u
-            print "_f_q2"
-            print _f_q2
-            print "_f_q2"
+            # print "_f_q2"
+            # print _f_q2
+            # print "_f_q2"
             # print _q2_a
             # print _q2_B
             # print _l0_a
@@ -681,7 +711,7 @@ class MarkAndRF:
 
             #print l_trlsNearMAP
             
-            pcklme["cp%d" % epc] = _N.array(smp_sp_prms)
+            #pcklme["cp%d" % epc] = _N.array(smp_sp_prms)
             #trlsNearMAP = _N.array(list(set(trlsNearMAP_D)))+frm   #  use these trials to pick out posterior params for MARK part
 
             #oo.mk_prmPstMd = [ epochs, M, K
@@ -718,7 +748,7 @@ class MarkAndRF:
                 oo.mk_hypPstMd[oo.ky_h_u_Sg][epc, m]  = _u_Sg[m]
                 oo.mk_hypPstMd[oo.ky_h_Sg_nu][epc, m] = _Sg_nu[m]
                 oo.mk_hypPstMd[oo.ky_h_Sg_PSI][epc, m]= _Sg_PSI[m]
-                print _u_Sg[m]
+                #print _u_Sg[m]
             u[:]         = oo.mk_prmPstMd[oo.ky_p_u][epc]
             Sg[:]        = oo.mk_prmPstMd[oo.ky_p_Sg][epc]
 
@@ -738,26 +768,28 @@ class MarkAndRF:
 
             print occ
             
-            for m in xrange(M):
-                #  Sg and q2 are treated differently.  Even if no spikes are
-                #  observed, q2 is updated, while Sg is not.  
-                #  This is because NO spikes in physical space AND trajectory
-                #  information contains information about the place field.
-                #  However, in mark space, not observing any marks tells you
-                #  nothing about the mark distribution.  That is why f, q2
-                #  are updated when there are no spikes, but u and Sg are not.
+            if oo.resetClus:
+                for m in xrange(M):
+                    #  Sg and q2 are treated differently.  Even if no spikes are
+                    #  observed, q2 is updated, while Sg is not.  
+                    #  This is because NO spikes in physical space AND trajectory
+                    #  information contains information about the place field.
+                    #  However, in mark space, not observing any marks tells you
+                    #  nothing about the mark distribution.  That is why f, q2
+                    #  are updated when there are no spikes, but u and Sg are not.
 
-                if (occ[m] < minAss) and ((l0[m] / _N.sqrt(twpi*q2[m]) < 1) or \
-                                      ((f[m] < 0) and (-1*f[m] > sq25[m])) or \
-                                      ((f[m] > 0) and (f[m] > sq25[m]))):
-                    print "resetting  cluster %d" % m
-                    _q2_a[m] = 1e-4
-                    _q2_B[m] = 1e-3
-                    _f_q2[m] = 4
-                    _u_Sg[m] = _N.identity(K)*9
-                    freeClstr[m] = True
-                else:
-                    freeClstr[m] = False
+                    if ((occ[m] < minAss) and (l0[m] / _N.sqrt(twpi*q2[m]) < 1)) or \
+                                          (f[m] < oo.xLo-sq25[m]) or \
+                                          (f[m] > oo.xHi+sq25[m]):
+                        print "resetting  cluster %(m)d   %(l0).3f  %(f).3f" % {"m" : m, "l0" : (l0[m] / _N.sqrt(twpi*q2[m])), "f" : f[m]}
+
+                        _q2_a[m] = 1e-4
+                        _q2_B[m] = 1e-3
+                        _f_q2[m] = 4
+                        _u_Sg[m] = _N.identity(K)*9
+                        freeClstr[m] = True
+                    else:
+                        freeClstr[m] = False
 
 
             rsmp_sp_prms = smp_sp_prms.swapaxes(1, 0).reshape(ITERS, 3*M, order="F")
@@ -766,12 +798,14 @@ class MarkAndRF:
             #_N.savetxt(resFN("posHypParams.dat", dir=oo.outdir), smp_sp_hyps[:, :, 0].T, fmt="%.4f %.4f %.4f %.4f %.4f %.4f")
 
 
-        pcklme["md"] = _N.array(oo.sp_prmPstMd)
-        dmp = open(resFN("posteriors.dump", dir=oo.outdir), "wb")
+        pcklme["sp_prmPstMd"] = oo.sp_prmPstMd
+        pcklme["mk_prmPstMd"] = oo.mk_prmPstMd
+        pcklme["intvs"]       = oo.intvs
+        dmp = open(resFN("posteriors.dmp", dir=oo.outdir), "wb")
         pickle.dump(pcklme, dmp, -1)
         dmp.close()
 
-        _N.savetxt(resFN("posModes.dat", dir=oo.outdir), oo.sp_prmPstMd, fmt=("%.4f %.4f %.4f " * M))
+        #_N.savetxt(resFN("posModes.dat", dir=oo.outdir), oo.sp_prmPstMd, fmt=("%.4f %.4f %.4f " * M))
         #_N.savetxt(resFN("hypModes.dat", dir=oo.outdir), oo.sp_hypPstMd, fmt=("%.4f %.4f %.4f %.4f %.4f %.4f" * M))
 
         

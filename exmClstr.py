@@ -192,7 +192,6 @@ def showTrajectory(dec, t0, t1, ep, setname, dir):
     _plt.close()
 
 
-
 def timeline(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1):
     d = _N.loadtxt(datFN("%s.dat" % datfn))
     itv = _N.loadtxt(datFN("%s.dat" % itvfn))

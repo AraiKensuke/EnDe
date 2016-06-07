@@ -5,6 +5,7 @@ import utilities as _U
 from utils import createSmoothedPath, createSmoothedPathK
 import numpy as _N
 import matplotlib.pyplot as _plt
+import pickle
 
 UNIF  = 0
 NUNIF = 1
@@ -23,7 +24,10 @@ def makeCovs(nNrns, K, LoHisMk):
 
 
 
-def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, l0ts, l_ctr_chpts, ctrts, mk_chpts, mkts, Covs, LoHis):
+def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, l0ts, l_ctr_chpts, ctrts, mk_chpts, mkts, Covs, LoHis, km):
+    """
+    km  tells me neuron N gives rise to clusters km[N]  (list)
+    """
     global UNIF, NUNIF
     #####  First check that the number of neurons and PFs all consistent.
     nNrnsSX = len(l_sx_chpts)
@@ -64,7 +68,6 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, 
             return None
         M += len(l_ctr_chpts[nrn])
         nrnNum += [nrn]*nPFsSX
-
         PFsPerNrn[nrn] = nPFsSX
 
     ####  build data
@@ -186,8 +189,7 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, 
         iInd += 1
         fn = "../DATA/%(bfn)s%(iI)d.dat" % {"bfn" : bfn, "iI" : iInd}
         fnocc="../DATA/%(bfn)s%(iI)docc.png" % {"bfn" : bfn, "iI" : iInd}
-        fnprm = "../DATA/%(bfn)s%(iI)d_prms.dat" % {"bfn" : bfn, "iI" : iInd}
-        fnlam = "../DATA/%(bfn)s%(iI)d_lam.dat" % {"bfn" : bfn, "iI" : iInd}
+        fnprm = "../DATA/%(bfn)s%(iI)d_prms.pkl" % {"bfn" : bfn, "iI" : iInd}
 
         if not os.access(fn, os.F_OK):  # file exists
             bFnd = True
@@ -195,29 +197,19 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, 
     smk = " %.4f" * K
     _N.savetxt("%s" % fn, dat, fmt=("%.4f %d" + smk), delimiter=" ")
 
-    smM = " %.4f" * M
-    _N.savetxt("%s" % fnlam, Lam.T, fmt=("%.4f " * M), delimiter=" ")
+    pcklme = {}
 
-    prms = _N.zeros((NT, M*3))
+    pcklme["l0"]  = l0[:, ::100]
+    pcklme["f"]   = ctr[:, ::100]
+    pcklme["sq2"] = sx[:, ::100]
+    pcklme["u"]   = mk_MU[:, ::100]
+    pcklme["covs"]= Covs
+    pcklme["intv"]= 100
+    pcklme["km"]  = km
 
-    for m in xrange(M):
-        prms[:, m*3]   = ctr[m]
-        prms[:, m*3+1] = sx[m]
-        prms[:, m*3+2] = l0[m]
-
-    _N.savetxt("%s" % fnprm, prms, fmt=("%.4f %.4f %.4f " * M), delimiter=" ")
-
-    """
-    if K > 0:
-        mks = _N.zeros((NT, M*3))
-
-        for m in xrange(M):
-            mks[:, m*3]   = ctr[m]
-            mks[:, m*3+1] = sx[m]
-            prms[:, m*3+2] = l0[m]
-
-        _N.savetxt("%s" % fnprm, prms, fmt=("%.4f %.4f %.4f " * M), delimiter=" ")
-    """
+    dmp = open(fnprm, "wb")
+    pickle.dump(pcklme, dmp, -1)
+    dmp.close()
 
     print "created %s" % fn
 
@@ -225,5 +217,3 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, 
     _plt.hist(dat[:, 0], bins=_N.linspace(0, 3, 61), color="black")
     _plt.savefig(fnocc)
     _plt.close()
-
-
