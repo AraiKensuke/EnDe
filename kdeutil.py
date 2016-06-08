@@ -32,7 +32,7 @@ def kerFr(atMark, sptl, tr_mks, mdim, Bx, cBm, bx):
 
     return fr1
 
-def Lambda(fld_x, tr_pos, all_pos, Bx, bx):
+def Lambda(fld_x, tr_pos, all_pos, Bx, bx, dxp):
     """
     return me a function of position.  Call for each new received mark.
 
@@ -45,14 +45,20 @@ def Lambda(fld_x, tr_pos, all_pos, Bx, bx):
 
     nSpks  = tr_pos.shape[0]
     sptl   = -0.5*iBx2*(fld_x - tr_pos)**2  #  this piece doesn't need to be evaluated for every new spike
-    occ    = _N.sum(_N.exp(-0.5*iBx2*(fld_x - all_pos)**2), axis=1)  #  this piece doesn't need to be evaluated for every new spike
-    #occ    = _N.sum(_N.exp(-0.5*ibx2*(oo.xpr - oo.all_pos)**2), axis=1)  #  this piece doesn't need to be evaluated for every new spike
-    Tot_occ  = _N.sum(occ)
-    print Tot_occ
+    #occ    = (1/_N.sum(_N.exp(-0.5*iBx2*(fld_x - all_pos)**2), axis=1)  #  this piece doesn't need to be evaluated for every new spike
+    occ    = (1/_N.sqrt(2*_N.pi*bx*bx))*_N.sum(_N.exp(-0.5*iBx2*(fld_x - all_pos)**2), axis=1) #  this piece doesn't need to be evaluated for every new spike
 
+    occ    /= _N.mean(occ)
 
-    Lam    = isqrt2pi*(1./nSpks)*(1./Bx)*_N.sum(_N.exp(sptl), axis=1)  #  return me # of positions to evaluate
-    Lam    /= (occ + Tot_occ*0.01)
+    Lam    = isqrt2pi*(1./Bx)*_N.sum(_N.exp(sptl), axis=1)*dxp*50  #  return me # of positions to evaluate
+    # print "^^^^^^^^^^^^^^^^"
+    # print _N.sum(Lam)
+    # print nSpks
+    # print (len(all_pos)*0.001)
+    # print "^^^^^^^^^^^^^^^^"
+    Lam    /= (len(all_pos)*0.001)
+    Lam    /= occ
+    #print occ
 
     return Lam
 

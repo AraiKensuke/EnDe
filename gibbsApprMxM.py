@@ -175,7 +175,7 @@ class MarkAndRF:
                     #_plt.scatter(_x[hashsp[these], 0], _x[hashsp[these], 1], color=cls[i+clstrs[0]])
 
                 MF     = clstrs[0] + clstrs[1]
-                M = int(MF * 1.1) + 2   #  20% more clusters
+                M = int(MF * 1.3) + 2   #  20% more clusters
                 print "cluters:  %d" % M
 
                 freeClstr = _N.empty(M, dtype=_N.bool)   #  Actual cluster
@@ -390,9 +390,9 @@ class MarkAndRF:
 
                     iused = 0  #  use up to 3
                     bDone = False
-                    fig = _plt.figure(figsize=(8, 5))
-                    fig.add_subplot(2, 1, 1)
-                    _plt.scatter(x[Asts + t0], mks[Asts+t0, 0], color="black", s=2)
+                    # fig = _plt.figure(figsize=(8, 5))
+                    # fig.add_subplot(2, 1, 1)
+                    # _plt.scatter(x[Asts + t0], mks[Asts+t0, 0], color="black", s=2)
                     bDoMKS = (len(farMKS) > 0)
                     bDoSPC = (len(farSPC) > 0)
 

@@ -224,8 +224,9 @@ class mkdecoder:
         tEnd = _tm.time()
         #print "decode   %(1).3e" % {"1" : (tEnd-tStart)}
 
-    def setLmd0(self, t0, t1, uFE=None, prms=None):
+    def setLmd0(self, enc_t0, enc_t1, uFE=None, prms=None):
         """
+        0:t0   used for encode
         Lmd0.  
         """
         oo = self
@@ -235,12 +236,12 @@ class mkdecoder:
 
         if oo.kde:
             ibx2 = 1./ (oo.bx*oo.bx)        
-            occ    = _N.sum(_N.exp(-0.5*ibx2*(oo.xpr - oo.pos[t0:t1])**2), axis=1)  #  this piece doesn't need to be evaluated for every new spike
+            occ    = _N.sum(_N.exp(-0.5*ibx2*(oo.xpr - oo.pos[enc_t0:enc_t1])**2), axis=1)  #  this piece doesn't need to be evaluated for every new spike
             Tot_occ  = _N.sum(occ)
             oo.iocc = 1./occ
 
             for nt in xrange(oo.nTets):
-                oo.Lam_xk[:, nt] = _ku.Lambda(oo.xpr, oo.tr_pos[nt], oo.pos, oo.Bx, oo.bx)
+                oo.Lam_xk[:, nt] = _ku.Lambda(oo.xpr, oo.tr_pos[nt], oo.pos[enc_t0:enc_t1], oo.Bx, oo.bx, oo.dxp)
         else:  #####  fit mix gaussian
             for nt in xrange(oo.nTets):
                 l0s   = prms[nt][0][uFE]
@@ -253,10 +254,12 @@ class mkdecoder:
                     var = covs[m, 0, 0]
                     ivar = 1./var
                     cmps[m] = (1/_N.sqrt(2*_N.pi*var)) * _N.exp(-0.5*ivar*(oo.xp - us[m, 0])**2)
-                print l0s*cmps
                 oo.Lam_xk[:, nt]   = _N.sum(l0s*cmps, axis=0)
 
     def decodeKDE(self, t0, t1):
+        """
+        decode activity from [t0:t1]
+        """
         oo = self
 
         oo.init_pX_Nm(t0)   #  flat pX_Nm  init cond at start of decode
@@ -280,12 +283,11 @@ class mkdecoder:
 
         tStart = _tm.time()
 
-        if oo.kde:
-            occ    = 1./oo.iocc
-            iBx2   = 1. / (oo.Bx * oo.Bx)
-            sptl   =  []
-            for nt in xrange(oo.nTets):
-                sptl.append(-0.5*iBx2*(oo.xpr - oo.tr_pos[nt])**2)  #  this piece doesn't need to be evalu
+        occ    = 1./oo.iocc
+        iBx2   = 1. / (oo.Bx * oo.Bx)
+        sptl   =  []
+        for nt in xrange(oo.nTets):
+            sptl.append(-0.5*iBx2*(oo.xpr - oo.tr_pos[nt])**2)  #  this piece doesn't need to be evalu
         for t in xrange(t0+1,t1): # start at 1 because initial condition
             #tt1 = _tm.time()
             for nt in xrange(oo.nTets):
