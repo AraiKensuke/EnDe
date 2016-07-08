@@ -11,7 +11,7 @@ import numpy as _N
 import matplotlib.pyplot as _plt
 from EnDedirs import resFN, datFN
 import pickle
-from fitutil import  emMKPOS_sep1A, sepHashEM, sepHash, colorclusters
+from fitutil import  emMKPOS_sep1A, sepHashEM, sepHash, colorclusters, mergesmallclusters, splitclstrs
 from posteriorUtil import MAPvalues2
 from filter import gauKer
 
@@ -155,8 +155,11 @@ class MarkAndRF:
                     labS, labH, clstrs = emMKPOS_sep1A(None, _x[hashsp], TR=5)
                 else:
                     labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], None, TR=5)
-                colorclusters(_x[hashsp], labH, clstrs[1])
-                colorclusters(_x[unonhash], labS, clstrs[0])
+                splitclstrs(_x[unonhash], labS)
+                #mergesmallclusters(_x[unonhash], _x[hashsp], labS, labH, K+1, clstrs)
+
+                #colorclusters(_x[hashsp], labH, clstrs[1])
+                #colorclusters(_x[unonhash], labS, clstrs[0])
 
                 #fig = _plt.figure(figsize=(7, 10))
                 #fig.add_subplot(2, 1, 1)
@@ -175,7 +178,7 @@ class MarkAndRF:
                     #_plt.scatter(_x[hashsp[these], 0], _x[hashsp[these], 1], color=cls[i+clstrs[0]])
 
                 MF     = clstrs[0] + clstrs[1]
-                M = int(MF * 1.3) + 2   #  20% more clusters
+                M = int(MF * 1.2) + 2   #  20% more clusters
                 print "cluters:  %d" % M
 
                 freeClstr = _N.empty(M, dtype=_N.bool)   #  Actual cluster
@@ -185,8 +188,8 @@ class MarkAndRF:
 
                 #  PRIORS
                 #  priors  prefixed w/ _
-                #_f_u   = _N.zeros(M);    _f_q2  = _N.ones(M)*4 #  wide
-                _f_u   = _N.zeros(M);    _f_q2  = _N.ones(M)*1 #  wide
+                _f_u   = _N.zeros(M);    _f_q2  = _N.ones(M)*4 #  wide
+                #_f_u   = _N.zeros(M);    _f_q2  = _N.ones(M)*1 #  wide
                 #  inverse gamma
                 _q2_a  = _N.ones(M)*1e-4;    _q2_B  = _N.ones(M)*1e-3
                 #_plt.plot(q2x, q2x**(-_q2_a-1)*_N.exp(-_q2_B / q2x))
@@ -194,8 +197,8 @@ class MarkAndRF:
 
                 #  
                 _u_u   = _N.zeros((M, K));  
-                #_u_Sg = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*9
-                _u_Sg = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*1
+                _u_Sg = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*9
+                #_u_Sg = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*1
                 _u_iSg = _N.linalg.inv(_u_Sg)
                 _Sg_nu = _N.ones((M, 1));  
                 _Sg_PSI = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*0.1
@@ -258,17 +261,25 @@ class MarkAndRF:
                     if im < MF:
                         kinds = _N.where(flatlabels == im)[0]  #  inds
                         f[im]  = _N.mean(x[Asts[kinds]+t0], axis=0)
+                        _f_u[im]= f[im]
+                        _f_q2[im]= 0.2
                         u[im]  = _N.mean(mks[Asts[kinds]+t0], axis=0)
-                        q2[im] = 0.05
-                        Sg[im] = _N.identity(K)*0.1
-                        l0[im] = 10
-
+                        _u_u[im]= u[im]
+                        _u_Sg[im] = _N.identity(K)
+                        q2[im] = _N.std(x[Asts[kinds]+t0], axis=0)**2
+                        Sg[im] = _N.cov(mks[Asts[kinds]+t0], rowvar=0)
+                        l0[im] = (len(kinds) / float(n1))*100
                     else:
-                        f[im]  = _N.random.rand()*3
+                        f[im]  = _N.random.randn()*3
                         u[im]  = _N.random.rand(K)
-                        q2[im] = 0.05
-                        Sg[im] = _N.identity(K)*0.1
-                        l0[im] = 2
+                        q2[im] = 100
+                        Sg[im] = _N.identity(K)*20
+                        l0[im] = 100
+                    #print "^-----------"
+                    # print f[im]
+                    # print u[im]
+                    # print q2[im]
+
 
                 oo.sp_prmPstMd[0, oo.ky_p_l0::3] = l0
                 oo.sp_prmPstMd[0, oo.ky_p_f::3] = f
@@ -621,12 +632,22 @@ class MarkAndRF:
                     condPos = _N.exp(sat)
                     q2_a_, q2_B_ = ig_prmsUV(q2x, condPos, d_q2x, q2x_m1, ITER=1)
                     q2[m] = _ss.invgamma.rvs(q2_a_ + 1, scale=q2_B_)  #  check
+
                     #print ((1./nSpks)*_N.sum((xt0t1[sts]-f)*(xt0t1[sts]-f)))
+
+                    if q2[m] < 0:
+                        print "********  q2[%(m)d] = %(q2).3f" % {"m" : m, "q2" : q2[m]}
 
                     smp_sp_prms[oo.ky_p_q2, iter, m]   = q2[m]
                     smp_sp_hyps[oo.ky_h_q2_a, iter, m] = q2_a_
                     smp_sp_hyps[oo.ky_h_q2_B, iter, m] = q2_B_
                     
+                    if q2[m] < 0:
+                        print "^^^^^^^^  q2[%(m)d] = %(q2).3f" % {"m" : m, "q2" : q2[m]}
+                        print q2[m]
+                        print smp_sp_prms[oo.ky_p_q2, 0:iter+1, m]
+
+
                     #ttc1h = _tm.time()
                     ###############  CONDITIONAL l0
 
@@ -666,6 +687,9 @@ class MarkAndRF:
                     #print "cls %(c)d  1) %(dt1).2f  2) %(dt2).2f  3) %(dt3).2f   4) %(dt4).2f  5) %(dt5).2f   6) %(dt6).2f  7) %(dt7).2f  8) %(dt8).2f  9) %(dt8).2f" % {"c" : m, "dt1" : (ttc1a-ttc1), "dt2" : (ttc1b-ttc1a),  "dt3" : (ttc1c-ttc1b), "dt4" : (ttc1d-ttc1c), "dt5" : (ttc1e-ttc1d), "dt6" : (ttc1f-ttc1e), "dt7" : (ttc1g-ttc1f), "dt8" : (ttc1g-ttc1f), "dt8" : (ttc2-ttc1g)}
                     #print "cls %(c)d  %(dt).3f" % {"c" : m, "dt" : (ttc2-ttc1)}
 
+            print "oooooooooooooooooooo"
+            print q2
+            print "iiiiiiiiiiiiiiiiiiii"
             tt2 = _tm.time()
             # print "iter time %.1f" % (tt2-tt1)
             # print "l0 is"
@@ -778,6 +802,15 @@ class MarkAndRF:
                     #  nothing about the mark distribution.  That is why f, q2
                     #  are updated when there are no spikes, but u and Sg are not.
 
+                    if q2[m] < 0:
+                        print "????????????????"
+                        print q2
+                        print "q2[%(m)d] = %(q2).3f" % {"m" : m, "q2" : q2[m]}
+                        print smp_sp_prms[0, :, m]
+                        print smp_sp_prms[1, :, m]
+                        print smp_sp_prms[2, :, m]
+                        print smp_sp_hyps[4, :, m]
+                        print smp_sp_hyps[5, :, m]
                     if ((occ[m] < minAss) and (l0[m] / _N.sqrt(twpi*q2[m]) < 1)) or \
                                           (f[m] < oo.xLo-sq25[m]) or \
                                           (f[m] > oo.xHi+sq25[m]):
@@ -797,7 +830,10 @@ class MarkAndRF:
             _N.savetxt(resFN("posParams_%d.dat" % epc, dir=oo.outdir), rsmp_sp_prms, fmt=("%.4f %.4f %.4f " * M))
             #_N.savetxt(resFN("posHypParams.dat", dir=oo.outdir), smp_sp_hyps[:, :, 0].T, fmt="%.4f %.4f %.4f %.4f %.4f %.4f")
 
-
+        pcklme["smp_sp_hyps"] = smp_sp_hyps
+        pcklme["smp_mk_hyps"] = smp_mk_hyps
+        pcklme["smp_sp_prms"] = oo.smp_sp_prms
+        pcklme["smp_mk_prms"] = oo.smp_mk_prms
         pcklme["sp_prmPstMd"] = oo.sp_prmPstMd
         pcklme["mk_prmPstMd"] = oo.mk_prmPstMd
         pcklme["intvs"]       = oo.intvs

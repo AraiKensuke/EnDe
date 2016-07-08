@@ -98,9 +98,9 @@ def EMwfBICs(mks, TR=5, minK=2, maxK=15):
             labs[K-minK, tr] = gmm.predict(mks[:, 1:])
 
     coords = _N.where(bics == _N.min(bics))
-    bestLab = labs[coords[0][0], coords[1][0]]
+    bestLab = labs[coords[0][0], coords[1][0]]   #  indices in 2-D array
 
-    nClstrs = coords[0][0] + minK
+    nClstrs = coords[0][0] + minK   #  best # of clusters
 
     return labs, bics, bestLab, nClstrs
 
@@ -130,7 +130,7 @@ def EMposBICs(pos, TR=5, minK=1, maxK=15):
     """
     """
     bics = _N.empty(((maxK-minK), TR))
-    labs = _N.empty((maxK-minK, TR, pos.shape[0]))
+    labs = _N.empty((maxK-minK, TR, pos.shape[0]), dtype=_N.int)
 
     for K in xrange(minK, maxK):
         for tr in xrange(TR):

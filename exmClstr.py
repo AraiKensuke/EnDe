@@ -197,47 +197,48 @@ def timeline(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1):
     itv = _N.loadtxt(datFN("%s.dat" % itvfn))
     N = d.shape[0]
     epochs = itv.shape[0]-1
-    ch1 += 2
+    ch1 += 2   #  because this is data col
     ch2 += 2
 
     sts = _N.where(d[:, 1] == 1)[0]
 
     fig = _plt.figure(figsize=(10, 12))
     #######################
-    _plt.subplot2grid((4, 3), (0, 0), colspan=3)
-    _plt.scatter(sts, d[sts, 0], s=2, color="black")
-    _plt.yticks([0, 1, 2, 3], fontsize=18)
-    _plt.ylabel("position", fontsize=20)
+    ax =_plt.subplot2grid((4, 3), (0, 0), colspan=3)
+    _plt.scatter(sts/1000., d[sts, 0], s=2, color="black")
+    mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
+    mF.setTicksAndLims(xlabel="time (s)", ylabel="position", xticks=None, yticks=[0, 1,2,3], xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[-0.3, 3.3], tickFS=15, labelFS=18)
     for ep in xrange(epochs):
-        _plt.axvline(x=(itv[ep+1]*N), color="red", ls="--")
-    _plt.xlim(0, N)
+        _plt.axvline(x=(itv[ep+1]*N/1000.), color="red", ls="--")
     #######################
-    _plt.subplot2grid((4, 3), (1, 0), colspan=3)
-    _plt.scatter(sts, d[sts, ch1], s=2, color="black")
-    _plt.ylabel("mk dim 1", fontsize=20)
+    ax = _plt.subplot2grid((4, 3), (1, 0), colspan=3)
+    _plt.scatter(sts/1000., d[sts, ch1], s=2, color="black")
+    mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
+    mF.setTicksAndLims(xlabel="time (s)", ylabel=("mk tet%d" % (ch1-1)), xticks=None, yticks=[0, 3, 6], xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[-1, 6], tickFS=15, labelFS=18)
     for ep in xrange(epochs):
-        _plt.axvline(x=(itv[ep+1]*N), color="red", ls="--")
-    _plt.xlim(0, N)
+        _plt.axvline(x=(itv[ep+1]*N/1000.), color="red", ls="--")
     #######################
-    _plt.subplot2grid((4, 3), (2, 0), colspan=3)
-    _plt.scatter(sts, d[sts, ch2], s=2, color="black")
-    _plt.ylabel("mk dim 2", fontsize=20)
+    ax = _plt.subplot2grid((4, 3), (2, 0), colspan=3)
+    _plt.scatter(sts/1000., d[sts, ch2], s=2, color="black")
+    mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
+    mF.setTicksAndLims(xlabel="time (s)", ylabel=("mk tet%d" % (ch2-1)), xticks=None, yticks=[0, 3, 6], xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[-1, 6], tickFS=15, labelFS=18)
     for ep in xrange(epochs):
-        _plt.axvline(x=(itv[ep+1]*N), color="red", ls="--")
-    _plt.xlim(0, N)
-    _plt.subplot2grid((4, 3), (3, 0), colspan=1)
+        _plt.axvline(x=(itv[ep+1]*N/1000.), color="red", ls="--")
+    ax = _plt.subplot2grid((4, 3), (3, 0), colspan=1)
     _plt.scatter(d[sts, ch1], d[sts, ch2], s=2, color="black")
-    _plt.xlabel("mk1")
-    _plt.ylabel("mk2")
-    _plt.subplot2grid((4, 3), (3, 1), colspan=1)
+    mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
+    mF.setTicksAndLims(xlabel=("mk tet%d" % (ch1-1)), ylabel=("mk tet%d" % (ch2-1)), xticks=[0, 3, 6], yticks=[0, 3, 6], xticksD=None, yticksD=None, xlim=[-1, 6], ylim=[-1, 6], tickFS=15, labelFS=18)
+    ##############
+    ax = _plt.subplot2grid((4, 3), (3, 1), colspan=1)
     _plt.scatter(d[sts, 0], d[sts, ch1], s=2, color="black")
-    _plt.xlabel("pos")
-    _plt.ylabel("mk%d" % (ch1-2))
-    _plt.subplot2grid((4, 3), (3, 2), colspan=1)
+    mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
+    mF.setTicksAndLims(xlabel="pos", ylabel=("mk tet%d" % (ch1-1)), xticks=[0, 1.5, 3], yticks=[0, 3, 6], xticksD=None, yticksD=None, xlim=[0, 3], ylim=None, tickFS=15, labelFS=18)
+    ax = _plt.subplot2grid((4, 3), (3, 2), colspan=1)
     _plt.scatter(d[sts, 0], d[sts, ch2], s=2, color="black")
-    _plt.xlabel("pos")
-    _plt.ylabel("mk%d" % (ch2-2))
+    mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
+    mF.setTicksAndLims(xlabel="pos", ylabel=("mk tet%d" % (ch2-1)), xticks=[0, 1.5, 3], yticks=[0, 3, 6], xticksD=None, yticksD=None, xlim=[0, 3], ylim=None, tickFS=15, labelFS=18)
 
+    fig.subplots_adjust(left=0.15, bottom=0.15, wspace=0.38, hspace=0.38)
     epochs = len(itv)-1
-    choutfn = "%(of)s_%(1)d,%(2)d" % {"of" : outfn, "1" : ch1, "2" : ch2}
-    _plt.savefig(resFN(choutfn, dir=bfn))
+    choutfn = "%(of)s_%(1)d,%(2)d" % {"of" : outfn, "1" : (ch1-1), "2" : (ch2-1)}
+    _plt.savefig(resFN(choutfn, dir=bfn), transparent=True)
