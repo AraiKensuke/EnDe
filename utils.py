@@ -43,23 +43,21 @@ def createSmoothedPathK(cps, N, K, ts, LoHis):
     Ne  = 3*N
     pth = _N.zeros((Ne, K))
 
-    NC  = cps.shape[0]
-
     gk  = gauKer(int(ts*N))
     gk  /= _N.sum(gk)
 
-    print LoHis
     Amps = _N.diff(LoHis, axis=1).reshape(K)
-    print Amps
-    for k in xrange(K):
-        pth[0:N, k] = LoHis[k, 0] + Amps[k]*cps[0, 1]
-        for p in xrange(1, cps.shape[0]-1):
-            cps[p, 0] += _N.random.randn()*0.02
-        for p in xrange(cps.shape[0]):
-            t0 = cps[p, 0]
-            t1 = cps[p+1, 0] if (p < NC - 1) else 2
 
-            pth[N+(N*t0):N+int(N*t1), k] = LoHis[k, 0] + Amps[k]*cps[p, 1]
+    for k in xrange(K):
+        NC  = cps[k].shape[0]
+        pth[0:N, k] = LoHis[k, 0] + Amps[k]*cps[k, 0, 1]   #  
+        for p in xrange(1, cps[k].shape[0]-1):
+            cps[k, p, 0] += _N.random.randn()*0.02
+        for p in xrange(cps[k].shape[0]):
+            t0 = cps[k, p, 0]
+            t1 = cps[k, p+1, 0] if (p < NC - 1) else 2
+
+            pth[N+(N*t0):N+int(N*t1), k] = LoHis[k, 0] + Amps[k]*cps[k, p, 1]
 
         spth = _N.convolve(pth[:, k], gk, mode="same")
         pth[:, k] = spth

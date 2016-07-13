@@ -21,9 +21,6 @@ class simpMixGauss:
         oo = self
         nSpks  = x.shape[0]
 
-        xLo    = _N.min(x)
-        xHi    = _N.max(x)
-
         f      = _N.empty((ITERS, M, 1))
         q2     = _N.empty((ITERS, M, 1))
         ms     = _N.empty((ITERS, M, 1))

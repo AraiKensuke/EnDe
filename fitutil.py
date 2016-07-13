@@ -18,8 +18,8 @@ _single_ = 2
 def contiguous_pack2(arr, startAt=0):
     """
     arr4 = _N.array([10, 4, 2, 2, 9, 3])
-    contiguous_pack(arr4)
-    #  arr4  ->  4 2 0 0 3 1
+    Contiguous_pack(arr4)
+    #  arr4  ->  4 2 0 0 3 1   #  array where _N.unique(entries) is contiguous
     Probably faster previous version
     """
     unqItms = _N.unique(arr)   #  5 uniq items
@@ -32,7 +32,29 @@ def contiguous_pack2(arr, startAt=0):
     arr += (startAt - unqItms[0])
     return nUnqItms
 
-def colorclusters(smkpos, labs, MS):
+def resortLabelsByClusterSize(labarr):
+    #  relabel cluster labels so that larger clusters have low labels
+    ulabs = _N.unique(labarr)
+    
+    clabs  = _N.empty(len(labarr))   # copy of labs
+    ulabs, cnts = _N.unique(labarr, return_counts=True)
+    uc    = _N.empty((ulabs.shape[0], 2))
+    uc[:, 0] = ulabs
+    uc[:, 1] = cnts
+    kys = _N.lexsort((uc[:, 0], uc[:, 1]))  #  sort by last column  (cnts)
+
+    nunq = len(ulabs)
+    #  longest clusters first
+    ik   = ulabs[0]  #  the smallest label
+    
+    for nu in xrange(nunq-1, -1, -1):
+        replace = _N.where(labarr == kys[nu])[0]  #   old sspots
+        clabs[replace] = ik
+
+        ik += 1
+    labarr[:] = clabs[:]
+
+def colorclusters(smkpos, labs, MS, name="", xLo=0, xHi=3):
     fig = _plt.figure(figsize=(12, 8))
 
     myclrs = _clrs.get_colors(MS)
@@ -41,6 +63,22 @@ def colorclusters(smkpos, labs, MS):
         for k in xrange(4):
             fig.add_subplot(2, 2, k+1)
             _plt.scatter(smkpos[inds, 0], smkpos[inds, k+1], color=myclrs[m], s=9)
+            _plt.xlim(xLo-(xHi-xLo)*0.1, xHi+(xHi-xLo)*0.1)
+    _plt.savefig("cc%s-all" % name)
+    _plt.close()
+
+    for m in xrange(MS):
+        fig = _plt.figure(figsize=(12, 8))
+        inds = _N.where(labs == m)[0]
+        for k in xrange(4):
+            fig.add_subplot(2, 2, k+1)
+            _plt.scatter(smkpos[inds, 0], smkpos[inds, k+1], color=myclrs[m], s=9)
+            _plt.xlim(xLo-(xHi-xLo)*0.1, xHi+(xHi-xLo)*0.1)
+        _plt.savefig("cc%(n)s-%(m)d" % {"n" : name, "m" : m})
+        _plt.close()
+
+
+
 
 def sepHash(_x, BINS=50, blksz=20, xlo=-6, xhi=6):
     ##########################
@@ -53,8 +91,8 @@ def sepHash(_x, BINS=50, blksz=20, xlo=-6, xhi=6):
     totalMks = _x.shape[0]
 
     # only look in bins where at least minInBin marks observed.
-    #for ch in xrange(1, 5):
-    for ch in xrange(1, 3):
+    for ch in xrange(1, 5):
+    #for ch in xrange(1, 3):
         cnts0, bns0 = _N.histogram(_x[:, 0], bins=bins)
         mncnt       = _N.mean(cnts0)
         minBins       = _N.where(cnts0 > 0.5*mncnt)[0]   # only compare these
@@ -165,51 +203,6 @@ def emMKPOS(nhmks, hmks, TR=5, minK=2, maxK=15):
         bestLabs.append(_N.array(bestLabMP))
     return bestLabs[0], bestLabs[1]
 
-def emMKPOS(nhmks, hmks, TR=5, minK=2, maxK=15):
-    TR = 5
-    minK=2
-    maxK=15
-
-    iNH = -1
-    sNH = ["nh", "h"]
-
-    bestLabs = []
-
-    # nhid, hid = sepHash(mkpos)
-
-    # nhmks     = mkpos[nhid]
-    # hmks      = mkpos[hid]
-
-    for mks in [nhmks, hmks]:
-        iNH += 1
-        labs, bics, bestLab, nClstrs = _oT.EMwfBICs(mks, minK=minK, maxK=maxK, TR=TR)
-        bestLab = _N.array(labs[nClstrs-minK, 0], dtype=_N.int)
-
-        #    if mks == nhmks:
-
-        ##  non-hash, do spatial clustering
-        startCl = 0 
-        bestLabMP = _N.array(bestLab)
-        maxK = 3 if (iNH == 1) else 10
-        minK = 2 if (iNH == 1) else 3
-
-        for nc in xrange(nClstrs):
-            inThisClstr = _N.where(bestLab == nc)[0]
-            pos = mks[inThisClstr, 0]
-
-            pos = pos.reshape(len(inThisClstr), 1)
-
-            if len(inThisClstr) > maxK:
-                plabs, pbics, pbestLab, pClstrs = _oT.EMposBICs(pos, minK=1, maxK=maxK, TR=3)
-                pClstrs = contiguous_pack2(pbestLab)
-                cmp = _N.where(pbics == _N.min(pbics))[0]
-            else:
-                pbestLab = _N.zeros(len(inThisClstr), dtype=_N.int)
-                pClstrs  = 1
-            bestLabMP[inThisClstr] = pbestLab + startCl
-            startCl += pClstrs
-        bestLabs.append(_N.array(bestLabMP))
-    return bestLabs[0], bestLabs[1]
 
 def emMKPOS_sep(nhmks, hmks, TR=5, minK=2, maxK=15):
     TR = 2
@@ -314,6 +307,111 @@ def emMKPOS_sep(nhmks, hmks, TR=5, minK=2, maxK=15):
             bestLabs.append(_N.array(bestLabMP))
     return bestLabs[0], bestLabs[1], startClstrs
 
+def mergesmallclusters(nhmks, hmks, slabs, hlabs, pmdim, clstrSzs):
+    """
+    slabs, hlabs are contiguous labels (both start from 0) of hash and nonhash
+    """
+    #  EM init sometimes creates very small clusters.  Merge these with the 
+    #  larger clusters EM finds
+
+    for hh in xrange(2):
+        if hh == 0:
+            labs = slabs
+            mks  = nhmks
+        else:
+            labs = hlabs
+            mks  = hmks
+        smallOnes = []
+        largeClstrs = []
+        ulabs    = _N.unique(labs)   # labs contiguous
+        lctrs      = []
+        lcovs      = []
+
+        for i in xrange(len(ulabs)):  # how many "neurons" did we find?
+            sts = _N.where(labs == i)[0]
+            sz  = len(sts)
+            #print "for %(i)d   there are %(n)d" % {"i" : i, "n" : sz}
+            if sz <= pmdim:
+                smallOnes.extend(sts)
+            else:
+                largeClstrs.append(i)
+                lctrs.append(_N.mean(mks[sts], axis=0))
+                lcovs.append(_N.cov(mks[sts], rowvar=0))
+        ctrs = _N.array(lctrs)
+        covs = _N.array(lcovs)
+
+        if len(smallOnes) > 0:
+            smind   = _N.array(smallOnes)
+            sngls   = mks[smind].reshape((smind.shape[0], 1, pmdim))
+            rctrs   = ctrs.reshape((1, len(largeClstrs), pmdim))
+
+            dmu     = (sngls - rctrs)
+            iSg     = _N.linalg.inv(covs)
+            qdrMKS  = _N.empty((len(largeClstrs), smind.shape[0]))
+            _N.einsum("nmj,mjk,nmk->mn", dmu, iSg, dmu, out=qdrMKS)
+
+            #  for each column, find the row with the smallest distance.  
+            #  largeClstrs[row] is the cluster # that data point should be assigned to
+            clst_clstr, nrn_nmb = _N.where(_N.min(qdrMKS, axis=0) == qdrMKS)
+
+            for ii in xrange(len(nrn_nmb)):   # nrn_nmb out of order, [0...len(nrn_nmb)]
+                #print "for neuron %(1)d   closest cluster is %(2)d" % {"1" : smallOnes[nrn_nmb[ii]], "2" : clst_clstr[ii]}
+                labs[smallOnes[nrn_nmb[ii]]] = largeClstrs[clst_clstr[ii]]
+            contiguous_pack2(labs)
+            clstrSzs[hh] = len(_N.unique(labs))
+
+def smallclustersAreNoise(nhmks, hmks, slabs, hlabs, pmdim, clstrSzs):
+    """
+    slabs, hlabs are contiguous labels (both start from 0) of hash and nonhash
+    """
+    #  EM init sometimes creates very small clusters.  Merge these with the 
+    #  larger clusters EM finds
+
+    for hh in xrange(2):
+        if hh == 0:
+            labs = slabs
+            mks  = nhmks
+        else:
+            labs = hlabs
+            mks  = hmks
+        smallOnes = []
+        largeClstrs = []
+        ulabs    = _N.unique(labs)   # labs contiguous
+        lctrs      = []
+        lcovs      = []
+
+        for i in xrange(len(ulabs)):  # how many "neurons" did we find?
+            sts = _N.where(labs == i)[0]
+            sz  = len(sts)
+            #print "for %(i)d   there are %(n)d" % {"i" : i, "n" : sz}
+            if sz <= pmdim:
+                smallOnes.extend(sts)
+            else:
+                largeClstrs.append(i)
+                lctrs.append(_N.mean(mks[sts], axis=0))
+                lcovs.append(_N.cov(mks[sts], rowvar=0))
+        ctrs = _N.array(lctrs)
+        covs = _N.array(lcovs)
+
+        if len(smallOnes) > 0:
+            smind   = _N.array(smallOnes)
+            sngls   = mks[smind].reshape((smind.shape[0], 1, pmdim))
+            rctrs   = ctrs.reshape((1, len(largeClstrs), pmdim))
+
+            dmu     = (sngls - rctrs)
+            iSg     = _N.linalg.inv(covs)
+            qdrMKS  = _N.empty((len(largeClstrs), smind.shape[0]))
+            _N.einsum("nmj,mjk,nmk->mn", dmu, iSg, dmu, out=qdrMKS)
+
+            #  for each column, find the row with the smallest distance.  
+            #  largeClstrs[row] is the cluster # that data point should be assigned to
+            clst_clstr, nrn_nmb = _N.where(_N.min(qdrMKS, axis=0) == qdrMKS)
+
+            for ii in xrange(len(nrn_nmb)):   # nrn_nmb out of order, [0...len(nrn_nmb)]
+                #print "for neuron %(1)d   closest cluster is %(2)d" % {"1" : smallOnes[nrn_nmb[ii]], "2" : clst_clstr[ii]}
+                labs[smallOnes[nrn_nmb[ii]]] = largeClstrs[clst_clstr[ii]]
+            contiguous_pack2(labs)
+            clstrSzs[hh] = len(_N.unique(labs))
 
 def emMKPOS_sep1A(nhmks, hmks, TR=5, minK=2, maxK=15):
     TR = 2
@@ -327,13 +425,14 @@ def emMKPOS_sep1A(nhmks, hmks, TR=5, minK=2, maxK=15):
 
     minSz = 8
     startClstrs = _N.empty(2, dtype=_N.int)
+    iRMv_ME   = 0
     for mks in [nhmks, hmks]:
         iNH += 1
         startCl = 0 
         bestLabMP = None
         if mks is not None:
             labs, bics, bestLab, nClstrs = _oT.EMwfBICs(mks, minK=minK, maxK=maxK, TR=TR)
-            bestLab = _N.array(labs[nClstrs-minK, 0], dtype=_N.int)
+            bestLab = _N.array(bestLab, dtype=_N.int)
 
             #    if mks == nhmks:
 
@@ -342,13 +441,17 @@ def emMKPOS_sep1A(nhmks, hmks, TR=5, minK=2, maxK=15):
             bestLabMP = _N.array(bestLab)
             minK = 1
             _maxK = 7
-
+            
+            #for i in _N.unique(bestLab):  # how many "neurons" did we find?
+            #    print "for %(i)d   there are %(n)d" % {"i" : i, "n" : len(_N.where(bestLab == i)[0])}
             print "neurons for iNH=%(nh)d   nclusters %(nc)d" % {"nh" : iNH, "nc" : nClstrs}
             for nc in xrange(nClstrs):
                 inThisClstr = _N.where(bestLab == nc)[0]
                 LiTC        = len(inThisClstr)
                 pbestLab = _N.ones(LiTC, dtype=_N.int) * -1   #  poslabs
                 pos = mks[inThisClstr, 0]
+                _N.savetxt("clstr%(nh)d_%(iRM)d" % {"nh" : iNH, "iRM" : iRMv_ME}, mks[inThisClstr], fmt="%.4f %4f %.4f %4f %.4f")
+                iRMv_ME += 1
                 pos = pos.reshape(LiTC, 1)
 
                 #  1 spk / clstr maxK == LiTC   want a few more than 1 / clstr
@@ -366,6 +469,7 @@ def emMKPOS_sep1A(nhmks, hmks, TR=5, minK=2, maxK=15):
             bestLabs.append(_N.array([], dtype=_N.int))
         else:
             bestLabs.append(_N.array(bestLabMP))
+
     return bestLabs[0], bestLabs[1], startClstrs
 
 
@@ -713,3 +817,20 @@ def sepHashEM(mks):
         return _N.array([]), _N.arange(mks.shape[0]), None
 
 
+
+def splitclstrs(posmk, labS):
+    #  for each cluster, see if its better as 1 or 2 cluster
+    unIDs = _N.unique(labS)
+    nClstrs = len(unIDs)
+
+    startID = 0
+
+    for uID in unIDs:
+        these = _N.where(labS == uID)[0]
+        if len(these) > 8:
+            plabs, pbics, pbestLab, pClstrs = _oT.EMposBICs(posmk[these, 0].reshape(len(these), 1), minK=1, maxK=3, TR=1)
+            if pClstrs > 1:
+                print "bigger"
+                lrgr = _N.where(labS > uID)[0]   #  clusters with larger IDs
+                labS[lrgr] += 1
+                labS[these] = pbestLab + uID

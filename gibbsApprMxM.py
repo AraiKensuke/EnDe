@@ -135,19 +135,20 @@ class MarkAndRF:
                     hashsp   = _N.array([])
                     hashthresh = _N.min(_x[:, 1:], axis=0)
                 else:
-                    unonhash, hashsp, hashthresh = sepHash(_x, BINS=10, blksz=5, xlo=0, xhi=3)
+                    unonhash, hashsp, hashthresh = sepHash(_x, BINS=10, blksz=5, xlo=oo.xLo, xhi=oo.xHi)
+                    #unonhash, hashsp, hashthresh = sepHash(_x, BINS=10, blksz=5, xlo=0, xhi=3)
                 #  hashthresh is dim 2
                 
-                    # fig = _plt.figure(figsize=(5, 10))
-                    # fig.add_subplot(3, 1, 1)
-                    # _plt.scatter(_x[hashsp, 1], _x[hashsp, 2], color="red")
-                    # _plt.scatter(_x[unonhash, 1], _x[unonhash, 2], color="black")
-                    # fig.add_subplot(3, 1, 2)
-                    # _plt.scatter(_x[hashsp, 0], _x[hashsp, 1], color="red")
-                    # _plt.scatter(_x[unonhash, 0], _x[unonhash, 1], color="black")
-                    # fig.add_subplot(3, 1, 3)
-                    # _plt.scatter(_x[hashsp, 0], _x[hashsp, 2], color="red")
-                    # _plt.scatter(_x[unonhash, 0], _x[unonhash, 2], color="black")
+                    fig = _plt.figure(figsize=(5, 10))
+                    fig.add_subplot(3, 1, 1)
+                    _plt.scatter(_x[hashsp, 1], _x[hashsp, 2], color="red")
+                    _plt.scatter(_x[unonhash, 1], _x[unonhash, 2], color="black")
+                    fig.add_subplot(3, 1, 2)
+                    _plt.scatter(_x[hashsp, 0], _x[hashsp, 1], color="red")
+                    _plt.scatter(_x[unonhash, 0], _x[unonhash, 1], color="black")
+                    fig.add_subplot(3, 1, 3)
+                    _plt.scatter(_x[hashsp, 0], _x[hashsp, 2], color="red")
+                    _plt.scatter(_x[unonhash, 0], _x[unonhash, 2], color="black")
 
                 if (len(unonhash) > 0) and (len(hashsp) > 0):
                     labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], _x[hashsp])
@@ -156,7 +157,7 @@ class MarkAndRF:
                 else:
                     labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], None, TR=5)
                 splitclstrs(_x[unonhash], labS)
-                #mergesmallclusters(_x[unonhash], _x[hashsp], labS, labH, K+1, clstrs)
+                mergesmallclusters(_x[unonhash], _x[hashsp], labS, labH, K+1, clstrs)
 
                 #colorclusters(_x[hashsp], labH, clstrs[1])
                 #colorclusters(_x[unonhash], labS, clstrs[0])
@@ -191,17 +192,19 @@ class MarkAndRF:
                 _f_u   = _N.zeros(M);    _f_q2  = _N.ones(M)*4 #  wide
                 #_f_u   = _N.zeros(M);    _f_q2  = _N.ones(M)*1 #  wide
                 #  inverse gamma
-                _q2_a  = _N.ones(M)*1e-4;    _q2_B  = _N.ones(M)*1e-3
+                _q2_a  = _N.ones(M)*2.2;    _q2_B  = _N.ones(M)*1e-3
                 #_plt.plot(q2x, q2x**(-_q2_a-1)*_N.exp(-_q2_B / q2x))
                 _l0_a = _N.ones(M)*1.1;     _l0_B  = _N.ones(M)*(1/30.)
 
                 #  
-                _u_u   = _N.zeros((M, K));  
-                _u_Sg = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*9
-                #_u_Sg = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*1
+                mkmn = _N.mean(mks[Asts+t0], axis=0)
+                mkcv = _N.cov(mks[Asts+t0], rowvar=0)
+                _u_u   = _N.tile(mkmn, M).T.reshape((M, K))
+                #_u_Sg = _N.tile(mkcv, M).T.reshape((M, K, K))*
+                _u_Sg = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*1
                 _u_iSg = _N.linalg.inv(_u_Sg)
-                _Sg_nu = _N.ones((M, 1));  
-                _Sg_PSI = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*0.1
+                _Sg_nu = _N.ones((M, 1))*2
+                _Sg_PSI = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*0.05
 
                 #####  MODES  - find from the sampling
                 oo.sp_prmPstMd = _N.zeros((oo.epochs, 3*M))   # mode of params
@@ -260,6 +263,7 @@ class MarkAndRF:
                 for im in xrange(M):  #if lab < 0, these marks not used for init
                     if im < MF:
                         kinds = _N.where(flatlabels == im)[0]  #  inds
+                        #print "len   %d" % len(kinds)
                         f[im]  = _N.mean(x[Asts[kinds]+t0], axis=0)
                         _f_u[im]= f[im]
                         _f_q2[im]= 0.2
@@ -366,13 +370,16 @@ class MarkAndRF:
                 ###  how far is closest cluster to each newly observed mark
 
                 realCl = _N.where(freeClstr == False)[0]
+                #print qdrMKS
+                #print qdrMKS[realCl]
                 nNrstMKS_d = _N.sqrt(_N.min(qdrMKS[realCl], axis=0)/K)  #  dim len(sts)
                 nNrstSPC_d = _N.sqrt(_N.min(qdrSPC[realCl], axis=0))
 
 
                 #  mAS = mks[Asts+t0] 
                 #  xAS = x[Asts + t0]   #  position @ spikes
-                
+
+                #  CheckFarFromExistingClusters()
                 if (epc > 0) and (iter == 0):
                     # print "---------------qdrSPC"
                     # print qdrSPC

@@ -24,9 +24,10 @@ def makeCovs(nNrns, K, LoHisMk):
 
 
 
-def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, l0ts, l_ctr_chpts, ctrts, mk_chpts, mkts, Covs, LoHis, km):
+def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, l0ts, l_ctr_chpts, ctrts, mk_chpts, mkts, Covs, LoHis, km, bckgrdLam=None):
     """
     km  tells me neuron N gives rise to clusters km[N]  (list)
+    bckgrd is background spike rate  (Hz)
     """
     global UNIF, NUNIF
     #####  First check that the number of neurons and PFs all consistent.
@@ -167,7 +168,16 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, 
             for t in xrange(len(sts)):
                 dat[sts[t], 2:] = _N.random.multivariate_normal(mk_MU[nrn, t], Covs[nrn], size=1)
 
-    
+        #  now noise spikes
+        if bckgrdLam is not None:
+            sts  = _N.where(rnds[m] < (bckgrdLam*dt)/float(M))[0]
+            dat[sts, 1] = 1
+            nrn = nrnNum[m]
+            if K > 0:
+                for t in xrange(len(sts)):
+                    dat[sts[t], 2:] = _N.random.multivariate_normal(mk_MU[nrn, t], Covs[nrn], size=1)
+
+
 
     bFnd  = False
 
