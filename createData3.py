@@ -6,10 +6,44 @@ from utils import createSmoothedPath, createSmoothedPathK
 import numpy as _N
 import matplotlib.pyplot as _plt
 import pickle
+import time as _tm
 
 UNIF  = 0
 NUNIF = 1
 
+APPEAR=0
+DISAPPEAR=1
+NEITHER=-1
+#_N.array([[0, 0.02], [0.1, 0.03], [0.2, 0.04], [0.5, 0.05], [0.7, 0.06]]
+def chpts(npts, yL, yH, t0=0, ad=NEITHER):
+    #  [tn, dy]
+    cpts = _N.empty((npts, 2))
+    ts   = _N.random.rand(npts)
+    ts[0] = 0
+    for i in xrange(1, npts):
+        ts[i] += ts[i-1]
+    ts /= _N.sum(ts[-1])
+    cpts[:, 0] = ts
+    F = 0.9999
+    x = _N.random.randn()
+    cpts[0, 1] = x
+    for i in xrange(1, npts):
+        x = F*x + 0.1*_N.random.randn()
+        cpts[i, 1] = x
+    miny = _N.min(cpts[:, 1])
+    cpts[:, 1] -= miny   # min value is now 0
+    maxy = _N.max(cpts[:, 1])
+    cpts[:, 1] /= maxy   # max value is now 1
+    cpts[:, 1] *= (yH-yL)   # max value is now 1
+    cpts[:, 1] += yL
+    if ad != NEITHER:
+        if ad == APPEAR:
+            cpts[0:t0, 1] = 0
+        else:
+            cpts[t0:, 1]  = 0
+    return cpts
+
+        
 def makeCovs(nNrns, K, LoHisMk):
     Covs = _N.empty((nNrns, K, K))
     for n in xrange(nNrns):
@@ -22,9 +56,7 @@ def makeCovs(nNrns, K, LoHisMk):
                 Covs[n, k2, k1] = Covs[n, k1, k2]
     return Covs
 
-
-
-def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, l0ts, l_ctr_chpts, ctrts, mk_chpts, mkts, Covs, LoHis, km, bckgrdLam=None):
+def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, l0ts, l_ctr_chpts, ctrts, mk_chpts, mkts, Covs, LoHis, km, bckgrdLam=None, script="no info", addShortStops=False, stops=10, stopDur=500, thresh=None):
     """
     km  tells me neuron N gives rise to clusters km[N]  (list)
     bckgrd is background spike rate  (Hz)
@@ -71,6 +103,8 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, 
         nrnNum += [nrn]*nPFsSX
         PFsPerNrn[nrn] = nPFsSX
 
+    #  M = # of clusters  (in mark + pos space)  
+    #  nNrns = # of neurons
     ####  build data
     Ns     = _N.empty(RTs, dtype=_N.int)
     if mvPat == NUNIF:
@@ -86,6 +120,7 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, 
     x01    = _N.linspace(0, 1, len(pths))
     x01    = x01.reshape((1, NT))
     plastic = False
+
     ##########  nonstationary center width
     #  sxt  should be (M x NT)
     sxt   = _N.empty((M, NT))
@@ -146,12 +181,22 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, 
             pths[now:now+N]     = x
             now += N
 
+    if addShortStops:
+        for ist in xrange(stops):
+            done   = False
+            while not done:
+                t0 = int(_N.random.rand()*NT)
+                t1 = t0 + int(stopDur*(1+0.1*_N.random.randn()))
+                if _N.abs(_N.max(_N.diff(pths[t0:t1]))) < 0.05*(Hx-Lx):
+                    done = True   #  not crossing origin
+                
+            pths[t0:t1] = _N.mean(pths[t0:t1])
+
     ###  now calculate firing rates
     dt   = 0.001
     fdt  = f*dt
     #  change place field location
     Lam   = f*dt*_N.exp(-0.5*(pths-ctr)**2 / sx)
-    print Lam.shape
 
     rnds = _N.random.rand(M, NT)
 
@@ -177,7 +222,19 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, 
                 for t in xrange(len(sts)):
                     dat[sts[t], 2:] = _N.random.multivariate_normal(mk_MU[nrn, t], Covs[nrn], size=1)
 
+    if thresh is not None:
+        sts = _N.where(dat[:, 1] == 1)[0]
+        nID, nC = _N.where(dat[sts, 2:] < thresh)
 
+        swtchs  = _N.zeros((len(sts), K))
+        swtchs[nID, nC] = 1    #  for all cells, all components below hash == 1
+
+        swtchsK = _N.sum(swtchs, axis=1)
+        
+        blw_thrsh_all_chs = _N.where(swtchsK == K)[0]
+        abv_thr = _N.setdiff1d(_N.arange(len(sts)), blw_thrsh_all_chs)
+        print "below thresh in all channels  %(1)d / %(2)d" % {"1" : len(blw_thrsh_all_chs), "2" : len(sts)}
+        dat[sts[blw_thrsh_all_chs], 1:] = 0
 
     bFnd  = False
 
@@ -205,7 +262,7 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, 
             bFnd = True
 
     smk = " %.4f" * K
-    _N.savetxt("%s" % fn, dat, fmt=("%.4f %d" + smk), delimiter=" ")
+    _U.savetxtWCom("%s" % fn, dat, fmt=("%.4f %d" + smk), delimiter=" ", com="#  script=%s.py" % script)
 
     pcklme = {}
 
@@ -224,6 +281,6 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, 
     print "created %s" % fn
 
     fig = _plt.figure()
-    _plt.hist(dat[:, 0], bins=_N.linspace(0, 3, 61), color="black")
+    _plt.hist(dat[:, 0], bins=_N.linspace(Lx, Hx, 101), color="black")
     _plt.savefig(fnocc)
     _plt.close()

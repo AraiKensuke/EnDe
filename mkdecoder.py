@@ -2,6 +2,7 @@ import numpy as _N
 from EnDedirs import resFN, datFN
 import kdeutil as _ku
 import time as _tm
+import matplotlib.pyplot as _plt
 
 class mkdecoder:
     nTets   = 1
@@ -48,7 +49,7 @@ class mkdecoder:
     mHi      = 8
 
     ##  X_   and _X
-    def __init__(self, kde=False, bx=None, Bx=None, Bm=None, mkfns=None, encfns=None, K=None, nTets=None):
+    def __init__(self, kde=False, bx=None, Bx=None, Bm=None, mkfns=None, encfns=None, K=None, nTets=None, xLo=0, xHi=3):
         """
         """
         oo = self
@@ -57,10 +58,13 @@ class mkdecoder:
         oo.bx = bx;   oo.Bx = Bx;   oo.Bm = Bm
         oo.mkpos = []
         #  read mkfns
+        _sts   = []#  a mark on one of the several tetrodes
         for fn in mkfns:
             dat = _N.loadtxt(datFN("%s.dat" % fn))
             K   = dat.shape[1] - 2
             oo.mkpos.append(dat)
+            _sts.extend(_N.where(dat[:, 1] == 1)[0])
+        oo.sts = _N.unique(_sts)
 
         oo.nTets = len(oo.mkpos)
         oo.mdim  = K
@@ -69,6 +73,8 @@ class mkdecoder:
         if not kde:
             oo.mdim  = K
             oo.nTets  = nTets
+        
+        oo.xLo = xLo;     oo.xHi = xHi
         
         ####  spatial grid for evaluating firing rates
         oo.xp   = _N.linspace(oo.xLo, oo.xHi, oo.Nx)  #  space points
@@ -186,8 +192,8 @@ class mkdecoder:
             i2pidcovsr= i2pidcovs.reshape((M, 1))
 
         oo.init_pX_Nm(t0)   #  flat pX_Nm  init cond at start of decode
-        oo.setLmd0(0, t0, prms=prms, uFE=uFE)
-        pNkmk0   = _N.exp(-oo.dt * oo.Lam_xk)  #  one for each tetrode
+        oo.LmdMargOvrMrks(0, t0, prms=prms, uFE=uFE)
+        pNkmk0   = _N.exp(-oo.dt * oo.Lam_MoMks)  #  one for each tetrode
 
         fxdMks = _N.empty((oo.Nx, oo.mdim+1))  #  for each pos, a fixed mark
         fxdMks[:, 0] = oo.xp
@@ -199,7 +205,11 @@ class mkdecoder:
 
                 if (oo.mkpos[nt][t, 1] == 1):
                     fxdMks[:, 1:] = oo.mkpos[nt][t, 2:]
-                    oo.Lklhd[nt, t] *= _ku.evalAtFxdMks_new(fxdMks, l0s, us, covs, iSgs, i2pidcovsr)*oo.lmd0[nt] * oo.dt
+                    #oo.Lklhd[nt, t] *= _ku.evalAtFxdMks_new(fxdMks, l0s, us, covs, iSgs, i2pidcovsr)*oo.lmd0[nt] * oo.dt
+                    oo.Lklhd[nt, t] *= _ku.evalAtFxdMks_new(fxdMks, l0s, us, covs, iSgs, i2pidcovsr)* oo.dt
+                    if t == 135554:
+                        print "nt is %d" % nt
+                        print _ku.evalAtFxdMks_new(fxdMks, l0s, us, covs, iSgs, i2pidcovsr)
 
             ttt1 =0
             ttt2 =0
@@ -217,6 +227,19 @@ class mkdecoder:
             #tt3 = _tm.time()
             oo.pX_Nm[t] = oo.intgrl * _N.product(oo.Lklhd[:, t], axis=0)
             A = _N.trapz(oo.pX_Nm[t], dx=oo.dxp)
+            if A == 0:
+                print "A is %.5f" % A
+                fig = _plt.figure()
+
+                #_plt.plot(_N.product(oo.Lklhd[:, t], axis=0))
+                print "t=%d" % t
+                for tet in xrange(4):
+                    print oo.Lklhd[tet, t]
+                    fig = _plt.figure()
+                    _plt.plot(oo.Lklhd[tet, t])
+
+            assert A > 0, "die"
+
             oo.pX_Nm[t] /= A
             #tt4 = _tm.time()
             #print "%(1).3e   %(2).3e   %(3).3e" % {"1" : (tt2-tt1), "2" : (tt3-tt2), "3" : (tt4-tt3)}
@@ -224,27 +247,28 @@ class mkdecoder:
         tEnd = _tm.time()
         #print "decode   %(1).3e" % {"1" : (tEnd-tStart)}
 
-    def setLmd0(self, enc_t0, enc_t1, uFE=None, prms=None):
+    def LmdMargOvrMrks(self, enc_t0, enc_t1, uFE=None, prms=None):
         """
         0:t0   used for encode
         Lmd0.  
         """
         oo = self
         #####  
-        oo.lmd0 = _N.empty(oo.nTets)
-        oo.Lam_xk = _N.ones((oo.Nx, oo.nTets))
+        #oo.lmd0 = _N.empty(oo.nTets)
+        oo.Lam_MoMks = _N.ones((oo.Nx, oo.nTets))
 
-        if oo.kde:
+        if oo.kde:  #  also calculate the occupation. Nothing to do with LMoMks
             ibx2 = 1./ (oo.bx*oo.bx)        
             occ    = _N.sum(_N.exp(-0.5*ibx2*(oo.xpr - oo.pos[enc_t0:enc_t1])**2), axis=1)  #  this piece doesn't need to be evaluated for every new spike
             Tot_occ  = _N.sum(occ)
             oo.iocc = 1./occ
 
+            ###  Lam_MoMks  is a function of space
             for nt in xrange(oo.nTets):
-                oo.Lam_xk[:, nt] = _ku.Lambda(oo.xpr, oo.tr_pos[nt], oo.pos[enc_t0:enc_t1], oo.Bx, oo.bx, oo.dxp)
+                oo.Lam_MoMks[:, nt] = _ku.Lambda(oo.xpr, oo.tr_pos[nt], oo.pos[enc_t0:enc_t1], oo.Bx, oo.bx, oo.dxp)
         else:  #####  fit mix gaussian
             for nt in xrange(oo.nTets):
-                l0s   = prms[nt][0][uFE]
+                l0s   = prms[nt][0][uFE]    #  M x 1
                 us    = prms[nt][1][uFE]
                 covs  = prms[nt][2][uFE]
                 M     = covs.shape[0]
@@ -254,7 +278,7 @@ class mkdecoder:
                     var = covs[m, 0, 0]
                     ivar = 1./var
                     cmps[m] = (1/_N.sqrt(2*_N.pi*var)) * _N.exp(-0.5*ivar*(oo.xp - us[m, 0])**2)
-                oo.Lam_xk[:, nt]   = _N.sum(l0s*cmps, axis=0)
+                oo.Lam_MoMks[:, nt]   = _N.sum(l0s*cmps, axis=0)
 
     def decodeKDE(self, t0, t1):
         """
@@ -263,7 +287,7 @@ class mkdecoder:
         oo = self
 
         oo.init_pX_Nm(t0)   #  flat pX_Nm  init cond at start of decode
-        oo.setLmd0(0, t0)
+        oo.LmdMargOvrMrks(0, t0)
 
         ##  each 
 
@@ -273,7 +297,7 @@ class mkdecoder:
         #  I will perform integral L times for each time step
         #  multiply integral with p(\Delta N_k, m_k | x_k)
 
-        pNkmk0   = _N.exp(-oo.dt * oo.Lam_xk)  #  one for each tetrode
+        pNkmk0   = _N.exp(-oo.dt * oo.Lam_MoMks)  #  one for each tetrode
         pNkmk    = _N.ones(oo.Nx)
 
         fxdMks = _N.empty((oo.Nx, oo.mdim+1))  #  fixed mark for each field pos.

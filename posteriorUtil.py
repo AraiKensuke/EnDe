@@ -40,9 +40,6 @@ def MAPvalues(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, gk, l_trlsNear
             trlsNearMAP += frm
             l_trlsNearMAP.append(trlsNearMAP)
 
-
-
-
 def MAPvalues2(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, gk, l_trlsNearMAP, alltrials=False):
     print "IN MAPvalues2"
     N   = smp_prms.shape[1] - frm
@@ -52,7 +49,7 @@ def MAPvalues2(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, gk, l_trlsNea
         if alltrials:
             l_trlsNearMAP.append(_N.arange(ITERS))
         else:
-            for ip in xrange(nprms):  # params
+            for ip in xrange(nprms):  # for each param
                 col = nprms*m+ip
                 #fig.add_subplot(1, nprms, ip+1)
 
@@ -71,7 +68,7 @@ def MAPvalues2(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, gk, l_trlsNea
                 if len(thr_ispc) > 0:   #  this param not all the same
                     L     = _N.min(smps);  H     = _N.max(smps[ismps[thr_ispc]])
                     A     = H-L
-                    cnts, bns = _N.histogram(smps, bins=_N.linspace(L-0.1*A, H+0.1*A, 60))
+                    cnts, bns = _N.histogram(smps, bins=_N.linspace(L-0.0001*A, H + 0.0001*A, 60))
 
                     xfit    = 0.5*(bns[1:] + bns[0:-1])
 
@@ -89,15 +86,20 @@ def MAPvalues2(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, gk, l_trlsNea
                         these=_N.where((smps > xLo) & (smps < xHi))[0]
                         trlsNearMAP = _N.intersect1d(these, trlsNearMAP)
 
-
+                    if (m == 6) and (ip == 2):
+                        print "m is %(m)d    %(map).3f" % {"m" : m, "map" : xMAP}
+                        print ib
+                        print smps
+                        print L
+                        print H
                     postMode[epc, col] = xMAP
                 else:
                     postMode[epc, col] = smps[0]
                     trlsNearMAP = _N.arange(N)+frm    
 
             if l_trlsNearMAP is not None:
-                #trlsNearMAP += frm
-                l_trlsNearMAP.append(trlsNearMAP)
+                # trlsNearMAP for each params added to list
+                l_trlsNearMAP.append(trlsNearMAP)  
 
 
 

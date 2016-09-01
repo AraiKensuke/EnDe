@@ -1,9 +1,9 @@
 #  in terms of relative length
-firstT   = 3.1
+firstT   = 3.6
 minT     = 0.5
 maxT     = 1.5
 
-epochs   = 18
+epochs   = 25
 
 intvs = _N.empty(epochs+1)
 

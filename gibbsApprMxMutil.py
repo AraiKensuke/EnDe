@@ -1,8 +1,15 @@
 import numpy as _N
 from fitutil import  emMKPOS_sep1A, sepHashEM, sepHash, colorclusters, mergesmallclusters, splitclstrs
+from posteriorUtil import MAPvalues2
 import clrs 
+from filter import gauKer
+import time as _tm
+from EnDedirs import resFN, datFN
+import matplotlib.pyplot as _plt
 
-def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True):
+twpi = 2*_N.pi
+
+def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3):
     n0 = 0
     n1 = len(Asts)
 
@@ -13,21 +20,26 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True):
     if not doSepHash:
         unonhash = _N.arange(len(Asts))
         hashsp   = _N.array([])
-        hashthresh = _N.min(_x[:, 1:], axis=0)
+        hashthresh = _N.min(_x[:, 1:], axis=0)   #  no hash spikes
+        
+        ###   1 cluster
+        # labS = _N.zeros(len(Asts), dtype=_N.int)
+        # labH = _N.array([], dtype=_N.int)
+        # clstrs = _N.array([0, 1])
     else:
         unonhash, hashsp, hashthresh = sepHash(_x, BINS=10, blksz=5, xlo=oo.xLo, xhi=oo.xHi)
     #  hashthresh is dim 2
 
-        # fig = _plt.figure(figsize=(5, 10))
-        # fig.add_subplot(3, 1, 1)
-        # _plt.scatter(_x[hashsp, 1], _x[hashsp, 2], color="red")
-        # _plt.scatter(_x[unonhash, 1], _x[unonhash, 2], color="black")
-        # fig.add_subplot(3, 1, 2)
-        # _plt.scatter(_x[hashsp, 0], _x[hashsp, 1], color="red")
-        # _plt.scatter(_x[unonhash, 0], _x[unonhash, 1], color="black")
-        # fig.add_subplot(3, 1, 3)
-        # _plt.scatter(_x[hashsp, 0], _x[hashsp, 2], color="red")
-        # _plt.scatter(_x[unonhash, 0], _x[unonhash, 2], color="black")
+        fig = _plt.figure(figsize=(5, 10))
+        fig.add_subplot(3, 1, 1)
+        _plt.scatter(_x[hashsp, 1], _x[hashsp, 2], color="red")
+        _plt.scatter(_x[unonhash, 1], _x[unonhash, 2], color="black")
+        fig.add_subplot(3, 1, 2)
+        _plt.scatter(_x[hashsp, 0], _x[hashsp, 1], color="red")
+        _plt.scatter(_x[unonhash, 0], _x[unonhash, 1], color="black")
+        fig.add_subplot(3, 1, 3)
+        _plt.scatter(_x[hashsp, 0], _x[hashsp, 2], color="red")
+        _plt.scatter(_x[unonhash, 0], _x[unonhash, 2], color="black")
 
     if (len(unonhash) > 0) and (len(hashsp) > 0):
         labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], _x[hashsp])
@@ -35,30 +47,35 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True):
         labS, labH, clstrs = emMKPOS_sep1A(None, _x[hashsp], TR=5)
     else:
         labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], None, TR=5)
-    splitclstrs(_x[unonhash], labS)
-    mergesmallclusters(_x[unonhash], _x[hashsp], labS, labH, K+1, clstrs)
+    if doSepHash:
+        splitclstrs(_x[unonhash], labS)
+        mergesmallclusters(_x[unonhash], _x[hashsp], labS, labH, K+1, clstrs)
 
-    #colorclusters(_x[hashsp], labH, clstrs[1])
-    #colorclusters(_x[unonhash], labS, clstrs[0])
+        #_N.savetxt("hash", hashsp)
+        #_N.savetxt("nhash", unonhash)
+        #colorclusters(_x[hashsp], labH, clstrs[1], name="hash", xLo=xLo, xHi=xHi)
+        #colorclusters(_x[unonhash], labS, clstrs[0], name="nhash", xLo=xLo, xHi=xHi)
 
     #fig = _plt.figure(figsize=(7, 10))
     #fig.add_subplot(2, 1, 1)
 
     flatlabels = _N.ones(n1-n0, dtype=_N.int)*-1   # 
-    cls = clrs.get_colors(clstrs[0] + clstrs[1])
+    #cls = clrs.get_colors(clstrs[0] + clstrs[1])
     for i in xrange(clstrs[0]):
         these = _N.where(labS == i)[0]
 
-        flatlabels[unonhash[these]] = i
+        if len(these) > 0:
+            flatlabels[unonhash[these]] = i
         #_plt.scatter(_x[unonhash[these], 0], _x[unonhash[these], 1], color=cls[i])
     for i in xrange(clstrs[1]):
         these = _N.where(labH == i)[0]
 
-        flatlabels[hashsp[these]] = i + clstrs[0]
+        if len(these) > 0:
+            flatlabels[hashsp[these]] = i + clstrs[0]
         #_plt.scatter(_x[hashsp[these], 0], _x[hashsp[these], 1], color=cls[i+clstrs[0]])
 
     MF     = clstrs[0] + clstrs[1]
-    M = int(MF * 1.2) + 2   #  20% more clusters
+    M = MF#int(MF * 1.1) + 2   #  20% more clusters
     print "cluters:  %d" % M
 
 
@@ -76,7 +93,7 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True):
     ##################
     lab      = _N.array(labS.tolist() + (labH + clstrs[0]).tolist())
 
-    return labS, labH, lab, flatlabels, M, MF
+    return labS, labH, lab, flatlabels, M, MF, hashthresh
 
 def declare_params(M, K):
     ######################################  INITIAL VALUE OF PARAMS
@@ -90,16 +107,17 @@ def declare_params(M, K):
 def declare_prior_hyp_params(M, MF, K, x, mks, Asts, t0):
     #  PRIORS.  These get updated after each EPOCH
     #  priors  prefixed w/ _
-    _f_u    = _N.zeros(M);    _f_q2  = _N.ones(M)*4 #  wide
+    _f_u    = _N.zeros(M);    _f_q2  = _N.ones(M)*16 #  wide
     #  inverse gamma
-    _q2_a   = _N.ones(M)*2.2;    _q2_B  = _N.ones(M)*1e-3
+    #_q2_a   = _N.ones(M)*4;    _q2_B  = _N.ones(M)*1e-3
+    _q2_a   = _N.ones(M)*0.5;    _q2_B  = _N.ones(M)*1e-3
     _l0_a   = _N.ones(M)*1.1;     _l0_B  = _N.ones(M)*(1/30.)
     mkmn    = _N.mean(mks[Asts+t0], axis=0)
     mkcv    = _N.cov(mks[Asts+t0], rowvar=0)
     _u_u    = _N.tile(mkmn, M).T.reshape((M, K))
     _u_Sg   = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*1
     _u_iSg  = _N.linalg.inv(_u_Sg)
-    _Sg_nu  = _N.ones((M, 1))*2
+    _Sg_nu  = _N.ones((M, 1))*(K*1.01)
     _Sg_PSI = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*0.05
 
     return _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI
@@ -131,8 +149,7 @@ def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, Asts, t0, x, mks, flatlabel
     oo.mk_prmPstMd[oo.ky_p_u][0] = u
     oo.mk_prmPstMd[oo.ky_p_Sg][0] = Sg
 
-def stochasticAssignment(oo, it, M, K, l0, f, q2, u, Sg, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, cmp2Existing):
-    print "stochasticAssignment"
+def stochasticAssignment(oo, it, M, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, cmp2Existing):
     #  Gibbs sampling
     #  parameters l0, f, q2
     nSpks = len(Asts)
@@ -156,7 +173,7 @@ def stochasticAssignment(oo, it, M, K, l0, f, q2, u, Sg, Asts, t0, mASr, xASr, r
         if len(is0) > 0:
             l0[is0] = 0.001
 
-        pkFR       = _N.log(l0) - 0.5*_N.log(_N.sqrt(twpi*q2))
+        pkFR       = _N.log(l0) - 0.5*_N.log(twpi*q2)
     except RuntimeWarning:
         print "WARNING"
         print l0
@@ -200,7 +217,9 @@ def stochasticAssignment(oo, it, M, K, l0, f, q2, u, Sg, Asts, t0, mASr, xASr, r
         # fig.add_subplot(1, 1, 1)
         # _plt.hist(x[Asts+t0], bins=30)
 
-        abvthrEachCh = mks[Asts+t0] > hashthresh
+        ####  mks
+        #abvthrEachCh = mks[Asts+t0] > hashthresh
+        abvthrEachCh = mASr[:, 0] > hashthresh
         abvthrAtLeast1Ch = _N.sum(abvthrEachCh, axis=1) > 0
         abvthrInds   = _N.where(abvthrAtLeast1Ch)[0]
 
@@ -223,17 +242,17 @@ def stochasticAssignment(oo, it, M, K, l0, f, q2, u, Sg, Asts, t0, mASr, xASr, r
         for m in xrange(M):
             #if freeClstr[m] and (not bDone) and bDoMKS:
             if freeClstr[m]:
-                these     = (Asts+t0)[abvthrInds]
-                _f_u[m] = _N.mean(x[these], axis=0)
-                _u_u[m]   = _N.mean(mks[these], axis=0)
+                #these     = (Asts+t0)[abvthrInds]  #  in absolute coords
+                _f_u[m] = _N.mean(xASr[0, abvthrInds], axis=0)
+                _u_u[m]   = _N.mean(mASr[abvthrInds, 0], axis=0)
                 l0[m]     = _N.random.rand()*10
                 if (iused < 2) and bDoMKS:
-                    these     = (Asts+t0)[farMKS]
-                    f[m]      = _N.mean(x[these], axis=0)
-                    u[m]      = _N.mean(mks[these], axis=0)
+                    #these     = (Asts+t0)[farMKS] #Asts + t0 is t-index from 0
+                    f[m]      = _N.mean(xASr[0, farMKS], axis=0)
+                    u[m]      = _N.mean(mASr[farMKS, 0], axis=0)
                 else:
-                    f[m]      = _N.mean(x[these], axis=0)
-                    u[m]      = _N.mean(mks[these], axis=0)
+                    f[m]      = _N.mean(xASr[0, abvthrInds], axis=0)
+                    u[m]      = _N.mean(mASr[abvthrInds, 0], axis=0)
 
                     # print "BEG far markise"
                     # _plt.scatter(x[these], mks[these, 0], color="red", s=4)
@@ -251,18 +270,31 @@ def stochasticAssignment(oo, it, M, K, l0, f, q2, u, Sg, Asts, t0, mASr, xASr, r
         for m in xrange(M):
             #if freeClstr[m] and (not bDone) and bDoSPC:
             if freeClstr[m]:
-                these     = (Asts+t0)[abvthrInds]
-                _f_u[m] = _N.mean(x[these], axis=0)
-                _u_u[m]   = _N.mean(mks[these], axis=0)
+                #these     = (Asts+t0)[abvthrInds]
+                _f_u[m] = _N.mean(xASr[0, abvthrInds], axis=0)
+                _u_u[m]   = _N.mean(mASr[abvthrInds, 0], axis=0)
                 l0[m]     = _N.random.rand()*10
+
+                # _f_u[m] = _N.mean(x[these], axis=0)
+                # _u_u[m]   = _N.mean(mks[these], axis=0)
+                # l0[m]     = _N.random.rand()*10
+
                 if (iused < 2) and bDoSPC:
+                    #these     = (Asts+t0)[farMKS] #Asts + t0 is t-index from 0
+                    f[m]      = _N.mean(xASr[0, farSPC], axis=0)
+                    u[m]      = _N.mean(mASr[farSPC, 0], axis=0)
+                else:
+                    f[m]      = _N.mean(xASr[0, abvthrInds], axis=0)
+                    u[m]      = _N.mean(mASr[abvthrInds, 0], axis=0)
+                    """
+                    if (iused < 2) and bDoSPC:
                     these     = (Asts+t0)[farSPC]
                     f[m]      = _N.mean(x[these], axis=0)
                     u[m]      = _N.mean(mks[these], axis=0)
-                else:
+                    else:
                     f[m]      = _N.mean(x[these], axis=0)
                     u[m]      = _N.mean(mks[these], axis=0)
-
+                    """
                     # _plt.scatter(x[these], mks[these, 0], color="red", s=4)
                     # print "BEG far spatial"
                     # print "f[m]=%(1)s   u[m]=%(2)s" % {"1" : str(f[m]), "2" : str(u[m])}
@@ -273,7 +305,7 @@ def stochasticAssignment(oo, it, M, K, l0, f, q2, u, Sg, Asts, t0, mASr, xASr, r
             #     print "NOTTTTTTT far spatial"
             #     print "f[m]=%(1)s   u[m]=%(2)s" % {"1" : str(f[m]), "2" : str(u[m])}
 
-
+    ####  outside cmp2Existing here
     cont       = pkFRr + mkNrms - 0.5*(qdrSPC + qdrMKS)
 
     mcontr     = _N.max(cont, axis=0).reshape((1, nSpks))  
@@ -299,9 +331,10 @@ def stochasticAssignment(oo, it, M, K, l0, f, q2, u, Sg, Asts, t0, mASr, xASr, r
 
     gz[it] = (M1&M2).T
 
-def finish_epoch():
+def finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_hyps, smp_sp_prms, smp_mk_hyps, smp_mk_prms, freeClstr, M, K):
     tt2 = _tm.time()
 
+    gkMAP    = gauKer(2)
     frm   = int(0.6*ITERS)  #  have to test for stationarity
 
     if nSpks > 0:
