@@ -421,8 +421,8 @@ class MarkAndRF:
                         print "********  q2[%(m)d] = %(q2).3f" % {"m" : m, "q2" : q2[m]}
 
                     smp_sp_prms[oo.ky_p_q2, iter, m]   = q2[m]
-                    #smp_sp_hyps[oo.ky_h_q2_a, iter, m] = q2_a_
-                    #smp_sp_hyps[oo.ky_h_q2_B, iter, m] = q2_B_
+                    smp_sp_hyps[oo.ky_h_q2_a, iter, m] = q2_a_
+                    smp_sp_hyps[oo.ky_h_q2_B, iter, m] = q2_B_
                     
                     if q2[m] < 0:
                         print "^^^^^^^^  q2[%(m)d] = %(q2).3f" % {"m" : m, "q2" : q2[m]}

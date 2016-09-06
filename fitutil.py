@@ -67,15 +67,18 @@ def colorclusters(smkpos, labs, MS, name="", xLo=0, xHi=3):
     _plt.savefig("cc%s-all" % name)
     _plt.close()
 
+    L = 0
     for m in xrange(MS):
         fig = _plt.figure(figsize=(12, 8))
         inds = _N.where(labs == m)[0]
+        L += len(inds)
         for k in xrange(4):
             fig.add_subplot(2, 2, k+1)
             _plt.scatter(smkpos[inds, 0], smkpos[inds, k+1], color=myclrs[m], s=9)
             _plt.xlim(xLo-(xHi-xLo)*0.1, xHi+(xHi-xLo)*0.1)
         _plt.savefig("cc%(n)s-%(m)d" % {"n" : name, "m" : m})
         _plt.close()
+    print L
 
 
 

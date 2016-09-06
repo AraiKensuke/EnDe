@@ -335,7 +335,7 @@ def finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a
     tt2 = _tm.time()
 
     gkMAP    = gauKer(2)
-    frm   = int(0.6*ITERS)  #  have to test for stationarity
+    frm   = int(0.7*ITERS)  #  have to test for stationarity
 
     if nSpks > 0:
         #  ITERS x nSpks x M   
