@@ -41,7 +41,7 @@ def MAPvalues(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, gk, l_trlsNear
             l_trlsNearMAP.append(trlsNearMAP)
 
 def MAPvalues2(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, gk, l_trlsNearMAP, alltrials=False):
-    print "IN MAPvalues2"
+    print "IN MAPvalues2 - not mean"
     N   = smp_prms.shape[1] - frm
     for m in xrange(M):
         #fig = _plt.figure(figsize=(11, 4))
@@ -50,52 +50,45 @@ def MAPvalues2(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, gk, l_trlsNea
             l_trlsNearMAP.append(_N.arange(ITERS))
         else:
             for ip in xrange(nprms):  # for each param
-                col = nprms*m+ip
+                col = nprms*m+ip      #  0, 3, 6  for lambda0
                 #fig.add_subplot(1, nprms, ip+1)
 
                 smps  = smp_prms[ip, frm:, m]
-                ismps = smps.argsort()
-                spcng = _N.diff(smps[ismps])
-                ispcng= spcng.argsort()
+                postMode[epc, col] = _N.mean(smps)
+                # ismps = smps.argsort()
+                # spcng = _N.diff(smps[ismps])
+                # ispcng= spcng.argsort()
 
-                if int(0.1*N) > 1:
-                    hstSpc= _N.mean(spcng[ispcng[0:int(0.1*N)]])
-                else:
-                    hstSpc= 1
+                # if int(0.1*N) > 1:
+                #     hstSpc= _N.mean(spcng[ispcng[0:int(0.1*N)]])
+                # else:
+                #     hstSpc= 1
 
-                thr_ispc = _N.where(spcng[ispcng] < 100*hstSpc)[0]
+                # thr_ispc = _N.where(spcng[ispcng] < 100*hstSpc)[0]
 
-                if len(thr_ispc) > 0:   #  this param not all the same
-                    L     = _N.min(smps);  H     = _N.max(smps[ismps[thr_ispc]])
-                    A     = H-L
-                    cnts, bns = _N.histogram(smps, bins=_N.linspace(L-0.0001*A, H + 0.0001*A, 60))
+                # if len(thr_ispc) > 0:   #  this param not all the same
+                #     L     = _N.min(smps);  H     = _N.max(smps[ismps[thr_ispc]])
+                #     A     = H-L
+                #     cnts, bns = _N.histogram(smps, bins=_N.linspace(L-0.0001*A, H + 0.0001*A, 60))
 
-                    xfit    = 0.5*(bns[1:] + bns[0:-1])
+                #     xfit    = 0.5*(bns[1:] + bns[0:-1])
 
-                    fcnts = _N.convolve(cnts, gk, mode="same")
-                    ib  = int(_N.mean(_N.where(fcnts == _N.max(fcnts))[0]))
-                    xMAP = bns[ib]
-                    #_plt.plot(xfit, fcnts)
-                    #_plt.axvline(x=xMAP)
+                #     fcnts = _N.convolve(cnts, gk, mode="same")
+                #     ib  = int(_N.mean(_N.where(fcnts == _N.max(fcnts))[0]))
+                #     xMAP = bns[ib]
+                #     #_plt.plot(xfit, fcnts)
+                #     #_plt.axvline(x=xMAP)
 
+                #     xLo  = xfit[_N.where(fcnts > fcnts[ib]*0.6)[0][0]]
+                #     xHi  = xfit[_N.where(fcnts > fcnts[ib]*0.6)[0][-1]]
 
-                    xLo  = xfit[_N.where(fcnts > fcnts[ib]*0.6)[0][0]]
-                    xHi  = xfit[_N.where(fcnts > fcnts[ib]*0.6)[0][-1]]
-
-                    if occ[m] > 0:
-                        these=_N.where((smps > xLo) & (smps < xHi))[0]
-                        trlsNearMAP = _N.intersect1d(these, trlsNearMAP)
-
-                    if (m == 6) and (ip == 2):
-                        print "m is %(m)d    %(map).3f" % {"m" : m, "map" : xMAP}
-                        print ib
-                        print smps
-                        print L
-                        print H
-                    postMode[epc, col] = xMAP
-                else:
-                    postMode[epc, col] = smps[0]
-                    trlsNearMAP = _N.arange(N)+frm    
+                #     if occ[m] > 0:
+                #         these=_N.where((smps > xLo) & (smps < xHi))[0]
+                #         trlsNearMAP = _N.intersect1d(these, trlsNearMAP)
+                #     postMode[epc, col] = xMAP
+                # else:
+                #     postMode[epc, col] = smps[0]
+                #     trlsNearMAP = _N.arange(N)+frm    
 
             if l_trlsNearMAP is not None:
                 # trlsNearMAP for each params added to list

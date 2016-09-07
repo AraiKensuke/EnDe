@@ -55,13 +55,16 @@ class MarkAndRF:
     t_hlf_l0 = 1000*60*10   # 10minutes
     t_hlf_q2 = 1000*60*10   # 10minutes
     t_tau    = 1000*60*10   # 10minutes
+
+    nzclstr  = False
     
     diffusePerMin = 0.05    #  diffusion of certainty
     
-    def __init__(self, outdir, fn, intvfn, xLo=0, xHi=3, seed=1041, adapt=True):
+    def __init__(self, outdir, fn, intvfn, xLo=0, xHi=3, seed=1041, adapt=True, nzclstr=False):
         oo     = self
         oo.adapt = adapt
         _N.random.seed(seed)
+        oo.nzclstr = nzclstr
 
         ######################################  DATA input, define intervals
         # bFN = fn[0:-4]
@@ -103,9 +106,6 @@ class MarkAndRF:
 
         #  numerical grid
         ux = _N.linspace(oo.xLo, oo.xHi, oo.Nupx, endpoint=False)   # uniform x position
-        #q2x    = _N.exp(_N.linspace(_N.log(0.0001), _N.log(100), oo.q2ss))  #  5 orders of
-        #q2x    = _N.exp(_N.linspace(_N.log(0.00001), _N.log(100), oo.q2ss))  #  5 orders of
-        #q2x    = _N.exp(_N.linspace(_N.log(0.000001), _N.log(100), oo.q2ss))  #  5 orders of
         q2x    = _N.exp(_N.linspace(_N.log(1e-7), _N.log(100), oo.q2ss))  #  5 orders of
         d_q2x  = _N.diff(q2x)
         q2x_m1 = _N.array(q2x[0:-1])
@@ -153,6 +153,7 @@ class MarkAndRF:
             if epc == ep1:   ###  initialize
                 labS, labH, lab, flatlabels, M, MF, hashthresh = gAMxMu.initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=doSepHash, xLo=oo.xLo, xHi=oo.xHi)
 
+                Mwowonz = M if not oo.nzclstr else M + 1
                 #######   containers for GIBBS samples iterations
                 smp_sp_prms = _N.zeros((3, ITERS, M))  
                 smp_mk_prms = [_N.zeros((K, ITERS, M)), 
@@ -167,24 +168,24 @@ class MarkAndRF:
                 oo.smp_sp_hyps = smp_sp_hyps
                 oo.smp_mk_hyps = smp_mk_hyps
 
-
                 #  list of freeClstrs
                 freeClstr = _N.empty(M, dtype=_N.bool)   #  Actual cluster
                 freeClstr[:] = False
 
-                l0, f, q2, u, Sg = gAMxMu.declare_params(M, K)
+                l0, f, q2, u, Sg = gAMxMu.declare_params(M, K, nzclstr=oo.nzclstr)   #  nzclstr not inited
                 _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, \
                     _Sg_PSI = gAMxMu.declare_prior_hyp_params(M, MF, K, x, mks, Asts, t0)
-                gAMxMu.init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, Asts, t0, x, mks, flatlabels)
+                gAMxMu.init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, Asts, t0, x, mks, flatlabels, nzclstr=oo.nzclstr)
 
                 ######  the hyperparameters for f, q2, u, Sg, l0 during Gibbs
                 #  f_u_, f_q2_, q2_a_, q2_B_, u_u_, u_Sg_, Sg_nu, Sg_PSI_, l0_a_, l0_B_
+
 
             NSexp   = t1-t0    #  length of position data  #  # of no spike positions to sum
             xt0t1 = _N.array(x[t0:t1])
 
             nSpks    = len(Asts)
-            gz   = _N.zeros((ITERS, nSpks, M), dtype=_N.bool)
+            gz   = _N.zeros((ITERS, nSpks, Mwowonz), dtype=_N.bool)
             oo.gz=gz
             print "spikes %d" % nSpks
 
@@ -195,10 +196,10 @@ class MarkAndRF:
             mAS  = mks[Asts + t0]   #  position @ spikes
             xASr = xAS.reshape((1, nSpks))
             mASr = mAS.reshape((nSpks, 1, K))
-            econt = _N.empty((M, nSpks))
-            rat   = _N.zeros((M+1, nSpks))
+            econt = _N.empty((Mwowonz, nSpks))
+            rat   = _N.zeros((Mwowonz+1, nSpks))
 
-            qdrMKS = _N.empty((M, nSpks))
+            qdrMKS = _N.empty((Mwowonz, nSpks))
             ################################  GIBBS ITERS ITERS ITERS
 
             #  linalgerror
@@ -212,8 +213,9 @@ class MarkAndRF:
                 print "iter  %d" % iter
                 #if (iter % 100) == 0:    print "iter  %d" % iter
 
-                gAMxMu.stochasticAssignment(oo, iter, M, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, ((epc > 0) and (iter == 0)))
-                
+                gAMxMu.stochasticAssignment(oo, iter, M, Mwowonz, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, ((epc > 0) and (iter == 0)))
+
+
         #         ###############  FOR EACH CLUSTER
 
                 for m in xrange(M):
