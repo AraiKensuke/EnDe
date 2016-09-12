@@ -150,7 +150,8 @@ def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, Asts, t0, x, mks, flatlabel
     if nzclstr:   # the nzclstr has no hyperparams
         print "using the noise cluster"
         #  l0 / sqrt(2*pi*50**2)
-        l0[M] = 30.   #  ~ 0.1Hz
+        print "M   ''''''''''''    %d" % M
+        l0[M] = 200.   #  ~ 0.1Hz
         q2[M] = 50**2
         Sg[M] = _N.cov(mks[Asts], rowvar=0)#*100
         f[M]  = 0
