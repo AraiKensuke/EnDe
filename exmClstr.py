@@ -192,7 +192,7 @@ def showTrajectory(dec, t0, t1, ep, setname, dir):
     _plt.close()
 
 
-def timeline(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1):
+def timeline(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1, xL=0, xH=3, yticks=[0, 1, 2, 3], thin=1):
     d = _N.loadtxt(datFN("%s.dat" % datfn))
     itv = _N.loadtxt(datFN("%s.dat" % itvfn))
     N = d.shape[0]
@@ -200,14 +200,18 @@ def timeline(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1):
     ch1 += 2   #  because this is data col
     ch2 += 2
 
-    sts = _N.where(d[:, 1] == 1)[0]
+    _sts = _N.where(d[:, 1] == 1)[0]
+    if thin == 1:
+        sts = _sts
+    else:
+        sts = _sts[::thin]
 
     fig = _plt.figure(figsize=(10, 12))
     #######################
     ax =_plt.subplot2grid((4, 3), (0, 0), colspan=3)
     _plt.scatter(sts/1000., d[sts, 0], s=2, color="black")
     mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
-    mF.setTicksAndLims(xlabel="time (s)", ylabel="position", xticks=None, yticks=[0, 1,2,3], xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[-0.3, 3.3], tickFS=15, labelFS=18)
+    mF.setTicksAndLims(xlabel="time (s)", ylabel="position", xticks=None, yticks=yticks, xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[xL-0.3, xH+0.3], tickFS=15, labelFS=18)
     for ep in xrange(epochs):
         _plt.axvline(x=(itv[ep+1]*N/1000.), color="red", ls="--")
     #######################
@@ -232,11 +236,11 @@ def timeline(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1):
     ax = _plt.subplot2grid((4, 3), (3, 1), colspan=1)
     _plt.scatter(d[sts, 0], d[sts, ch1], s=2, color="black")
     mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
-    mF.setTicksAndLims(xlabel="pos", ylabel=("mk tet%d" % (ch1-1)), xticks=[0, 1.5, 3], yticks=[0, 3, 6], xticksD=None, yticksD=None, xlim=[0, 3], ylim=None, tickFS=15, labelFS=18)
+    mF.setTicksAndLims(xlabel="pos", ylabel=("mk tet%d" % (ch1-1)), xticks=_N.linspace(xL, xH, 3), yticks=[0, 3, 6], xticksD=None, yticksD=None, xlim=[xL, xH], ylim=None, tickFS=15, labelFS=18)
     ax = _plt.subplot2grid((4, 3), (3, 2), colspan=1)
     _plt.scatter(d[sts, 0], d[sts, ch2], s=2, color="black")
     mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
-    mF.setTicksAndLims(xlabel="pos", ylabel=("mk tet%d" % (ch2-1)), xticks=[0, 1.5, 3], yticks=[0, 3, 6], xticksD=None, yticksD=None, xlim=[0, 3], ylim=None, tickFS=15, labelFS=18)
+    mF.setTicksAndLims(xlabel="pos", ylabel=("mk tet%d" % (ch2-1)), xticks=_N.linspace(xL, xH, 3), yticks=[0, 3, 6], xticksD=None, yticksD=None, xlim=[xL, xH], ylim=None, tickFS=15, labelFS=18)
 
     fig.subplots_adjust(left=0.15, bottom=0.15, wspace=0.38, hspace=0.38)
     epochs = len(itv)-1

@@ -281,8 +281,6 @@ class MarkAndRF:
 
                         mcs[m]       = _N.mean(clstx, axis=0)
                         u_u_ = _N.einsum("jk,k->j", u_Sg_, _N.dot(_N.linalg.inv(_u_Sg[m]), _u_u[m]) + nSpksM*_N.dot(iSg[m], mcs[m]))
-                        u[m] = _N.random.multivariate_normal(u_u_, u_Sg_)
-
                         # hyp
                         ########  POSITION
                         ##  mean of posterior distribution of cluster means
@@ -293,14 +291,7 @@ class MarkAndRF:
                         u_Sg_ = _N.array(_u_Sg[m])
 
                         u_u_ = _N.array(_u_u[m])
-                        u[m] = _N.random.multivariate_normal(u_u_, u_Sg_)
-
-                        # hyp
-                        ########  POSITION
-                        ##  mean of posterior distribution of cluster means
-                        #  sigma^2 and mu are the current Gibbs-sampled values
-
-                        ##  mean of posterior distribution of cluster means
+                    u[m] = _N.random.multivariate_normal(u_u_, u_Sg_)
 
                     smp_mk_prms[oo.ky_p_u][:, iter, m] = u[m]
                     smp_mk_hyps[oo.ky_h_u_u][:, iter, m] = u_u_

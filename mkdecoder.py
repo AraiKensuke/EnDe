@@ -41,7 +41,7 @@ class mkdecoder:
     dbgMvt   = False
     spdMult   = 0.5
 
-    Nx       = 50
+    Nx       = 61
 
     xLo      = 0
     xHi      = 3
