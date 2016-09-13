@@ -8,7 +8,10 @@ import filter as _flt
 #  At least for well-trained animals, animals also do not turn around in 
 #  arms 1, 3, 5 very much.  We use
 
-day    = 4
+#  for bond day4, ex = 2, 4, 6
+#  for day3, ex 
+day    = 3
+ex=3-1; ep=4-1;
 
 anim1 = "bon"
 anim2 = "bond"
@@ -21,17 +24,16 @@ anim3 = "bond"
 
 #  experimental data mark, position container
 
-rip = _sio.loadmat("../Data/%(s2)s_data_day%(dy)d/%(s3)s/%(s1)sripplescons0%(dy)d.mat" % {"s1" : anim1, "s2" : anim2, "s3" : anim3, "dy" : day})
+rip = _sio.loadmat("../DATA/%(s2)s_data_day%(dy)d/%(s3)s/%(s1)sripplescons0%(dy)d.mat" % {"s1" : anim1, "s2" : anim2, "s3" : anim3, "dy" : day})
 
 #  these are in seconds
 strt = rip["ripplescons"][0, ex][0, ep][0, 0]["starttime"][0,0]
 endt = rip["ripplescons"][0, ex][0, ep][0, 0]["endtime"][0,0]
 
-mLp = _sio.loadmat("../Data/%(s2)s_data_day%(dy)d/%(s3)s/%(s1)slinpos0%(dy)d.mat" % {"s1" : anim1, "s2" : anim2, "s3" : anim3, "dy" : day})
-mRp = _sio.loadmat("../Data/%(s2)s_data_day%(dy)d/%(s3)s/%(s1)srawpos0%(dy)d.mat" % {"s1" : anim1, "s2" : anim2, "s3" : anim3, "dy" : day})
+mLp = _sio.loadmat("../DATA/%(s2)s_data_day%(dy)d/%(s3)s/%(s1)slinpos0%(dy)d.mat" % {"s1" : anim1, "s2" : anim2, "s3" : anim3, "dy" : day})
+mRp = _sio.loadmat("../DATA/%(s2)s_data_day%(dy)d/%(s3)s/%(s1)srawpos0%(dy)d.mat" % {"s1" : anim1, "s2" : anim2, "s3" : anim3, "dy" : day})
 
 
-ex=4-1; ep=4-1;
 
 #  episodes 2, 4, 6
 
@@ -421,7 +423,7 @@ marks   =  _N.empty((t1-t0, len(tetlist)), dtype=list)
 it      = -1
 for tet in tetlist:
     it += 1
-    A = _sio.loadmat("../Data/bond_data_day4/bond04/%(tt)s/bond04-%(tt)s_params.mat" % {"tt" : tet})
+    A = _sio.loadmat("../DATA/bond_data_day%(dy)d/bond0%(dy)d/%(tt)s/bond0%(dy)d-%(tt)s_params.mat" % {"tt" : tet, "dy" : day})
     t_champs = A["filedata"][0,0]["params"][:, 0:5]  # time and amplitudes
     t_champs[:, 1:5] /= 50.
 
@@ -475,20 +477,18 @@ for nr in xrange(trgns.shape[0]):
 
     _plt.plot(_N.arange(t0, t1), svecL0_ms[t0:t1])
 
-emc = EMC.ExperimentalMarkContainer()
+emc = EMC.ExperimentalMarkContainer(anim2, day, ep+1)
 emc.pos   = svecL0_ms   #  marks and position are not aligned
 emc.marks = marks
 emc.tetlist = tetlist
 emc.minds = minds
-
 emc.xA    = 6
 emc.mA    = 8
 emc.k     = 4
 emc.dt    = 0.001
 emc.Nx    = 50
 emc.Nm    = 50
-
-emc.save(ep+1)
+emc.save()
 
 
 
