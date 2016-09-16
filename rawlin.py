@@ -2,7 +2,9 @@ import scipy.io as _sio
 import pickle
 import ExperimentalMarkContainer as EMC
 import filter as _flt
-
+from os import listdir
+from os.path import isdir, join
+import EnDedirs as _edd
 
 #  The animal tends to spend much of its time in arms 1, 3, 5
 #  At least for well-trained animals, animals also do not turn around in 
@@ -10,29 +12,34 @@ import filter as _flt
 
 #  for bond day4, ex = 2, 4, 6
 #  for day3, ex 
-day    = 3
-ex=3-1; ep=4-1;
-
+day    = 6
+sdy    = ("0%d" % day) if (day < 10) else "%d" % day
+ep=6-1;
+"""
 anim1 = "bon"
 anim2 = "bond"
 anim3 = "Bon"
 """
-anim1 = "Cha"
-anim2 = "bon"
-anim3 = "bond"
-"""
+anim1 = "fra"
+anim2 = "frank"
+anim3 = "Fra"
+
 
 #  experimental data mark, position container
 
-rip = _sio.loadmat("../DATA/%(s2)s_data_day%(dy)d/%(s3)s/%(s1)sripplescons0%(dy)d.mat" % {"s1" : anim1, "s2" : anim2, "s3" : anim3, "dy" : day})
+frip = "/home/karai/Dropbox (EastWestSideHippos)/BostonData/%(s3)s/%(s1)sripplescons%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3}
+flnp = "/home/karai/Dropbox (EastWestSideHippos)/BostonData/%(s3)s/%(s1)slinpos%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3}
+frwp = "/home/karai/Dropbox (EastWestSideHippos)/BostonData/%(s3)s/%(s1)srawpos%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3}
+
+rip = _sio.loadmat(frip)
 
 #  these are in seconds
+ex   = rip["ripplescons"].shape[1] - 1
 strt = rip["ripplescons"][0, ex][0, ep][0, 0]["starttime"][0,0]
 endt = rip["ripplescons"][0, ex][0, ep][0, 0]["endtime"][0,0]
 
-mLp = _sio.loadmat("../DATA/%(s2)s_data_day%(dy)d/%(s3)s/%(s1)slinpos0%(dy)d.mat" % {"s1" : anim1, "s2" : anim2, "s3" : anim3, "dy" : day})
-mRp = _sio.loadmat("../DATA/%(s2)s_data_day%(dy)d/%(s3)s/%(s1)srawpos0%(dy)d.mat" % {"s1" : anim1, "s2" : anim2, "s3" : anim3, "dy" : day})
-
+mLp = _sio.loadmat(flnp)
+mRp = _sio.loadmat(frwp)
 
 
 #  episodes 2, 4, 6
@@ -65,6 +72,18 @@ seg5 = _N.where(seg_ts == 5)
 
 time=mLp["linpos"][0,ex][0,ep]["statematrix"][0][0]["time"][0,0].T[0]
 lindist=mLp["linpos"][0,ex][0,ep]["statematrix"][0][0]["lindist"][0,0].T[0]
+
+###  quick show
+zrrp = _N.where((r[:, 1] > 0) & (r[:, 2] > 0) & (r[:, 3] > 0) & (r[:, 4] > 0))[0]
+_plt.scatter(r[zrrp, 1], r[zrrp, 2], color="black")
+_plt.savefig(_edd.resFN("rawpos.png", dir="%(a)s%(sd)s0%(e)d" % {"a" : anim2, "sd" : sdy, "e" : ep+1}, create=True))
+_plt.close()
+_plt.plot(lindist, color="black")
+_plt.savefig(_edd.resFN("lindist.png", dir="%(a)s%(sd)s0%(e)d" % {"a" : anim2, "sd" : sdy, "e" : ep+1}))
+_plt.close()
+
+
+
 
 # _plt.plot(time[seg1[0]], lindist[seg1[0]], ls="", marker=".")
 # _plt.plot(time[seg4[0]], lindist[seg4[0]], ls="", marker=".")
@@ -416,49 +435,66 @@ pos     =  _N.empty(t1-t0)
 svecT_ms = _N.linspace(t0, t1, t1-t0, endpoint=False)    #  
 svecL0_ms = _N.interp(svecT_ms, svecT*1000, svecL0)
 
-tetlist = ["01", "02", "03", "04", "05", "07", "08", "10", "11", "12", "13", "14", "17", "18", "19", "20", "21", "22", "23", "24", "25", "27", "28", "29"]
+prmfilepath = "/home/karai/Dropbox (EastWestSideHippos)/BostonData/%(s2)s%(dy)s" %  {"s1" : anim1, "dy" : sdy, "s2" : anim2}
+onlydirs = [f for f in listdir(prmfilepath) if isdir(join(prmfilepath, f))]
+srtdirs  = _N.sort(onlydirs)
 
-marks   =  _N.empty((t1-t0, len(tetlist)), dtype=list)
+tetlist = []
+tetlistlen = 0
+for dir in srtdirs:
+    tet = dir.split("-")[0]
+    prmfn = "%(d)s/%(td)s/%(an)s%(sd)s-%(st)s_params.mat" % {"d" : prmfilepath, "an" : anim2, "sd" : sdy, "st" : tet, "td" : dir}
+    if os.access(prmfn, os.F_OK):
+        tetlistlen += 1
+        tetlist.append(tet)
+
+
+marks   =  _N.empty((t1-t0, tetlistlen), dtype=list)
 
 it      = -1
-for tet in tetlist:
-    it += 1
-    A = _sio.loadmat("../DATA/bond_data_day%(dy)d/bond0%(dy)d/%(tt)s/bond0%(dy)d-%(tt)s_params.mat" % {"tt" : tet, "dy" : day})
-    t_champs = A["filedata"][0,0]["params"][:, 0:5]  # time and amplitudes
-    t_champs[:, 1:5] /= 50.
-
-    #  tm/10000.    -->  seconds
-    #  vecT  is sampled every 33.4 ms?     #  let's intrapolate this 
-
-    #   we need  Nx, Nm, xA, mA, k, dt
-    #   pos, marks
-
-    ##  
-    #  times -0.5 before + 0.5 seconds after last position
 
 
-    #  svecT, svecL0    (time and position)  33Hz   (short period within expt.)
-    #  tm  chXamp       (time and mark)     10kHz
+for dir in srtdirs:
+    tet = dir.split("-")[0]
+    prmfn = "%(d)s/%(td)s/%(an)s%(sd)s-%(st)s_params.mat" % {"d" : prmfilepath, "an" : anim2, "sd" : sdy, "st" : tet, "td" : dir}
+    if os.access(prmfn, os.F_OK):
+        it += 1
+        A = _sio.loadmat(prmfn)
+        t_champs = A["filedata"][0,0]["params"][:, 0:5]  # time and amplitudes
+        t_champs[:, 1:5] /= 50.
 
-    #  need to match start times
-    y  = []
-    #  t = 0 for the marks is 
+        #  tm/10000.    -->  seconds
+        #  vecT  is sampled every 33.4 ms?     #  let's intrapolate this 
 
-    rngT = []
-    rngX = []
+        #   we need  Nx, Nm, xA, mA, k, dt
+        #   pos, marks
 
-    for imk in xrange(t_champs.shape[0]):  #  more marks than there is behavioral data
-        now_s  = t_champs[imk, 0]/10000.    #  now_s
-        now_ms = t_champs[imk, 0]/10.
-        ind = int(now_ms - svecT[0]*1000)  # svecT[0] is start of data we use
-        if (now_s > svecT[0]) and (now_s < svecT[-1]):
-            #for nr in xrange(trgns.shape[0]):
-            #    if (now_s >= trgns[nr, 0]) and (now_s <= trgns[nr, 1]):
-            fd = _N.where((now_s >= svecT[0:-1]) & (now_s <= svecT[1:]))[0]
-            y.append(t_champs[imk, 1])
-            rngT.append(now_s)
-            rngX.append(svecL0[fd[0]])
-            marks[ind, it] = [t_champs[imk, 1:]]
+        ##  
+        #  times -0.5 before + 0.5 seconds after last position
+
+
+        #  svecT, svecL0    (time and position)  33Hz   (short period within expt.)
+        #  tm  chXamp       (time and mark)     10kHz
+
+        #  need to match start times
+        y  = []
+        #  t = 0 for the marks is 
+
+        rngT = []
+        rngX = []
+
+        for imk in xrange(t_champs.shape[0]):  #  more marks than there is behavioral data
+            now_s  = t_champs[imk, 0]/10000.    #  now_s
+            now_ms = t_champs[imk, 0]/10.
+            ind = int(now_ms - svecT[0]*1000)  # svecT[0] is start of data we use
+            if (now_s > svecT[0]) and (now_s < svecT[-1]):
+                #for nr in xrange(trgns.shape[0]):
+                #    if (now_s >= trgns[nr, 0]) and (now_s <= trgns[nr, 1]):
+                fd = _N.where((now_s >= svecT[0:-1]) & (now_s <= svecT[1:]))[0]
+                y.append(t_champs[imk, 1])
+                rngT.append(now_s)
+                rngX.append(svecL0[fd[0]])
+                marks[ind, it] = [t_champs[imk, 1:]]
 
 x  = []
 xt = []

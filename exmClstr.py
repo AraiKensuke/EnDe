@@ -193,7 +193,7 @@ def showTrajectory(dec, t0, t1, ep, setname, dir):
 
 
 def timeline(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1, xL=0, xH=3, yticks=[0, 1, 2, 3], thin=1):
-    d = _N.loadtxt(datFN("%s.dat" % datfn))
+    d = _N.loadtxt(datFN("%s.dat" % datfn))   #  marks
     itv = _N.loadtxt(datFN("%s.dat" % itvfn))
     N = d.shape[0]
     epochs = itv.shape[0]-1
