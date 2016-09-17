@@ -27,7 +27,7 @@ def createSmoothedPath(cps, N, ts):
         t0 = cps[p, 0]
         t1 = cps[p+1, 0] if (p < NC - 1) else 2
 
-        pth[N+(N*t0):N+int(N*t1)] = cps[p, 1]
+        pth[N+int(N*t0):N+int(N*t1)] = cps[p, 1]
 
     spth = _N.convolve(pth, gk, mode="same")
 
