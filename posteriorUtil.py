@@ -54,7 +54,8 @@ def MAPvalues2(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, gk, l_trlsNea
                 #fig.add_subplot(1, nprms, ip+1)
 
                 smps  = smp_prms[ip, frm:, m]
-                postMode[epc, col] = _N.mean(smps)
+                #postMode[epc, col] = _N.mean(smps)
+                postMode[epc, col] = _N.median(smps)
                 # ismps = smps.argsort()
                 # spcng = _N.diff(smps[ismps])
                 # ispcng= spcng.argsort()

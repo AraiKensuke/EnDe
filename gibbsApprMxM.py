@@ -242,7 +242,7 @@ class MarkAndRF:
                     #  a' - 1 / B' = MODE  # mode is a - 1 / B
                     #  B' = (a' - 1) / MODE
                     #  discount a
-                    if (epc > 0) and oo.adapt:
+                    if (epc > 0) and oo.adapt and (_l0_a[m] > 1.1):
                         _md_nd= (_l0_a[m] - 1) / _l0_B[m]
                         _Dl0_a = _l0_a[m] * _N.exp(-dt/tau_l0)
                         _Dl0_B = (_Dl0_a - 1) / _md_nd
@@ -264,7 +264,20 @@ class MarkAndRF:
                     
                     #print "%(1).5f   %(2).5f" % {"1" : l0_a_, "2" : l0_B_}
 
-                    l0[m] = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_))  #  check
+                    try:
+                        l0[m] = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_))  #  check
+                    except ValueError:
+                        print "fail"
+                        print "M:        %d" % M
+                        print "_l0_a[m]  %.3f" % _l0_a[m]
+                        print "_l0_B[m]  %.3f" % _l0_B[m]
+                        print "l0_a_     %.3f" % l0_a_
+                        print "l0_B_     %.3f" % l0_B_
+                        print "aL        %.3f" % aL
+                        print "BL        %.3f" % BL
+                        print "_Dl0_a    %.3f" % _Dl0_a
+                        print "_Dl0_B    %.3f" % _Dl0_B
+                        raise
 
                     ###  l0 / _N.sqrt(twpi*q2) is f*dt used in createData2
                     smp_sp_prms[oo.ky_p_l0, iter, m] = l0[m]
@@ -374,9 +387,10 @@ class MarkAndRF:
                     #  B' / (a' - 1) = MODE   #keep mode the same after discount
                     #  B' = MODE * (a' - 1)
                     if (epc > 0) and oo.adapt:
-                        _md_nd= _q2_B[m] / (_q2_a[m] - 1)
+                        #_md_nd= _q2_B[m] / (_q2_a[m] - 1)
+                        _mn_nd = _q2_a[m] / _q2_B[m]
                         _Dq2_a = _q2_a[m] * _N.exp(-dt/tau_q2)
-                        _Dq2_B = (_Dq2_a - 1) / _md_nd
+                        _Dq2_B = _Dq2_a / _mn_nd
                     else:
                         _Dq2_a = _q2_a[m]
                         _Dq2_B = _q2_B[m]
