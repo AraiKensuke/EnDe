@@ -52,9 +52,8 @@ class MarkAndRF:
     xHi      = 6
 
     #  l0, q2      Sig    f, u
-    t_hlf_l0 = 1000*60*10   # 10minutes
-    t_hlf_q2 = 1000*60*10   # 10minutes
-    t_tau    = 1000*60*10   # 10minutes
+    t_hlf_l0 = 1000*60*5   # 10minutes
+    t_hlf_q2 = 1000*60*5   # 10minutes
 
     nzclstr  = False
     
