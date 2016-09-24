@@ -241,10 +241,11 @@ class MarkAndRF:
                     #  a' - 1 / B' = MODE  # mode is a - 1 / B
                     #  B' = (a' - 1) / MODE
                     #  discount a
-                    if (epc > 0) and oo.adapt and (_l0_a[m] > 1.1):
-                        _md_nd= (_l0_a[m] - 1) / _l0_B[m]
+                    #if (epc > 0) and oo.adapt and (_l0_a[m] > 1.1):
+                    if (epc > 0) and oo.adapt:
+                        _md_nd= _l0_a[m] / _l0_B[m]
                         _Dl0_a = _l0_a[m] * _N.exp(-dt/tau_l0)
-                        _Dl0_B = (_Dl0_a - 1) / _md_nd
+                        _Dl0_B = _Dl0_a / _md_nd
                     else:
                         _Dl0_a = _l0_a[m]
                         _Dl0_B = _l0_B[m]
@@ -386,10 +387,9 @@ class MarkAndRF:
                     #  B' / (a' - 1) = MODE   #keep mode the same after discount
                     #  B' = MODE * (a' - 1)
                     if (epc > 0) and oo.adapt:
-                        #_md_nd= _q2_B[m] / (_q2_a[m] - 1)
-                        _mn_nd = _q2_a[m] / _q2_B[m]
+                        _md_nd= _q2_B[m] / (_q2_a[m] + 1)
                         _Dq2_a = _q2_a[m] * _N.exp(-dt/tau_q2)
-                        _Dq2_B = _Dq2_a / _mn_nd
+                        _Dq2_B = _Dq2_a / _md_nd
                     else:
                         _Dq2_a = _q2_a[m]
                         _Dq2_B = _q2_B[m]
