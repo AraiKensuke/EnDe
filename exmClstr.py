@@ -246,3 +246,4 @@ def timeline(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1, xL=0, xH=3, ytic
     epochs = len(itv)-1
     choutfn = "%(of)s_%(1)d,%(2)d" % {"of" : outfn, "1" : (ch1-1), "2" : (ch2-1)}
     _plt.savefig(resFN(choutfn, dir=bfn), transparent=True)
+    _plt.close()

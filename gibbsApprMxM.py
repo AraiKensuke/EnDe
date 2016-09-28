@@ -171,7 +171,7 @@ class MarkAndRF:
                 freeClstr = _N.empty(M, dtype=_N.bool)   #  Actual cluster
                 freeClstr[:] = False
 
-                l0, f, q2, u, Sg = gAMxMu.declare_params(M, K, nzclstr=oo.nzclstr)   #  nzclstr not inited
+                l0, f, q2, u, Sg = gAMxMu.declare_params(M, K, nzclstr=oo.nzclstr)   #  nzclstr not inited  # sized to include noise cluster if needed
                 _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, \
                     _Sg_PSI = gAMxMu.declare_prior_hyp_params(M, MF, K, x, mks, Asts, t0)
                 gAMxMu.init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, Asts, t0, x, mks, flatlabels, nzclstr=oo.nzclstr)
@@ -437,6 +437,22 @@ class MarkAndRF:
                     iiq2 = 1./q2[m]
 
                     #ttc1h = _tm.time()
+                    
+
+                #  nz clstr.  fixed width
+                if oo.nzclstr:
+                    minds = _N.where(gz[iter, :, Mwowonz-1] == 1)[0]
+                    BL  = (oo.dt/_N.sqrt(twpi*q2[Mwowonz-1])) * (t1-t0) 
+                    aL  = len(minds)
+                    aL  = aL + 0.001
+                    BL  = BL + 0.1
+                    #_Dl0_a = _l0_a[m]
+                    #_Dl0_B = _l0_B[m]
+
+                    l0[Mwowonz-1] = _ss.gamma.rvs(aL, scale=(1./BL))  #  check
+                    print len(minds)
+                    print f[Mwowonz-1]
+                    print q2[Mwowonz-1]
 
             ###  THIS LEVEL:  Finished Gibbs iters for epoch
             gAMxMu.finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_hyps, smp_sp_prms, smp_mk_hyps, smp_mk_prms, freeClstr, M, K)

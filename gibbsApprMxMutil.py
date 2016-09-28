@@ -30,6 +30,7 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3):
         unonhash, hashsp, hashthresh = sepHash(_x, BINS=20, blksz=5, xlo=oo.xLo, xhi=oo.xHi)
     #  hashthresh is dim 2
 
+    """
         fig = _plt.figure(figsize=(5, 10))
         fig.add_subplot(3, 1, 1)
         _plt.scatter(_x[hashsp, 1], _x[hashsp, 2], color="red")
@@ -40,6 +41,7 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3):
         fig.add_subplot(3, 1, 3)
         _plt.scatter(_x[hashsp, 0], _x[hashsp, 2], color="red")
         _plt.scatter(_x[unonhash, 0], _x[unonhash, 2], color="black")
+    """
 
     if (len(unonhash) > 0) and (len(hashsp) > 0):
         labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], _x[hashsp])
@@ -151,9 +153,9 @@ def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, Asts, t0, x, mks, flatlabel
         print "using the noise cluster"
         #  l0 / sqrt(2*pi*50**2)
         print "M   ''''''''''''    %d" % M
-        l0[M] = 200.   #  ~ 0.1Hz
-        q2[M] = 50**2
-        Sg[M] = _N.cov(mks[Asts], rowvar=0)#*100
+        l0[M] = 1000.   #  ~ 0.1Hz
+        q2[M] = 300**2
+        Sg[M] = _N.cov(mks[Asts], rowvar=0)
         f[M]  = 0
         u[M]  = _N.mean(mks[Asts], axis=0)
 
