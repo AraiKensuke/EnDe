@@ -104,7 +104,8 @@ class MarkAndRF:
         ####  NSexp, Nupx, fss, q2ss
 
         #  numerical grid
-        ux = _N.linspace(oo.xLo, oo.xHi, oo.Nupx, endpoint=False)   # uniform x position
+        ux = _N.linspace(oo.xLo, oo.xHi, oo.Nupx, endpoint=False)   # uniform x position   #  grid over 
+        uxr= ux.reshape((1, oo.Nupx))
         q2x    = _N.exp(_N.linspace(_N.log(1e-7), _N.log(100), oo.q2ss))  #  5 orders of
         d_q2x  = _N.diff(q2x)
         q2x_m1 = _N.array(q2x[0:-1])
@@ -145,6 +146,7 @@ class MarkAndRF:
             posbins  = _N.linspace(oo.xLo, oo.xHi, oo.Nupx+1)
             #  _N.sum(px)*(xbns[1]-xbns[0]) = 1
             px, xbns = _N.histogram(xt0t1, bins=posbins, normed=True)   
+            pxr      = px.reshape((1, oo.Nupx))
 
             Asts    = _N.where(oo.dat[t0:t1, 1] == 1)[0]   #  based at 0
             Ants    = _N.where(oo.dat[t0:t1, 1] == 0)[0]
@@ -174,6 +176,7 @@ class MarkAndRF:
                 l0, f, q2, u, Sg = gAMxMu.declare_params(M, K, nzclstr=oo.nzclstr)   #  nzclstr not inited  # sized to include noise cluster if needed
                 _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, \
                     _Sg_PSI = gAMxMu.declare_prior_hyp_params(M, MF, K, x, mks, Asts, t0)
+                fr = f.reshape((M, 1))
                 gAMxMu.init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, Asts, t0, x, mks, flatlabels, nzclstr=oo.nzclstr)
 
                 ######  the hyperparameters for f, q2, u, Sg, l0 during Gibbs
@@ -218,99 +221,95 @@ class MarkAndRF:
 
                 gAMxMu.stochasticAssignment(oo, iter, M, Mwowonz, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, ((epc > 0) and (iter == 0)))
 
-        #         ###############  FOR EACH CLUSTER
+                #         ###############  FOR EACH CLUSTER
 
-                for m in xrange(M):
+
+                for m in xrange(M):   #  get the minds
                     minds = _N.where(gz[iter, :, m] == 1)[0]
                     sts  = Asts[minds] + t0
-                    nSpksM   = len(sts)
-                    clusSz[m] = nSpksM
+                    clusSz[m] = len(sts)
 
-                    ###############  CONDITIONAL l0
+                ###############  CONDITIONAL l0
 
-                    #  _ss.gamma.rvs.  uses k, theta  k is 1/B (B is our thing)
-                    iiq2 = 1./q2[m]
-                    # xI = (xt0t1-f[m])*(xt0t1-f[m])*0.5*iiq2
-                    # BL  = (oo.dt/_N.sqrt(twpi*q2[m]))*_N.sum(_N.exp(-xI))
+                #  _ss.gamma.rvs.  uses k, theta  k is 1/B (B is our thing)
+                iiq2 = 1./q2
+                iiq2r= iiq2.reshape((M, 1))
+                # xI = (xt0t1-f[m])*(xt0t1-f[m])*0.5*iiq2
+                # BL  = (oo.dt/_N.sqrt(twpi*q2[m]))*_N.sum(_N.exp(-xI))
 
-                    #  l0_intgrd   (M x Nupx)
-                    l0_intgrd   = _N.exp(-0.5*(f[m] - ux)*(f[m]-ux) * iiq2)  
-                    l0_exp_px   = _N.sum(l0_intgrd*px) * dSilenceX
+                l0_intgrd   = _N.exp(-0.5*(fr - ux)*(fr-ux) * iiq2r)  
 
-                    BL  = (oo.dt/_N.sqrt(twpi*q2[m]))*l0_exp_px
+                #print l0_intgrd
+                #print l0_intgrd.shape
 
+                l0_exp_px   = _N.sum(l0_intgrd*pxr, axis=1) * dSilenceX
+                BL  = (oo.dt/_N.sqrt(twpi*q2))*l0_exp_px    #  dim M
 
-                    #    #  keep mode same after discount
-                    #  a' - 1 / B' = MODE  # mode is a - 1 / B
-                    #  B' = (a' - 1) / MODE
-                    #  discount a
-                    #if (epc > 0) and oo.adapt and (_l0_a[m] > 1.1):
-                    if (epc > 0) and oo.adapt:
-                        _md_nd= _l0_a[m] / _l0_B[m]
-                        _Dl0_a = _l0_a[m] * _N.exp(-dt/tau_l0)
-                        _Dl0_B = _Dl0_a / _md_nd
+                #    #  keep mode same after discount
+                #  a' - 1 / B' = MODE  # mode is a - 1 / B
+                #  B' = (a' - 1) / MODE
+                #  discount a
+                #if (epc > 0) and oo.adapt and (_l0_a[m] > 1.1):
+                if (epc > 0) and oo.adapt:
+                    _md_nd= _l0_a / _l0_B
+                    _Dl0_a = _l0_a * _N.exp(-dt/tau_l0)
+                    _Dl0_B = _Dl0_a / _md_nd
+                else:
+                    _Dl0_a = _l0_a
+                    _Dl0_B = _l0_B
+
+                #  a'/B' = a/B
+                #  B' = (B/a)a'
+                aL  = clusSz
+                l0_a_ = aL + _Dl0_a
+                l0_B_ = BL + _Dl0_B
+
+                try:
+                    l0 = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_))  #  check
+                except ValueError:
+                    print "fail"
+                    print "M:     %d" % M
+                    print "_l0_a  %.3f" % _l0_a
+                    print "_l0_B  %.3f" % _l0_B
+                    print "l0_a_  %.3f" % l0_a_
+                    print "l0_B_  %.3f" % l0_B_
+                    print "aL     %.3f" % aL
+                    print "BL     %.3f" % BL
+                    print "_Dl0_a %.3f" % _Dl0_a
+                    print "_Dl0_B %.3f" % _Dl0_B
+                    raise
+
+                    ###  l0 / _N.sqrt(twpi*q2) is f*dt used in createData2
+                    smp_sp_prms[oo.ky_p_l0, iter, m] = l0[m]
+
+                    smp_sp_hyps[oo.ky_h_l0_a, iter, m] = l0_a_
+                    smp_sp_hyps[oo.ky_h_l0_B, iter, m] = l0_B_
+                    mcs = _N.empty((M, K))   # cluster sample means
+
+                for m in xrange(M):
+                    if clstsz[m] > 0:
+                        #try:
+                        #u_Sg_ = _N.linalg.inv(_N.linalg.inv(_u_Sg[m]) + nSpksM*iSg[m])
+                        u_Sg_[m] = _N.linalg.inv(_iu_Sg[m] + clstsz[m]*iSg[m])
+                        clstx    = mks[sts]
+
+                        mcs[m]       = _N.mean(clstx, axis=0)
+                        #u_u_ = _N.einsum("jk,k->j", u_Sg_, _N.dot(_N.linalg.inv(_u_Sg[m]), _u_u[m]) + nSpksM*_N.dot(iSg[m], mcs[m]))
+                        u_u_[m] = _N.einsum("jk,k->j", u_Sg_[m], _N.dot(_iu_Sg[m], _u_u[m]) + clstsz[m]*_N.dot(iSg[m], mcs[m]))
+                        # hyp
+                        ########  POSITION
+                        ##  mean of posterior distribution of cluster means
+                        #  sigma^2 and mu are the current Gibbs-sampled values
+
+                        ##  mean of posterior distribution of cluster means
                     else:
-                        _Dl0_a = _l0_a[m]
-                        _Dl0_B = _l0_B[m]
+                        u_Sg_[m] = _N.array(_u_Sg[m])
 
-                    #  a'/B' = a/B
-                    #  B' = (B/a)a'
-                    aL  = nSpksM
-                    l0_a_ = aL + _Dl0_a
-                    l0_B_ = BL + _Dl0_B
-                    print "%(a).3f   %(B).3f" % {"a" : l0_a_, "B" : l0_B_}
+                        u_u_[m] = _N.array(_u_u[m])
 
+                C       = _N.linalg.cholesky(u_Sg_)
+                u       = _N.einsum("njk,nk->nj", C, mvn1)
 
-
-            #         # print "------------------"
-            #         # print "liklhd  BL   %(B).3f     f   %(f).3f   a %(a)d    B/a  %(ba).3f" % {"B" : BL, "f" : f[m], "ba" : (aL/ BL), "a" : aL}
-            #         # print "prior   BL   %(B).3f     f   %(f).3f   a %(a)d    B/a  %(ba).3f" % {"B" : l0_B_, "f" : f[m], "ba" : (l0_a_/ l0_B_), "a" : l0_a_}
-            #         # print (len(xt0t1)*oo.dt)
-            #         # print "******************"
-                    
-            #         #print "%(1).5f   %(2).5f" % {"1" : l0_a_, "2" : l0_B_}
-
-            #         try:
-            #             l0[m] = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_))  #  check
-            #         except ValueError:
-            #             print "fail"
-            #             print "M:        %d" % M
-            #             print "_l0_a[m]  %.3f" % _l0_a[m]
-            #             print "_l0_B[m]  %.3f" % _l0_B[m]
-            #             print "l0_a_     %.3f" % l0_a_
-            #             print "l0_B_     %.3f" % l0_B_
-            #             print "aL        %.3f" % aL
-            #             print "BL        %.3f" % BL
-            #             print "_Dl0_a    %.3f" % _Dl0_a
-            #             print "_Dl0_B    %.3f" % _Dl0_B
-            #             raise
-
-            #         ###  l0 / _N.sqrt(twpi*q2) is f*dt used in createData2
-            #         smp_sp_prms[oo.ky_p_l0, iter, m] = l0[m]
-
-            #         smp_sp_hyps[oo.ky_h_l0_a, iter, m] = l0_a_
-            #         smp_sp_hyps[oo.ky_h_l0_B, iter, m] = l0_B_
-            #         mcs = _N.empty((M, K))   # cluster sample means
-
-            #         if nSpksM > 0:
-            #             #try:
-            #             #u_Sg_ = _N.linalg.inv(_N.linalg.inv(_u_Sg[m]) + nSpksM*iSg[m])
-            #             u_Sg_ = _N.linalg.inv(_iu_Sg[m] + nSpksM*iSg[m])
-            #             clstx    = mks[sts]
-
-            #             mcs[m]       = _N.mean(clstx, axis=0)
-            #             #u_u_ = _N.einsum("jk,k->j", u_Sg_, _N.dot(_N.linalg.inv(_u_Sg[m]), _u_u[m]) + nSpksM*_N.dot(iSg[m], mcs[m]))
-            #             u_u_ = _N.einsum("jk,k->j", u_Sg_, _N.dot(_iu_Sg[m], _u_u[m]) + nSpksM*_N.dot(iSg[m], mcs[m]))
-            #             # hyp
-            #             ########  POSITION
-            #             ##  mean of posterior distribution of cluster means
-            #             #  sigma^2 and mu are the current Gibbs-sampled values
-
-            #             ##  mean of posterior distribution of cluster means
-            #         else:
-            #             u_Sg_ = _N.array(_u_Sg[m])
-
-            #             u_u_ = _N.array(_u_u[m])
             #         u[m] = _N.random.multivariate_normal(u_u_, u_Sg_)
 
             #         smp_mk_prms[oo.ky_p_u][:, iter, m] = u[m]
