@@ -33,14 +33,15 @@ def sample_niw(mu_0,lmbda_0,kappa_0,nu_0):
 def sample_invwishart(lmbda,dof):
     # TODO make a version that returns the cholesky
     # TODO allow passing in chol/cholinv of matrix parameter lmbda
-    n = lmbda.shape[0]
+    n = int(lmbda.shape[0])
     chol = np.linalg.cholesky(lmbda)
 
     if (dof <= 81+n) and (dof == np.round(dof)):
         x = np.random.randn(int(dof),int(n))
     else:
         x = np.diag(np.sqrt(stats.chi2.rvs(dof-(np.arange(n)))))
-        x[np.triu_indices_from(x,1)] = np.random.randn(n*(n-1)/2)
+
+        x[np.triu_indices_from(x,1)] = np.random.randn(int(n*(n-1)/2))
     R = np.linalg.qr(x,'r')
     try:
         T = scipy.linalg.solve_triangular(R.T,chol.T).T

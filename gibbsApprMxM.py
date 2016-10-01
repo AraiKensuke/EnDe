@@ -33,8 +33,13 @@ class MarkAndRF:
     twpi = 2*_N.pi
 
     #  sizes of arrays
-    Nupx = 300      #   # points to sample position with  (uniform lam(x)p(x))
-    fss = 100       #  sampling at various values of f
+
+    ##  Int p(x) exp[-0.5 (fc - x)^2 / (2 sig_c)^2]   
+    #   do this for fss values ofss values of fc.  Riemann sum at Nupx points
+    Nupx = 200      #   # points to sample position with  (uniform lam(x)p(x))
+    fss = 30       #  sampling at various values of f
+    ##  Int p(x) exp[-0.5 (fc - x)^2 / (2 sig_c)^2]   
+    #   do this for q2ss values ofss values of sig_c.  Riemann sum at Nupx point
     q2ss = 150      #  sampling at various values of q2
 
     intvs = None    #  
@@ -131,7 +136,7 @@ class MarkAndRF:
         tau_q2 = oo.t_hlf_q2/_N.log(2)
 
         for epc in xrange(ep1, ep2):
-            print "^^^^^^^^^^^^^^^^^^^^^^^^    epoch %d" % epc
+
 
             t0 = oo.intvs[epc]
             t1 = oo.intvs[epc+1]
@@ -211,12 +216,14 @@ class MarkAndRF:
                 _iu_Sg[m] = _N.linalg.inv(_u_Sg[m])
 
             for iter in xrange(ITERS):
+                ttA = _tm.time()
                 iSg = _N.linalg.inv(Sg)
                 tt1 = _tm.time()
                 print "iter  %d" % iter
                 #if (iter % 100) == 0:    print "iter  %d" % iter
 
                 gAMxMu.stochasticAssignment(oo, iter, M, Mwowonz, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, ((epc > 0) and (iter == 0)))
+                ttSA = _tm.time()
 
         #         ###############  FOR EACH CLUSTER
 
@@ -258,222 +265,222 @@ class MarkAndRF:
                     aL  = nSpksM
                     l0_a_ = aL + _Dl0_a
                     l0_B_ = BL + _Dl0_B
-                    print "%(a).3f   %(B).3f" % {"a" : l0_a_, "B" : l0_B_}
 
 
-
-            #         # print "------------------"
-            #         # print "liklhd  BL   %(B).3f     f   %(f).3f   a %(a)d    B/a  %(ba).3f" % {"B" : BL, "f" : f[m], "ba" : (aL/ BL), "a" : aL}
-            #         # print "prior   BL   %(B).3f     f   %(f).3f   a %(a)d    B/a  %(ba).3f" % {"B" : l0_B_, "f" : f[m], "ba" : (l0_a_/ l0_B_), "a" : l0_a_}
-            #         # print (len(xt0t1)*oo.dt)
-            #         # print "******************"
+                    # print "------------------"
+                    # print "liklhd  BL   %(B).3f     f   %(f).3f   a %(a)d    B/a  %(ba).3f" % {"B" : BL, "f" : f[m], "ba" : (aL/ BL), "a" : aL}
+                    # print "prior   BL   %(B).3f     f   %(f).3f   a %(a)d    B/a  %(ba).3f" % {"B" : l0_B_, "f" : f[m], "ba" : (l0_a_/ l0_B_), "a" : l0_a_}
+                    # print (len(xt0t1)*oo.dt)
+                    # print "******************"
                     
-            #         #print "%(1).5f   %(2).5f" % {"1" : l0_a_, "2" : l0_B_}
+                    #print "%(1).5f   %(2).5f" % {"1" : l0_a_, "2" : l0_B_}
 
-            #         try:
-            #             l0[m] = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_))  #  check
-            #         except ValueError:
-            #             print "fail"
-            #             print "M:        %d" % M
-            #             print "_l0_a[m]  %.3f" % _l0_a[m]
-            #             print "_l0_B[m]  %.3f" % _l0_B[m]
-            #             print "l0_a_     %.3f" % l0_a_
-            #             print "l0_B_     %.3f" % l0_B_
-            #             print "aL        %.3f" % aL
-            #             print "BL        %.3f" % BL
-            #             print "_Dl0_a    %.3f" % _Dl0_a
-            #             print "_Dl0_B    %.3f" % _Dl0_B
-            #             raise
+                    try:
+                        l0[m] = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_))  #  check
+                    except ValueError:
+                        print "fail"
+                        print "M:        %d" % M
+                        print "_l0_a[m]  %.3f" % _l0_a[m]
+                        print "_l0_B[m]  %.3f" % _l0_B[m]
+                        print "l0_a_     %.3f" % l0_a_
+                        print "l0_B_     %.3f" % l0_B_
+                        print "aL        %.3f" % aL
+                        print "BL        %.3f" % BL
+                        print "_Dl0_a    %.3f" % _Dl0_a
+                        print "_Dl0_B    %.3f" % _Dl0_B
+                        raise
 
-            #         ###  l0 / _N.sqrt(twpi*q2) is f*dt used in createData2
-            #         smp_sp_prms[oo.ky_p_l0, iter, m] = l0[m]
+                    ###  l0 / _N.sqrt(twpi*q2) is f*dt used in createData2
+                    smp_sp_prms[oo.ky_p_l0, iter, m] = l0[m]
 
-            #         smp_sp_hyps[oo.ky_h_l0_a, iter, m] = l0_a_
-            #         smp_sp_hyps[oo.ky_h_l0_B, iter, m] = l0_B_
-            #         mcs = _N.empty((M, K))   # cluster sample means
+                    smp_sp_hyps[oo.ky_h_l0_a, iter, m] = l0_a_
+                    smp_sp_hyps[oo.ky_h_l0_B, iter, m] = l0_B_
+                    mcs = _N.empty((M, K))   # cluster sample means
 
-            #         if nSpksM > 0:
-            #             #try:
-            #             #u_Sg_ = _N.linalg.inv(_N.linalg.inv(_u_Sg[m]) + nSpksM*iSg[m])
-            #             u_Sg_ = _N.linalg.inv(_iu_Sg[m] + nSpksM*iSg[m])
-            #             clstx    = mks[sts]
+                    if nSpksM > 0:
+                        #try:
+                        #u_Sg_ = _N.linalg.inv(_N.linalg.inv(_u_Sg[m]) + nSpksM*iSg[m])
+                        u_Sg_ = _N.linalg.inv(_iu_Sg[m] + nSpksM*iSg[m])
+                        clstx    = mks[sts]
 
-            #             mcs[m]       = _N.mean(clstx, axis=0)
-            #             #u_u_ = _N.einsum("jk,k->j", u_Sg_, _N.dot(_N.linalg.inv(_u_Sg[m]), _u_u[m]) + nSpksM*_N.dot(iSg[m], mcs[m]))
-            #             u_u_ = _N.einsum("jk,k->j", u_Sg_, _N.dot(_iu_Sg[m], _u_u[m]) + nSpksM*_N.dot(iSg[m], mcs[m]))
-            #             # hyp
-            #             ########  POSITION
-            #             ##  mean of posterior distribution of cluster means
-            #             #  sigma^2 and mu are the current Gibbs-sampled values
+                        mcs[m]       = _N.mean(clstx, axis=0)
+                        #u_u_ = _N.einsum("jk,k->j", u_Sg_, _N.dot(_N.linalg.inv(_u_Sg[m]), _u_u[m]) + nSpksM*_N.dot(iSg[m], mcs[m]))
+                        u_u_ = _N.einsum("jk,k->j", u_Sg_, _N.dot(_iu_Sg[m], _u_u[m]) + nSpksM*_N.dot(iSg[m], mcs[m]))
+                        # hyp
+                        ########  POSITION
+                        ##  mean of posterior distribution of cluster means
+                        #  sigma^2 and mu are the current Gibbs-sampled values
 
-            #             ##  mean of posterior distribution of cluster means
-            #         else:
-            #             u_Sg_ = _N.array(_u_Sg[m])
+                        ##  mean of posterior distribution of cluster means
+                    else:
+                        u_Sg_ = _N.array(_u_Sg[m])
 
-            #             u_u_ = _N.array(_u_u[m])
-            #         u[m] = _N.random.multivariate_normal(u_u_, u_Sg_)
+                        u_u_ = _N.array(_u_u[m])
+                    u[m] = _N.random.multivariate_normal(u_u_, u_Sg_)
 
-            #         smp_mk_prms[oo.ky_p_u][:, iter, m] = u[m]
-            #         smp_mk_hyps[oo.ky_h_u_u][:, iter, m] = u_u_
-            #         smp_mk_hyps[oo.ky_h_u_Sg][:, :, iter, m] = u_Sg_
+                    # smp_mk_prms[oo.ky_p_u][:, iter, m] = u[m]
+                    # smp_mk_hyps[oo.ky_h_u_u][:, iter, m] = u_u_
+                    # smp_mk_hyps[oo.ky_h_u_Sg][:, :, iter, m] = u_Sg_
 
-            #         """
-            #         ############################################
-            #         """
-            #         ###############  CONDITIONAL f
-            #         #q2pr = _f_q2[m] if (_f_q2[m] > q2rate) else q2rate
-            #         if (epc > 0) and oo.adapt:
-            #             q2pr = _f_q2[m] + f_q2_rate * dt
-            #         else:
-            #             q2pr = _f_q2[m]
-            #         if nSpksM > 0:  #  spiking portion likelihood x prior
-            #             fs  = (1./nSpksM)*_N.sum(xt0t1[sts-t0])
-            #             fq2 = q2[m]/nSpksM
-            #             U   = (fs*q2pr + _f_u[m]*fq2) / (q2pr + fq2)
-            #             FQ2 = (q2pr*fq2) / (q2pr + fq2)
-            #         else:
-            #             U   = _f_u[m]
-            #             FQ2 = q2pr
-            #         FQ    = _N.sqrt(FQ2)
-            #         fx    = _N.linspace(U - FQ*60, U + FQ*60, oo.fss)
-            #         if use_spc:
-            #             fxr     = fx.reshape((oo.fss, 1))
-            #             fxrux = -0.5*(fxr-ux)*(fxr-ux)
-            #             f_intgrd  = _N.exp((fxrux*iiq2))   #  integrand
-            #             f_exp_px = _N.sum(f_intgrd*px, axis=1) * dSilenceX
-            #             s = -(l0[m]*oo.dt/_N.sqrt(twpi*q2[m])) * f_exp_px  #  a function of x
-            #         else:
-            #             s = 0
-            #         funcf   = -0.5*((fx-U)*(fx-U))/FQ2 + s
-            #         funcf   -= _N.max(funcf)
-            #         condPosF= _N.exp(funcf)
+                    """
+                    ############################################
+                    """
+                    ###############  CONDITIONAL f
+                    #q2pr = _f_q2[m] if (_f_q2[m] > q2rate) else q2rate
+                    if (epc > 0) and oo.adapt:
+                        q2pr = _f_q2[m] + f_q2_rate * dt
+                    else:
+                        q2pr = _f_q2[m]
+                    if nSpksM > 0:  #  spiking portion likelihood x prior
+                        fs  = (1./nSpksM)*_N.sum(xt0t1[sts-t0])
+                        fq2 = q2[m]/nSpksM
+                        U   = (fs*q2pr + _f_u[m]*fq2) / (q2pr + fq2)
+                        FQ2 = (q2pr*fq2) / (q2pr + fq2)
+                    else:
+                        U   = _f_u[m]
+                        FQ2 = q2pr
 
-            #         norm    = 1./_N.sum(condPosF)
-            #         f_u_    = norm*_N.sum(fx*condPosF)
-            #         f_q2_   = norm*_N.sum(condPosF*(fx-f_u_)*(fx-f_u_))
-            #         f[m]    = _N.sqrt(f_q2_)*_N.random.randn() + f_u_
-            #         smp_sp_prms[oo.ky_p_f, iter, m] = f[m]
-            #         smp_sp_hyps[oo.ky_h_f_u, iter, m] = f_u_
-            #         smp_sp_hyps[oo.ky_h_f_q2, iter, m] = f_q2_
+                    FQ    = _N.sqrt(FQ2)
+                    fx    = _N.linspace(U - FQ*15, U + FQ*15, oo.fss)
 
-            #         #ttc1g = _tm.time()
-            #         #############  VARIANCE, COVARIANCE
-            #         if nSpksM >= K:
-            #             ##  dof of posterior distribution of cluster covariance
-            #             Sg_nu_ = _Sg_nu[m, 0] + nSpksM
-            #             ##  dof of posterior distribution of cluster covariance
-            #             ur = u[m].reshape((1, K))
-            #             Sg_PSI_ = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
-            #             Sg[m] = s_u.sample_invwishart(Sg_PSI_, Sg_nu_)
-            #         else:
-            #             Sg_nu_ = _Sg_nu[m, 0] 
-            #             ##  dof of posterior distribution of cluster covariance
-            #             ur = u[m].reshape((1, K))
-            #             Sg_PSI_ = _Sg_PSI[m]
-            #             Sg[m] = s_u.sample_invwishart(Sg_PSI_, Sg_nu_)
+                    if use_spc:
+                        fxr     = fx.reshape((oo.fss, 1))
+                        fxrux = -0.5*(fxr-ux)*(fxr-ux)  # 
+                        f_intgrd  = _N.exp((fxrux*iiq2))   #  integrand
+                        f_exp_px = _N.sum(f_intgrd*px, axis=1) * dSilenceX
+                        s = -(l0[m]*oo.dt/_N.sqrt(twpi*q2[m])) * f_exp_px  #  a function of x
+                    else:
+                        s = 0
+                    funcf   = -0.5*((fx-U)*(fx-U))/FQ2 + s
+                    funcf   -= _N.max(funcf)
+                    condPosF= _N.exp(funcf)
 
-            #         ##############  SAMPLE COVARIANCES
+                    norm    = 1./_N.sum(condPosF)
+                    f_u_    = norm*_N.sum(fx*condPosF)
+                    f_q2_   = norm*_N.sum(condPosF*(fx-f_u_)*(fx-f_u_))
+                    f[m]    = _N.sqrt(f_q2_)*_N.random.randn() + f_u_
+                    smp_sp_prms[oo.ky_p_f, iter, m] = f[m]
+                    smp_sp_hyps[oo.ky_h_f_u, iter, m] = f_u_
+                    smp_sp_hyps[oo.ky_h_f_q2, iter, m] = f_q2_
 
-            #         ##  dof of posterior distribution of cluster covariance
+                    #ttc1g = _tm.time()
+                    #############  VARIANCE, COVARIANCE
+                    if nSpksM >= K:
+                        ##  dof of posterior distribution of cluster covariance
+                        Sg_nu_ = _Sg_nu[m, 0] + nSpksM
+                        ##  dof of posterior distribution of cluster covariance
+                        ur = u[m].reshape((1, K))
+                        Sg_PSI_ = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
+                        Sg[m] = s_u.sample_invwishart(Sg_PSI_, Sg_nu_)
+                    else:
+                        Sg_nu_ = _Sg_nu[m, 0] 
+                        ##  dof of posterior distribution of cluster covariance
+                        ur = u[m].reshape((1, K))
+                        Sg_PSI_ = _Sg_PSI[m]
+                        Sg[m] = s_u.sample_invwishart(Sg_PSI_, Sg_nu_)
 
-            #         smp_mk_prms[oo.ky_p_Sg][:, :, iter, m] = Sg[m]
-            #         smp_mk_hyps[oo.ky_h_Sg_nu][0, iter, m] = Sg_nu_
-            #         smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, iter, m] = Sg_PSI_
+                    ##############  SAMPLE COVARIANCES
 
-            #         # ###############  CONDITIONAL q2
-            #         #xI = (xt0t1-f)*(xt0t1-f)*0.5*iq2xr
+                    ##  dof of posterior distribution of cluster covariance
 
-            #         if use_spc:
-            #             q2_intgrd = _N.exp(-0.5*(f[m] - ux)*(f[m]-ux) * iq2xr)
-            #             q2_exp_px = _N.sum(q2_intgrd*px, axis=1) * dSilenceX
+                    smp_mk_prms[oo.ky_p_Sg][:, :, iter, m] = Sg[m]
+                    smp_mk_hyps[oo.ky_h_Sg_nu][0, iter, m] = Sg_nu_
+                    smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, iter, m] = Sg_PSI_
 
-            #             # function of q2
-            #             s = -((l0[m]*oo.dt)/sqrt_2pi_q2x)*q2_exp_px
-            #         else:
-            #             s = 0
-            #         #  B' / (a' - 1) = MODE   #keep mode the same after discount
-            #         #  B' = MODE * (a' - 1)
-            #         if (epc > 0) and oo.adapt:
-            #             _md_nd= _q2_B[m] / (_q2_a[m] + 1)
-            #             _Dq2_a = _q2_a[m] * _N.exp(-dt/tau_q2)
-            #             _Dq2_B = _Dq2_a / _md_nd
-            #         else:
-            #             _Dq2_a = _q2_a[m]
-            #             _Dq2_B = _q2_B[m]
+                    # ###############  CONDITIONAL q2
+                    #xI = (xt0t1-f)*(xt0t1-f)*0.5*iq2xr
 
-            #         if nSpksM > 0:
-            #             ##  (1/sqrt(sg2))^S
-            #             ##  (1/x)^(S/2)   = (1/x)-(a+1)
-            #             ##  -S/2 = -a - 1     -a = -S/2 + 1    a = S/2-1
-            #             xI = (xt0t1[sts-t0]-f[m])*(xt0t1[sts-t0]-f[m])*0.5
-            #             SL_a = 0.5*nSpksM - 1   #  spiking part of likelihood
-            #             SL_B = _N.sum(xI)  #  spiking part of likelihood
-            #             #  spiking prior x prior
-            #             sLLkPr = -(_q2_a[m] + SL_a + 2)*lq2x - iq2x*(_q2_B[m] + SL_B)
-            #         else:
-            #             sLLkPr = -(_q2_a[m] + 1)*lq2x - iq2x*_q2_B[m]
+                    if use_spc:
+                        q2_intgrd = _N.exp(-0.5*(f[m] - ux)*(f[m]-ux) * iq2xr)
+                        q2_exp_px = _N.sum(q2_intgrd*px, axis=1) * dSilenceX
 
+                        # function of q2
+                        s = -((l0[m]*oo.dt)/sqrt_2pi_q2x)*q2_exp_px
+                    else:
+                        s = 0
+                    #  B' / (a' - 1) = MODE   #keep mode the same after discount
+                    #  B' = MODE * (a' - 1)
+                    if (epc > 0) and oo.adapt:
+                        _md_nd= _q2_B[m] / (_q2_a[m] + 1)
+                        _Dq2_a = _q2_a[m] * _N.exp(-dt/tau_q2)
+                        _Dq2_B = _Dq2_a / _md_nd
+                    else:
+                        _Dq2_a = _q2_a[m]
+                        _Dq2_B = _q2_B[m]
 
-            #         sat = sLLkPr + s
-            #         sat -= _N.max(sat)
-            #         condPos = _N.exp(sat)
-            #         q2_a_, q2_B_ = ig_prmsUV(q2x, sLLkPr, s, d_q2x, q2x_m1, ITER=1, nSpksM=nSpksM, clstr=m, l0=l0[m])
-
-            #         # sat = sLLkPr + s
-            #         # sat -= _N.max(sat)
-            #         # condPos = _N.exp(sat)
-            #         # q2_a_, q2_B_ = ig_prmsUV(q2x, condPos, d_q2x, q2x_m1, ITER=1)
-            #         q2[m] = _ss.invgamma.rvs(q2_a_ + 1, scale=q2_B_)  #  check
+                    if nSpksM > 0:
+                        ##  (1/sqrt(sg2))^S
+                        ##  (1/x)^(S/2)   = (1/x)-(a+1)
+                        ##  -S/2 = -a - 1     -a = -S/2 + 1    a = S/2-1
+                        xI = (xt0t1[sts-t0]-f[m])*(xt0t1[sts-t0]-f[m])*0.5
+                        SL_a = 0.5*nSpksM - 1   #  spiking part of likelihood
+                        SL_B = _N.sum(xI)  #  spiking part of likelihood
+                        #  spiking prior x prior
+                        sLLkPr = -(_q2_a[m] + SL_a + 2)*lq2x - iq2x*(_q2_B[m] + SL_B)
+                    else:
+                        sLLkPr = -(_q2_a[m] + 1)*lq2x - iq2x*_q2_B[m]
 
 
-            #         #q2[m] = 1.1**2
+                    sat = sLLkPr + s
+                    sat -= _N.max(sat)
+                    condPos = _N.exp(sat)
+                    q2_a_, q2_B_ = ig_prmsUV(q2x, sLLkPr, s, d_q2x, q2x_m1, ITER=1, nSpksM=nSpksM, clstr=m, l0=l0[m])
 
-            #         #print ((1./nSpks)*_N.sum((xt0t1[sts]-f)*(xt0t1[sts]-f)))
+                    # sat = sLLkPr + s
+                    # sat -= _N.max(sat)
+                    # condPos = _N.exp(sat)
+                    # q2_a_, q2_B_ = ig_prmsUV(q2x, condPos, d_q2x, q2x_m1, ITER=1)
+                    q2[m] = _ss.invgamma.rvs(q2_a_ + 1, scale=q2_B_)  #  check
 
-            #         if q2[m] < 0:
-            #             print "********  q2[%(m)d] = %(q2).3f" % {"m" : m, "q2" : q2[m]}
 
-            #         smp_sp_prms[oo.ky_p_q2, iter, m]   = q2[m]
-            #         smp_sp_hyps[oo.ky_h_q2_a, iter, m] = q2_a_
-            #         smp_sp_hyps[oo.ky_h_q2_B, iter, m] = q2_B_
+                    #q2[m] = 1.1**2
+
+                    #print ((1./nSpks)*_N.sum((xt0t1[sts]-f)*(xt0t1[sts]-f)))
+
+                    if q2[m] < 0:
+                        print "********  q2[%(m)d] = %(q2).3f" % {"m" : m, "q2" : q2[m]}
+
+                    smp_sp_prms[oo.ky_p_q2, iter, m]   = q2[m]
+                    smp_sp_hyps[oo.ky_h_q2_a, iter, m] = q2_a_
+                    smp_sp_hyps[oo.ky_h_q2_B, iter, m] = q2_B_
                     
-            #         if q2[m] < 0:
-            #             print "^^^^^^^^  q2[%(m)d] = %(q2).3f" % {"m" : m, "q2" : q2[m]}
-            #             print q2[m]
-            #             print smp_sp_prms[oo.ky_p_q2, 0:iter+1, m]
-            #         iiq2 = 1./q2[m]
+                    if q2[m] < 0:
+                        print "^^^^^^^^  q2[%(m)d] = %(q2).3f" % {"m" : m, "q2" : q2[m]}
+                        print q2[m]
+                        print smp_sp_prms[oo.ky_p_q2, 0:iter+1, m]
+                    iiq2 = 1./q2[m]
 
-            #         #ttc1h = _tm.time()
+                    #ttc1h = _tm.time()
                     
 
-            #     #  nz clstr.  fixed width
-            #     if oo.nzclstr:
-            #         minds = _N.where(gz[iter, :, Mwowonz-1] == 1)[0]
-            #         BL  = (oo.dt/_N.sqrt(twpi*q2[Mwowonz-1])) * (t1-t0) 
-            #         aL  = len(minds)
-            #         aL  = aL + 0.001
-            #         BL  = BL + 0.1
-            #         #_Dl0_a = _l0_a[m]
-            #         #_Dl0_B = _l0_B[m]
+                #  nz clstr.  fixed width
+                if oo.nzclstr:
+                    minds = _N.where(gz[iter, :, Mwowonz-1] == 1)[0]
+                    BL  = (oo.dt/_N.sqrt(twpi*q2[Mwowonz-1])) * (t1-t0) 
+                    aL  = len(minds)
+                    aL  = aL + 0.001
+                    BL  = BL + 0.1
+                    #_Dl0_a = _l0_a[m]
+                    #_Dl0_B = _l0_B[m]
 
-            #         l0[Mwowonz-1] = _ss.gamma.rvs(aL, scale=(1./BL))  #  check
-            #         print len(minds)
-            #         print f[Mwowonz-1]
-            #         print q2[Mwowonz-1]
+                    l0[Mwowonz-1] = _ss.gamma.rvs(aL, scale=(1./BL))  #  check
+                    print len(minds)
+                    print f[Mwowonz-1]
+                    print q2[Mwowonz-1]
 
-            # ###  THIS LEVEL:  Finished Gibbs iters for epoch
-            # gAMxMu.finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_hyps, smp_sp_prms, smp_mk_hyps, smp_mk_prms, freeClstr, M, K)
-            # pcklme["smp_sp_hyps"] = smp_sp_hyps
-            # pcklme["smp_mk_hyps"] = smp_mk_hyps
-            # pcklme["smp_sp_prms"] = smp_sp_prms
-            # pcklme["smp_mk_prms"] = smp_mk_prms
-            # pcklme["sp_prmPstMd"] = oo.sp_prmPstMd
-            # pcklme["mk_prmPstMd"] = oo.mk_prmPstMd
-            # pcklme["intvs"]       = oo.intvs
-            # pcklme["occ"]         = gz
-            # pcklme["nz_pth"]         = nz_pth
+            ###  THIS LEVEL:  Finished Gibbs iters for epoch
+            gAMxMu.finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_hyps, smp_sp_prms, smp_mk_hyps, smp_mk_prms, freeClstr, M, K)
+            pcklme["smp_sp_hyps"] = smp_sp_hyps
+            pcklme["smp_mk_hyps"] = smp_mk_hyps
+            pcklme["smp_sp_prms"] = smp_sp_prms
+            pcklme["smp_mk_prms"] = smp_mk_prms
+            pcklme["sp_prmPstMd"] = oo.sp_prmPstMd
+            pcklme["mk_prmPstMd"] = oo.mk_prmPstMd
+            pcklme["intvs"]       = oo.intvs
+            pcklme["occ"]         = gz
+            pcklme["nz_pth"]         = nz_pth
 
-            # dmp = open(resFN("posteriors_%d.dmp" % epc, dir=oo.outdir), "wb")
-            # pickle.dump(pcklme, dmp, -1)
-            # dmp.close()
+            dmp = open(resFN("posteriors_%d.dmp" % epc, dir=oo.outdir), "wb")
+            pickle.dump(pcklme, dmp, -1)
+            dmp.close()
 
