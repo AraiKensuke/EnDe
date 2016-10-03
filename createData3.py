@@ -254,9 +254,10 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, 
     iInd = 0
     while not bFnd:
         iInd += 1
-        fn = "../DATA/%(bfn)s%(iI)d.dat" % {"bfn" : bfn, "iI" : iInd}
-        fnocc="../DATA/%(bfn)s%(iI)docc.png" % {"bfn" : bfn, "iI" : iInd}
-        fnprm = "../DATA/%(bfn)s%(iI)d_prms.pkl" % {"bfn" : bfn, "iI" : iInd}
+        dd   = os.getenv("__EnDeDataDir__")
+        fn = "%(dd)s/%(bfn)s%(iI)d.dat" % {"bfn" : bfn, "iI" : iInd, "dd" : dd}
+        fnocc="%(dd)s/%(bfn)s%(iI)docc.png" % {"bfn" : bfn, "iI" : iInd, "dd" : dd}
+        fnprm = "%(dd)s/%(bfn)s%(iI)d_prms.pkl" % {"bfn" : bfn, "iI" : iInd, "dd" : dd}
 
         if not os.access(fn, os.F_OK):  # file exists
             bFnd = True

@@ -7,6 +7,7 @@ import numpy as _N
 cdef Py_ssize_t idx, i, n = 100
 
 @cython.boundscheck(False)
+@cython.wraparound(False)
 def M_times_N_intrgrls(double [:, :] fxs, double[:] ux, double [:] iiq2, double dSilenceX, double [:] px, double [:, :] f_exp_px, int M, int fss, int Nupx, int nthrds):
     #  fxs       M x fss   
     #  fxrux     Nupx    
