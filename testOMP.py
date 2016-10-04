@@ -1,11 +1,15 @@
 import time as _tm
+import os
 
-from par_intgrls  import M_times_N_intrgrls
+from par_intgrls  import M_times_N_intrgrls, M_times_N_intrgrls_noOMP, M_times_N_intrgrls_noOMP_raw, M_times_N_intrgrls_pure
+#from par_intgrls  import M_times_N_intrgrls_noOMP
 M = 40
+
+os.system("taskset -p 0xffffffff %d" % os.getpid())
 
 #  Fill the U
 
-Nupx  = 300
+Nupx  = 3000
 fss   = 60
 U     = _N.random.randn(M)
 ux    = _N.linspace(-6, 6, Nupx)
@@ -32,10 +36,21 @@ fxs += Ur
 ###
 
 t1 = _tm.time()
-f_exp_px_omp = _N.empty((M, fss))
-M_times_N_intrgrls(fxs, ux, iiq2, dSilenceX, px, f_exp_px_omp, M, fss, Nupx, 2)
-
+f_exp_px_noomp = _N.empty((M, fss))
+M_times_N_intrgrls_noOMP(fxs, ux, iiq2, dSilenceX, px, f_exp_px_noomp, M, fss, Nupx, 8)
 t2 = _tm.time()
+
+f_exp_px_noomp_r = _N.empty((M, fss))
+M_times_N_intrgrls_noOMP_raw(fxs, ux, iiq2, dSilenceX, px, f_exp_px_noomp_r, M, fss, Nupx, 8)
+t3 = _tm.time()
+
+f_exp_px_omp = _N.empty((M, fss))
+M_times_N_intrgrls(fxs, ux, iiq2, dSilenceX, px, f_exp_px_omp, M, fss, Nupx, 8)
+t4 = _tm.time()
+
+f_exp_px_pure = _N.empty((M, fss))
+M_times_N_intrgrls_pure(fxs, ux, iiq2, dSilenceX, px, f_exp_px_omp, M, fss, Nupx, 8)
+t5 = _tm.time()
 
 fxsr     = fxs.reshape((M, fss, 1))
 fxrux = -0.5*(fxsr-uxrr)*(fxsr-uxrr)
@@ -44,8 +59,11 @@ f_intgrd  = _N.exp(fxrux*iiq2rr)   #  integrand
 f_exp_px = _N.sum(f_intgrd*pxrr, axis=2) * dSilenceX
 #  f_exp_px   is M x fss
 
-t3 = _tm.time()
+t6 = _tm.time()
 
 print (t2-t1)
 print (t3-t2)
+print (t4-t3)
+print (t5-t4)
+print (t6-t5)
 

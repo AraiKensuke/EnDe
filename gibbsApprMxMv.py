@@ -6,7 +6,7 @@ import stats_util as s_u
 import scipy.stats as _ss
 import os
 import time as _tm
-from ig_prmLib import ig_prmsUV
+from ig_prmLib import mltpl_ig_prmsUV
 import numpy as _N
 import matplotlib.pyplot as _plt
 from EnDedirs import resFN, datFN
@@ -117,6 +117,9 @@ class MarkAndRF:
         iq2xr     = 1./q2xr
         q2xrr     = q2x.reshape((1, oo.q2ss, 1))
         iq2xrr     = 1./q2xrr
+        d_q2xr  =  d_q2x.reshape((oo.q2ss - 1, 1))
+        q2x_m1  = _N.array(q2x[0:-1])
+        q2x_m1r = q2x_m1.reshape((oo.q2ss-1, 1))
 
         sqrt_2pi_q2x   = _N.sqrt(twpi*q2x)
         l_sqrt_2pi_q2x = _N.log(sqrt_2pi_q2x)
@@ -243,7 +246,7 @@ class MarkAndRF:
 
                 l_sts = []
                 for m in xrange(M):   #  get the minds
-                    minds = _N.where(gz[iter, :, m] == 1)[0]
+                    minds = _N.where(gz[iter, :, m] == 1)[0]  
                     sts  = Asts[minds] + t0
                     clstsz[m] = len(sts)
                     l_sts.append(sts)
@@ -258,9 +261,6 @@ class MarkAndRF:
                 # BL  = (oo.dt/_N.sqrt(twpi*q2[m]))*_N.sum(_N.exp(-xI))
 
                 l0_intgrd   = _N.exp(-0.5*(fr - ux)*(fr-ux) * iiq2r)  
-
-                #print l0_intgrd
-                #print l0_intgrd.shape
 
                 sLLkPr      = _N.empty((M, oo.q2ss))
                 l0_exp_px   = _N.sum(l0_intgrd*pxr, axis=1) * dSilenceX
@@ -279,30 +279,13 @@ class MarkAndRF:
                     _Dl0_a = _l0_a
                     _Dl0_B = _l0_B
 
-                #  a'/B' = a/B
-                #  B' = (B/a)a'
                 aL  = clstsz
                 l0_a_ = aL + _Dl0_a
                 l0_B_ = BL + _Dl0_B
-
-                try:
-                    l0 = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_))  #  check
-                except ValueError:
-                    print "fail"
-                    print "M:     %d" % M
-                    print "_l0_a  %.3f" % _l0_a
-                    print "_l0_B  %.3f" % _l0_B
-                    print "l0_a_  %.3f" % l0_a_
-                    print "l0_B_  %.3f" % l0_B_
-                    print "aL     %.3f" % aL
-                    print "BL     %.3f" % BL
-                    print "_Dl0_a %.3f" % _Dl0_a
-                    print "_Dl0_B %.3f" % _Dl0_B
-                    raise
+                l0 = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_))  #  check
 
                     ###  l0 / _N.sqrt(twpi*q2) is f*dt used in createData2
                 smp_sp_prms[oo.ky_p_l0, iter] = l0
-
                 smp_sp_hyps[oo.ky_h_l0_a, iter] = l0_a_
                 smp_sp_hyps[oo.ky_h_l0_B, iter] = l0_B_
                 mcs = _N.empty((M, K))   # cluster sample means
@@ -332,9 +315,11 @@ class MarkAndRF:
                 C       = _N.linalg.cholesky(u_Sg_)
                 u       = _N.einsum("njk,nk->nj", C, ucmvnrms) + u_u_
 
-                # smp_mk_prms[oo.ky_p_u][:, iter] = u.T  # dim of u wrong
-                # smp_mk_hyps[oo.ky_h_u_u][:, iter] = u_u_
-                # smp_mk_hyps[oo.ky_h_u_Sg][:, :, iter] = u_Sg_
+                print u.shape
+                print smp_mk_prms[oo.ky_p_u][:, iter].shape
+                smp_mk_prms[oo.ky_p_u][:, iter] = u.T  # dim of u wrong
+                smp_mk_hyps[oo.ky_h_u_u][:, iter] = u_u_
+                smp_mk_hyps[oo.ky_h_u_Sg][:, :, iter] = u_Sg_
 
                 """
                 ############################################
@@ -381,7 +366,6 @@ class MarkAndRF:
                         f_intgrd  = _N.exp(fxrux*iiq2rr)   #  integrand
                         f_exp_px = _N.sum(f_intgrd*pxrr, axis=2) * dSilenceX
                         #  f_exp_px   is M x fss
-                    print f_exp_px
                     tt2     = _tm.time()
                     l0r = l0.reshape((M, 1))
                     q2r = q2.reshape((M, 1))
@@ -456,7 +440,7 @@ class MarkAndRF:
 
                     s = -((l0r*oo.dt)/sqrt_2pi_q2x)*q2_exp_px
                 else:
-                    s = 0
+                    s = _N.zeros((oo.q2ss, M))
                 #  B' / (a' - 1) = MODE   #keep mode the same after discount
                 #  B' = MODE * (a' - 1)
                 if (epc > 0) and oo.adapt:
@@ -478,39 +462,20 @@ class MarkAndRF:
                         SL_B = _N.sum(xI)  #  spiking part of likelihood
                         #  spiking prior x prior
                         sLLkPr[m] = -(_q2_a[m] + SL_a + 2)*lq2x - iq2x*(_q2_B[m] + SL_B)
-                else:
-                    sLLkPr[m] = -(_q2_a[m] + 1)*lq2x - iq2x*_q2_B[m]
+                    else:
+                        sLLkPr[m] = -(_q2_a[m] + 1)*lq2x - iq2x*_q2_B[m]
 
-                    # sat = sLLkPr + s
-                    # sat -= _N.max(sat)
-                    # condPos = _N.exp(sat)
-                    # q2_a_, q2_B_ = ig_prmsUV(q2x, sLLkPr, s, d_q2x, q2x_m1, ITER=1, nSpksM=nSpksM, clstr=m, l0=l0[m])
-
-                    # # sat = sLLkPr + s
-                    # # sat -= _N.max(sat)
-                    # # condPos = _N.exp(sat)
-                    # # q2_a_, q2_B_ = ig_prmsUV(q2x, condPos, d_q2x, q2x_m1, ITER=1)
-                    # q2[m] = _ss.invgamma.rvs(q2_a_ + 1, scale=q2_B_)  #  check
+                q2_a_, q2_B_ = mltpl_ig_prmsUV(q2xr, sLLkPr.T, s.T, d_q2xr, q2x_m1r, clstsz)
+                q2 = _ss.invgamma.rvs(q2_a_ + 1, scale=q2_B_)  #  check
 
 
-                    # #q2[m] = 1.1**2
+                # #print ((1./nSpks)*_N.sum((xt0t1[sts]-f)*(xt0t1[sts]-f)))
 
-                    # #print ((1./nSpks)*_N.sum((xt0t1[sts]-f)*(xt0t1[sts]-f)))
-
-                    # if q2[m] < 0:
-                    #     print "********  q2[%(m)d] = %(q2).3f" % {"m" : m, "q2" : q2[m]}
-
-                    # smp_sp_prms[oo.ky_p_q2, iter, m]   = q2[m]
-                    # smp_sp_hyps[oo.ky_h_q2_a, iter, m] = q2_a_
-                    # smp_sp_hyps[oo.ky_h_q2_B, iter, m] = q2_B_
+                smp_sp_prms[oo.ky_p_q2, iter]   = q2
+                smp_sp_hyps[oo.ky_h_q2_a, iter] = q2_a_
+                smp_sp_hyps[oo.ky_h_q2_B, iter] = q2_B_
                     
-                    # if q2[m] < 0:
-                    #     print "^^^^^^^^  q2[%(m)d] = %(q2).3f" % {"m" : m, "q2" : q2[m]}
-                    #     print q2[m]
-                    #     print smp_sp_prms[oo.ky_p_q2, 0:iter+1, m]
-                    # iiq2 = 1./q2[m]
-
-                    #ttc1h = _tm.time()
+                #ttc1h = _tm.time()
                     
 
             #     #  nz clstr.  fixed width
