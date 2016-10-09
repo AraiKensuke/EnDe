@@ -61,7 +61,7 @@ def createSmoothedPathK(cps, N, K, ts, LoHis):
             t0 = cps[k, p, 0]
             t1 = cps[k, p+1, 0] if (p < NC - 1) else 2
 
-            pth[N+(N*t0):N+int(N*t1), k] = LoHis[k, 0] + Amps[k]*cps[k, p, 1]
+            pth[N+int(N*t0):N+int(N*t1), k] = LoHis[k, 0] + Amps[k]*cps[k, p, 1]
 
         spth = _N.convolve(pth[:, k], gk, mode="same")
         pth[:, k] = spth

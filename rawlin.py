@@ -14,7 +14,7 @@ import EnDedirs as _edd
 #  for day3, ex 
 day    = 6
 sdy    = ("0%d" % day) if (day < 10) else "%d" % day
-ep=6-1;
+ep=2-1;
 """
 anim1 = "bon"
 anim2 = "bond"

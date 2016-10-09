@@ -3,7 +3,7 @@ firstT   = 3.6
 minT     = 0.5
 maxT     = 1.5
 
-epochs   = 25
+epochs   = 15
 
 intvs = _N.empty(epochs+1)
 

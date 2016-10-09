@@ -64,7 +64,7 @@ class MarkAndRF:
     
     diffusePerMin = 0.05    #  diffusion of certainty
     
-    def __init__(self, outdir, fn, intvfn, xLo=0, xHi=3, seed=1041, adapt=True, nzclstr=False):
+    def __init__(self, outdir, fn, intvfn, xLo=0, xHi=3, seed=1041, adapt=True, nzclstr=False, t_hlf_l0_mins=None, t_hlf_q2_mins=None):
         oo     = self
         oo.adapt = adapt
         _N.random.seed(seed)
@@ -88,6 +88,8 @@ class MarkAndRF:
         NT     = oo.dat.shape[0]
         oo.xLo = xLo
         oo.xHi = xHi
+        oo.t_hlf_l0 = int(1000*60*t_hlf_l0_mins) if (t_hlf_l0_mins is not None) else oo.t_hlf_l0
+        oo.t_hlf_q2 = int(1000*60*t_hlf_q2_mins) if (t_hlf_q2_mins is not None) else oo.t_hlf_q2
 
     def gibbs(self, ITERS, K, ep1=0, ep2=None, savePosterior=True, gtdiffusion=False, Mdbg=None, doSepHash=True, use_spc=True, nz_pth=0., ignoresilence=False):
         """
@@ -212,6 +214,7 @@ class MarkAndRF:
             clusSz = _N.zeros(M, dtype=_N.int)
 
             _iu_Sg = _N.array(_u_Sg)
+
             for m in xrange(M):
                 _iu_Sg[m] = _N.linalg.inv(_u_Sg[m])
 
@@ -219,8 +222,8 @@ class MarkAndRF:
                 ttA = _tm.time()
                 iSg = _N.linalg.inv(Sg)
                 tt1 = _tm.time()
-                print "iter  %d" % iter
-                #if (iter % 100) == 0:    print "iter  %d" % iter
+                if (iter % 5) == 0:    
+                    print "iter  %d" % iter
 
                 gAMxMu.stochasticAssignment(oo, iter, M, Mwowonz, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, ((epc > 0) and (iter == 0)))
                 ttSA = _tm.time()
@@ -297,9 +300,10 @@ class MarkAndRF:
                     smp_sp_hyps[oo.ky_h_l0_B, iter, m] = l0_B_
                     mcs = _N.empty((M, K))   # cluster sample means
 
-                    if nSpksM > 0:
+                    if nSpksM >= K:
                         #try:
                         #u_Sg_ = _N.linalg.inv(_N.linalg.inv(_u_Sg[m]) + nSpksM*iSg[m])
+                        
                         u_Sg_ = _N.linalg.inv(_iu_Sg[m] + nSpksM*iSg[m])
                         clstx    = mks[sts]
 
@@ -318,9 +322,9 @@ class MarkAndRF:
                         u_u_ = _N.array(_u_u[m])
                     u[m] = _N.random.multivariate_normal(u_u_, u_Sg_)
 
-                    # smp_mk_prms[oo.ky_p_u][:, iter, m] = u[m]
-                    # smp_mk_hyps[oo.ky_h_u_u][:, iter, m] = u_u_
-                    # smp_mk_hyps[oo.ky_h_u_Sg][:, :, iter, m] = u_Sg_
+                    smp_mk_prms[oo.ky_p_u][:, iter, m] = u[m]
+                    smp_mk_hyps[oo.ky_h_u_u][:, iter, m] = u_u_
+                    smp_mk_hyps[oo.ky_h_u_Sg][:, :, iter, m] = u_Sg_
 
                     """
                     ############################################

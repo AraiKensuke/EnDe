@@ -9,7 +9,7 @@ cdef Py_ssize_t idx, i, n = 100
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def M_times_N_intrgrls_noOMP_raw(double[:, ::1] fxs, double[::1] ux, double[::1] iiq2, double dSilenceX, double[::1] px, double[:, ::1] f_exp_px, int M, int fss, int Nupx, int nthrds):
+def M_times_N_f_intgrls_noOMP_raw(double[:, ::1] fxs, double[::1] ux, double[::1] iiq2, double dSilenceX, double[::1] px, double[:, ::1] f_exp_px, int M, int fss, int Nupx, int nthrds):
     #  fxs       M x fss   
     #  fxrux     Nupx    
     #  f_intgrd  Nupx
@@ -42,10 +42,13 @@ cdef double intgrl(int m, double *p_fxs, double *p_ux, double *p_px, int M, int 
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def M_times_N_intrgrls_noOMP(double[:, ::1] fxs, double[::1] ux, double[::1] iiq2, double dSilenceX, double[::1] px, double[:, ::1] f_exp_px, int M, int fss, int Nupx, int nthrds):
+def M_times_N_f_intgrls_noOMP(double[:, ::1] fxs, double[::1] ux, double[::1] iiq2, double dSilenceX, double[::1] px, double[:, ::1] f_exp_px, int M, int fss, int Nupx, int nthrds):
     #  fxs       M x fss   
-    #  fxrux     Nupx    
-    #  f_intgrd  Nupx
+    #  ux        fss
+    #  iiq2      M
+    #  px        Nupx
+    #  f_exp_px  M x fss
+
     cdef int fi, m, n
     cdef double dd, IIQ2
     cdef double[:, ::1] f_exp_px_N = f_exp_px
@@ -63,7 +66,32 @@ def M_times_N_intrgrls_noOMP(double[:, ::1] fxs, double[::1] ux, double[::1] iiq
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def M_times_N_intrgrls_pure(fxs, ux, iiq2, dSilenceX, px, f_exp_px, M, fss, Nupx, nthrds):
+def M_times_N_q2_intgrls_noOMP(double[::1] fxs, double[::1] ux, double[::1] iiq2, double dSilenceX, double[::1] px, double[:, ::1] f_exp_px, int M, int q2ss, int Nupx, int nthrds):
+    #  fxs       M
+    #  ux        Nupx
+    #  iiq2      M
+    #  px        Nupx
+    #  f_exp_px  M x q2ss
+
+    cdef int q2i, m, n
+    cdef double dd, IIQ2
+    cdef double[:, ::1] f_exp_px_N = f_exp_px
+
+    for m in range(M):
+        fm = fxs[m]   #  current value of f for m-th cluster
+        for q2i in range(q2ss):    #  
+            f_exp_px_N[m, q2i] = 0
+            IIQ2 = iiq2[q2i]
+            for n in range(Nupx):
+                dd = fm-ux[n]  #  ux[n] integ. variable 
+                f_exp_px_N[m, q2i] += exp(-0.5*dd*dd*IIQ2)*px[n]
+            f_exp_px_N[m, q2i] *= dSilenceX
+        #  f_exp_px   is M x fss
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def M_times_N_f_intgrls_pure(fxs, ux, iiq2, dSilenceX, px, f_exp_px, M, fss, Nupx, nthrds):
     #  fxs       M x fss   
     #  fxrux     Nupx    
     #  f_intgrd  Nupx
@@ -82,7 +110,7 @@ def M_times_N_intrgrls_pure(fxs, ux, iiq2, dSilenceX, px, f_exp_px, M, fss, Nupx
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def M_times_N_intrgrls(double[:, ::1] fxs, double[::1] ux, double[::1] iiq2, double dSilenceX, double[::1] px, double[:, ::1] f_exp_px, int M, int fss, int Nupx, int nthrds):
+def M_times_N_f_intgrls(double[:, ::1] fxs, double[::1] ux, double[::1] iiq2, double dSilenceX, double[::1] px, double[:, ::1] f_exp_px, int M, int fss, int Nupx, int nthrds):
     #  fxs       M x fss   
     #  fx                                        rux     Nupx    
     #  f_intgrd  Nupx

@@ -77,7 +77,8 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3):
         #_plt.scatter(_x[hashsp[these], 0], _x[hashsp[these], 1], color=cls[i+clstrs[0]])
 
     MF     = clstrs[0] + clstrs[1]
-    M = MF#int(MF * 1.1) + 2   #  20% more clusters
+    #M = MF#int(MF * 1.1) + 2   #  20% more clusters
+    M = int(MF * 1.1) + 2   #  20% more clusters
     print "cluters:  %d" % M
 
 
@@ -140,8 +141,12 @@ def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, Asts, t0, x, mks, flatlabel
         #_u_u[im]= u[im]
         #_u_Sg[im] = _N.identity(K)
         q2[im] = _N.std(x[Asts[kinds]+t0], axis=0)**2
-        Sg[im] = _N.cov(mks[Asts[kinds]+t0], rowvar=0)
+        if len(kinds) >= K:
+            Sg[im] = _N.cov(mks[Asts[kinds]+t0], rowvar=0)
+        else:
+            Sg[im] = _N.cov(mks[Asts+t0], rowvar=0)
         l0[im] = (len(kinds) / float(nSpks))*100
+
     for im in xrange(MF, M):  #if lab < 0, these marks not used for init
         f[im]  = _N.random.randn()*3
         u[im]  = _N.random.rand(K)
@@ -396,24 +401,28 @@ def finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a
     #                  K, K, ITERS, M
 
     ##  params and hyper parms for mark
+
     for m in xrange(M):
         MAPtrls = l_trlsNearMAP[m]
         if len(MAPtrls) == 0:  #  none of them.  causes nan in mean
             MAPtrls = _N.arange(frm, ITERS, 10)
         #print MAPtrls
-        u[m] = _N.mean(smp_mk_prms[0][:, MAPtrls, m], axis=1)
-        Sg[m] = _N.mean(smp_mk_prms[1][:, :, MAPtrls, m], axis=2)
+        u[m] = _N.median(smp_mk_prms[0][:, frm:, m], axis=1)
+
+        Sg[m] = _N.mean(smp_mk_prms[1][:, :, frm:, m], axis=2)
         oo.mk_prmPstMd[oo.ky_p_u][epc, m] = u[m]
         oo.mk_prmPstMd[oo.ky_p_Sg][epc, m]= Sg[m]
-        _u_u[m]    = _N.mean(smp_mk_hyps[oo.ky_h_u_u][:, MAPtrls, m], axis=1)
-        _u_Sg[m]   = _N.mean(smp_mk_hyps[oo.ky_h_u_Sg][:, :, MAPtrls, m], axis=2)
-        _Sg_nu[m]  = _N.mean(smp_mk_hyps[oo.ky_h_Sg_nu][0, MAPtrls, m], axis=0)
-        _Sg_PSI[m] = _N.mean(smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, MAPtrls, m], axis=2)
+        _u_u[m]    = _N.mean(smp_mk_hyps[oo.ky_h_u_u][:, frm:, m], axis=1)
+        _u_Sg[m]   = _N.mean(smp_mk_hyps[oo.ky_h_u_Sg][:, :, frm:, m], axis=2)
+
+        _Sg_nu[m]  = _N.mean(smp_mk_hyps[oo.ky_h_Sg_nu][0, frm:, m], axis=0)
+        _Sg_PSI[m] = _N.mean(smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, frm:, m], axis=2)
         oo.mk_hypPstMd[oo.ky_h_u_u][epc, m]   = _u_u[m]
         oo.mk_hypPstMd[oo.ky_h_u_Sg][epc, m]  = _u_Sg[m]
         oo.mk_hypPstMd[oo.ky_h_Sg_nu][epc, m] = _Sg_nu[m]
         oo.mk_hypPstMd[oo.ky_h_Sg_PSI][epc, m]= _Sg_PSI[m]
         #print _u_Sg[m]
+
     u[0:M]         = oo.mk_prmPstMd[oo.ky_p_u][epc]
     Sg[0:M]        = oo.mk_prmPstMd[oo.ky_p_Sg][epc]
 

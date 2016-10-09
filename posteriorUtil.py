@@ -1,6 +1,7 @@
 import numpy as _N
 from filter import gauKer
 import matplotlib.pyplot as _plt
+#from scipy.spatial.distance import cdist, euclidean
 
 def MAPvalues(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, gk, l_trlsNearMAP):
 
@@ -117,4 +118,36 @@ gk    = gauKer(3)
 xb    = 0.5*(bns[1:] + bns[0:-1])
 fcnts = _N.convolve(cnts, gk, mode="same")
 iMax  = int(_N.mean(_N.where(fcnts == _N.max(fcnts))[0]))
+"""
+
+#  borrowed from
+#  http://stackoverflow.com/questions/30299267/geometric-median-of-multidimensional-points
+"""
+def geometric_median(X, eps=1e-5):
+    y = _N.mean(X, 0)
+
+    while True:
+        D = cdist(X, [y])
+        nonzeros = (D != 0)[:, 0]
+
+        Dinv = 1 / D[nonzeros]
+        Dinvs = _N.sum(Dinv)
+        W = Dinv / Dinvs
+        T = _N.sum(W * X[nonzeros], 0)
+
+        num_zeros = len(X) - _N.sum(nonzeros)
+        if num_zeros == 0:
+            y1 = T
+        elif num_zeros == len(X):
+            return y
+        else:
+            R = (T - y) * Dinvs
+            r = _N.linalg.norm(R)
+            rinv = 0 if r == 0 else num_zeros/r
+            y1 = max(0, 1-rinv)*T + min(1, rinv)*y
+
+        if euclidean(y, y1) < eps:
+            return y1
+
+        y = y1
 """
