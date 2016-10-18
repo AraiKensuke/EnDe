@@ -27,14 +27,14 @@ def M_times_N_f_intgrls_noOMP_raw(double[:, ::1] fxs, double[::1] ux, double[::1
             p_f_exp_px[m*M + fi] = intgrl(m, p_fxs, p_ux, p_px, M, Nupx, dSilenceX, IIQ2, fi)
     #     #  f_exp_px   is M x fss
 
-cdef double intgrl(int m, double *p_fxs, double *p_ux, double *p_px, int M, int Nupx, double dSilenceX, double IIQ2, int fi):
+cdef double intgrl(int m, double *p_fxs, double *p_ux, double *p_px, int M, int Nupx, double dSilenceX, double IIQ2, int fi) nogil:
     cdef double dd, tot
     cdef int mM
 
     mM = m*M
 
     tot = 0.0
-    for n in xrange(Nupx):
+    for n in range(Nupx):
         dd = p_fxs[mM + fi]-p_ux[n]
         tot += exp(-0.5*dd*dd*IIQ2)*p_px[n]
     tot *= dSilenceX
@@ -117,17 +117,50 @@ def M_times_N_f_intgrls(double[:, ::1] fxs, double[::1] ux, double[::1] iiq2, do
     cdef int fi, m, n
     cdef double dd, IIQ2
     cdef double[:, ::1] f_exp_px_N = f_exp_px
+    cdef double ans = 0
+
+    print "M is %d" % M
+    cdef int I, J
+    cdef int i, j, x
+    cdef double k, slp, dzdx, dzdy
+    I = f_exp_px_N.shape[0]
+    J = f_exp_px_N.shape[1]
 
     with nogil, parallel(num_threads=nthrds):
-        for m in xrange(M):
+        for m in prange(M, schedule="dynamic"):
             IIQ2 = iiq2[m]
+        
             for fi in range(fss):
                 f_exp_px_N[m, fi] = 0
                 for n in range(Nupx):
                     dd = fxs[m, fi]-ux[n]
                     f_exp_px_N[m, fi] += exp(-0.5*dd*dd*IIQ2)*px[n]
+                    exp(-0.5*dd*dd*IIQ2)*px[n]
                 f_exp_px_N[m, fi] *= dSilenceX
             #  f_exp_px   is M x fss
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def M_times_N_f_intgrls_raw(double[:, ::1] fxs, double[::1] ux, double[::1] iiq2, double dSilenceX, double[::1] px, double[:, ::1] f_exp_px, int M, int fss, int Nupx, int nthrds):
+    #  fxs       M x fss   
+    #  fxrux     Nupx    
+    #  f_intgrd  Nupx
+    cdef int fi, m, n
+    cdef double dd, IIQ2
+
+    cdef double *p_fxs = &fxs[0, 0]
+    cdef double *p_px  = &px[0]
+    cdef double *p_ux  = &ux[0]
+    cdef double *p_f_exp_px = &f_exp_px[0, 0]
+
+    with nogil, parallel(num_threads=nthrds):
+        for m in prange(M, schedule="dynamic"):
+            IIQ2 = iiq2[m]
+            for fi in range(fss):
+                p_f_exp_px[m*M + fi] = intgrl(m, p_fxs, p_ux, p_px, M, Nupx, dSilenceX, IIQ2, fi)
+    #     #  f_exp_px   is M x fss
+
 
 
 
