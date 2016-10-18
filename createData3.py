@@ -215,12 +215,12 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, 
 
         #  now noise spikes
         if bckgrdLam is not None:
-            sts  = _N.where(rnds[m] < (bckgrdLam*dt)/float(M))[0]
-            dat[sts, 1] = 1
+            nzsts  = _N.where(rnds[m] < (bckgrdLam*dt)/float(M))[0]
+            dat[nzsts, 1] = 1
             nrn = nrnNum[m]
             if K > 0:
-                for t in xrange(len(sts)):
-                    dat[sts[t], 2:] = _N.random.multivariate_normal(mk_MU[nrn, t], Covs[nrn], size=1)
+                for t in xrange(len(nzsts)):
+                    dat[nzsts[t], 2:] = _N.random.multivariate_normal(mk_MU[nrn, t], Covs[nrn], size=1)
 
     if thresh is not None:
         sts = _N.where(dat[:, 1] == 1)[0]

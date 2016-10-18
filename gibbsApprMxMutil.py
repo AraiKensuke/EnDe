@@ -96,7 +96,8 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3):
     ##################
     lab      = _N.array(labS.tolist() + (labH + clstrs[0]).tolist())
 
-    return labS, labH, lab, flatlabels, M, MF, hashthresh
+    # flatlabels + lab = same content, but flatlabels are temporally correct
+    return labS, labH, lab, flatlabels, M, MF, hashthresh, clstrs
 
 def declare_params(_M, K, nzclstr=False, uAll=None, SgAll=None):
     ######################################  INITIAL VALUE OF PARAMS
@@ -126,7 +127,7 @@ def declare_prior_hyp_params(M, MF, K, x, mks, Asts, t0):
 
     return _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI
 
-def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, Asts, t0, x, mks, flatlabels, nzclstr=False):
+def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, Asts, t0, x, mks, flatlabels, nzclstr=False, signalClusters=None):
     """
     M is # of clusters excluding noize
     """
@@ -140,8 +141,11 @@ def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, Asts, t0, x, mks, flatlabel
         u[im]  = _N.mean(mks[Asts[kinds]+t0], axis=0)
         #_u_u[im]= u[im]
         #_u_Sg[im] = _N.identity(K)
-        q2[im] = _N.std(x[Asts[kinds]+t0], axis=0)**2
-        if len(kinds) >= K:
+        if len(kinds) > 1:
+            q2[im] = _N.std(x[Asts[kinds]+t0], axis=0)**2
+        else:
+            q2[im] = 0.1  #   just don't know about this one
+        if len(kinds) > K:
             Sg[im] = _N.cov(mks[Asts[kinds]+t0], rowvar=0)
         else:
             Sg[im] = _N.cov(mks[Asts+t0], rowvar=0)
@@ -158,11 +162,15 @@ def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, Asts, t0, x, mks, flatlabel
         print "using the noise cluster"
         #  l0 / sqrt(2*pi*50**2)
         print "M   ''''''''''''    %d" % M
-        l0[M] = 1000.   #  ~ 0.1Hz
-        q2[M] = 300**2
-        Sg[M] = _N.cov(mks[Asts], rowvar=0)
+        l0[M] = 10000.   #  ~ 0.1Hz    #  1000/sqrt(2*pi*300**2)  #  seems better to start high here
+        q2[M] = 500**2
+        if signalClusters is not None:
+            Sg[M] = _N.cov(mks[Asts[signalClusters]], rowvar=0) * 0.5
+            u[M]  = _N.mean(mks[Asts[signalClusters]], axis=0)
+        else:
+            Sg[M] = _N.cov(mks[Asts], rowvar=0)
+            u[M]  = _N.mean(mks[Asts], axis=0)
         f[M]  = 0
-        u[M]  = _N.mean(mks[Asts], axis=0)
 
     oo.sp_prmPstMd[0, oo.ky_p_l0::3] = l0[0:M]
     oo.sp_prmPstMd[0, oo.ky_p_f::3] = f[0:M]
@@ -183,6 +191,7 @@ def stochasticAssignment(oo, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, 
 
     ur         = u.reshape((1, M, K))
     fr         = f.reshape((M, 1))    # centers
+    #print q2
     iq2        = 1./q2
     iSg        = _N.linalg.inv(Sg)
     iq2r       = iq2.reshape((M, 1))  
@@ -477,7 +486,7 @@ def finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a
 
     rsmp_sp_prms = smp_sp_prms.swapaxes(1, 0).reshape(ITERS, 3*M, order="F")
 
-    _N.savetxt(resFN("posParams_%d.dat" % epc, dir=oo.outdir), rsmp_sp_prms, fmt=("%.4f %.4f %.4f " * M))
+    _N.savetxt(resFN("posParams_%d.dat" % epc, dir=oo.outdir), rsmp_sp_prms, fmt=("%.4f %.4f %.4f " * M))   #  the params for the non-noise
     #_N.savetxt(resFN("posHypParams.dat", dir=oo.outdir), smp_sp_hyps[:, :, 0].T, fmt="%.4f %.4f %.4f %.4f %.4f %.4f")
 
 

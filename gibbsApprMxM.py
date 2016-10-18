@@ -63,7 +63,10 @@ class MarkAndRF:
     nzclstr  = False
     
     diffusePerMin = 0.05    #  diffusion of certainty
-    
+
+    nz_q2               = 500
+    nz_f                = 0
+
     def __init__(self, outdir, fn, intvfn, xLo=0, xHi=3, seed=1041, adapt=True, nzclstr=False, t_hlf_l0_mins=None, t_hlf_q2_mins=None):
         oo     = self
         oo.adapt = adapt
@@ -131,15 +134,13 @@ class MarkAndRF:
         mks    = oo.dat[:, 2:]
 
         f_q2_rate = (oo.diffusePerMin**2)/60000.  #  unit of minutes  
-        
+
         ######################################  PRECOMPUTED
 
         tau_l0 = oo.t_hlf_l0/_N.log(2)
         tau_q2 = oo.t_hlf_q2/_N.log(2)
 
         for epc in xrange(ep1, ep2):
-
-
             t0 = oo.intvs[epc]
             t1 = oo.intvs[epc+1]
             if epc > 0:
@@ -157,8 +158,9 @@ class MarkAndRF:
             Ants    = _N.where(oo.dat[t0:t1, 1] == 0)[0]
 
             if epc == ep1:   ###  initialize
-                labS, labH, lab, flatlabels, M, MF, hashthresh = gAMxMu.initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=doSepHash, xLo=oo.xLo, xHi=oo.xHi)
+                labS, labH, lab, flatlabels, M, MF, hashthresh, nHSclusters = gAMxMu.initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=doSepHash, xLo=oo.xLo, xHi=oo.xHi)  # nHSclusters  is # of clusters in hash and signal 
 
+                signalClusters = _N.where(flatlabels < nHSclusters[0])[0]
                 Mwowonz = M if not oo.nzclstr else M + 1
                 #######   containers for GIBBS samples iterations
                 smp_sp_prms = _N.zeros((3, ITERS, M))  
@@ -174,18 +176,26 @@ class MarkAndRF:
                 oo.smp_sp_hyps = smp_sp_hyps
                 oo.smp_mk_hyps = smp_mk_hyps
 
+                if oo.nzclstr:
+                    smp_nz_l0     = _N.zeros(ITERS)
+                    smp_nz_hyps = _N.zeros((2, ITERS))
+
                 #  list of freeClstrs
                 freeClstr = _N.empty(M, dtype=_N.bool)   #  Actual cluster
                 freeClstr[:] = False
 
-                l0, f, q2, u, Sg = gAMxMu.declare_params(M, K, nzclstr=oo.nzclstr)   #  nzclstr not inited  # sized to include noise cluster if needed
+                l0, f, q2, u, Sg = gAMxMu.declare_params(M, K, nzclstr=oo.nzclstr)   #  nzclstr not INITED, sized to include noise cluster if needed
                 _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, \
-                    _Sg_PSI = gAMxMu.declare_prior_hyp_params(M, MF, K, x, mks, Asts, t0)
-                gAMxMu.init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, Asts, t0, x, mks, flatlabels, nzclstr=oo.nzclstr)
+                    _Sg_PSI = gAMxMu.declare_prior_hyp_params(M, MF, K, x, mks, Asts, t0)    #  hyper params don't include noise cluster
+                gAMxMu.init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, Asts, t0, x, mks, flatlabels, nzclstr=oo.nzclstr, signalClusters=signalClusters)
 
                 ######  the hyperparameters for f, q2, u, Sg, l0 during Gibbs
                 #  f_u_, f_q2_, q2_a_, q2_B_, u_u_, u_Sg_, Sg_nu, Sg_PSI_, l0_a_, l0_B_
 
+                if oo.nzclstr:
+                    nz_l0_intgrd   = _N.exp(-0.5*ux*ux / q2[Mwowonz-1])
+                    _nz_l0_a       = 0.001
+                    _nz_l0_B       = 0.1
 
             NSexp   = t1-t0    #  length of position data  #  # of no spike positions to sum
             xt0t1 = _N.array(x[t0:t1])
@@ -295,15 +305,11 @@ class MarkAndRF:
 
                     ###  l0 / _N.sqrt(twpi*q2) is f*dt used in createData2
                     smp_sp_prms[oo.ky_p_l0, iter, m] = l0[m]
-
                     smp_sp_hyps[oo.ky_h_l0_a, iter, m] = l0_a_
                     smp_sp_hyps[oo.ky_h_l0_B, iter, m] = l0_B_
                     mcs = _N.empty((M, K))   # cluster sample means
 
                     if nSpksM >= K:
-                        #try:
-                        #u_Sg_ = _N.linalg.inv(_N.linalg.inv(_u_Sg[m]) + nSpksM*iSg[m])
-                        
                         u_Sg_ = _N.linalg.inv(_iu_Sg[m] + nSpksM*iSg[m])
                         clstx    = mks[sts]
 
@@ -459,21 +465,26 @@ class MarkAndRF:
 
                 #  nz clstr.  fixed width
                 if oo.nzclstr:
-                    minds = _N.where(gz[iter, :, Mwowonz-1] == 1)[0]
-                    BL  = (oo.dt/_N.sqrt(twpi*q2[Mwowonz-1])) * (t1-t0) 
-                    aL  = len(minds)
-                    aL  = aL + 0.001
-                    BL  = BL + 0.1
-                    #_Dl0_a = _l0_a[m]
-                    #_Dl0_B = _l0_B[m]
+                    nz_l0_exp_px   = _N.sum(nz_l0_intgrd*px) * dSilenceX
+                    BL  = (oo.dt/_N.sqrt(twpi*q2[Mwowonz-1]))*nz_l0_exp_px
 
-                    l0[Mwowonz-1] = _ss.gamma.rvs(aL, scale=(1./BL))  #  check
-                    print len(minds)
-                    print f[Mwowonz-1]
-                    print q2[Mwowonz-1]
+                    minds = len(_N.where(gz[iter, :, Mwowonz-1] == 1)[0])
+                    l0_a_ = minds + _nz_l0_a
+                    l0_B_ = BL    + _nz_l0_B
+
+                    l0[Mwowonz-1]  = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_)) 
+                    smp_nz_l0[iter]       = l0[Mwowonz-1]
+                    smp_nz_hyps[0, iter]  = l0_a_
+                    smp_nz_hyps[1, iter]  = l0_B_
+                    
 
             ###  THIS LEVEL:  Finished Gibbs iters for epoch
             gAMxMu.finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_hyps, smp_sp_prms, smp_mk_hyps, smp_mk_prms, freeClstr, M, K)
+            #  MAP of nzclstr
+            if oo.nzclstr:
+                frm = int(0.7*ITERS)
+                _nz_l0_a              = _N.median(smp_nz_hyps[0, frm:])
+                _nz_l0_B              = _N.median(smp_nz_hyps[1, frm:])
             pcklme["smp_sp_hyps"] = smp_sp_hyps
             pcklme["smp_mk_hyps"] = smp_mk_hyps
             pcklme["smp_sp_prms"] = smp_sp_prms
@@ -483,7 +494,12 @@ class MarkAndRF:
             pcklme["intvs"]       = oo.intvs
             pcklme["occ"]         = gz
             pcklme["nz_pth"]         = nz_pth
-
+            pcklme["M"]           = M
+            pcklme["Mwowonz"]           = Mwowonz
+            if Mwowonz > M:  # or oo.nzclstr == True
+                pcklme["smp_nz_l0"]  = smp_nz_l0
+                pcklme["smp_nz_hyps"]= smp_nz_hyps
+                
             dmp = open(resFN("posteriors_%d.dmp" % epc, dir=oo.outdir), "wb")
             pickle.dump(pcklme, dmp, -1)
             dmp.close()
