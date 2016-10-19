@@ -246,7 +246,9 @@ class MarkAndRF:
                     nSpksM   = len(sts)
                     clusSz[m] = nSpksM
 
+                    ###############
                     ###############  CONDITIONAL l0
+                    ###############
 
                     #  _ss.gamma.rvs.  uses k, theta  k is 1/B (B is our thing)
                     iiq2 = 1./q2[m]
@@ -256,7 +258,6 @@ class MarkAndRF:
                     #  l0_intgrd   (M x Nupx)
                     l0_intgrd   = _N.exp(-0.5*(f[m] - ux)*(f[m]-ux) * iiq2)  
                     l0_exp_px   = _N.sum(l0_intgrd*px) * dSilenceX
-
                     BL  = (oo.dt/_N.sqrt(twpi*q2[m]))*l0_exp_px
 
 

@@ -235,7 +235,6 @@ class MarkAndRF:
 
             for iter in xrange(ITERS):
                 ttA = _tm.time()
-
                 iSg = _N.linalg.inv(Sg)
 
                 if (iter % 5) == 0:    
@@ -244,7 +243,7 @@ class MarkAndRF:
                 gAMxMu.stochasticAssignment(oo, iter, M, Mwowonz, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, ((epc > 0) and (iter == 0)))
                 ttSA = _tm.time()
 
-                #         ###############  FOR EACH CLUSTER
+                ###############  FOR EACH CLUSTER
 
                 l_sts = []
                 for m in xrange(M):   #  get the minds
@@ -253,7 +252,9 @@ class MarkAndRF:
                     clstsz[m] = len(sts)
                     l_sts.append(sts)
 
+                ###############
                 ###############  CONDITIONAL l0
+                ###############
 
                 #  _ss.gamma.rvs.  uses k, theta  k is 1/B (B is our thing)
                 iiq2 = 1./q2
@@ -292,6 +293,9 @@ class MarkAndRF:
                 smp_sp_hyps[oo.ky_h_l0_B, iter] = l0_B_
                 mcs = _N.empty((M, K))   # cluster sample means
 
+                ###############
+                ###############     u
+                ###############
                 for m in xrange(M):
                     if clstsz[m] > 0:
                         #try:
@@ -321,10 +325,9 @@ class MarkAndRF:
                 smp_mk_hyps[oo.ky_h_u_u][:, iter] = u_u_.T
                 smp_mk_hyps[oo.ky_h_u_Sg][:, :, iter] = u_Sg_.T
 
-                """
-                ############################################
-                """
+                ###############
                 ###############  Conditional f
+                ###############
                 #q2pr = _f_q2[m] if (_f_q2[m] > q2rate) else q2rate
                 if (epc > 0) and oo.adapt:
                     q2pr = _f_q2 + f_q2_rate * dt
@@ -354,7 +357,7 @@ class MarkAndRF:
 
                     tt1     = _tm.time()
                     if use_omp:
-                        M_times_N_f_intgrls_noOMP(fxs, ux, iiq2, dSilenceX, px, f_exp_px, M, oo.fss, oo.Nupx, 16)
+                        M_times_N_f_intgrls(fxs, ux, iiq2, dSilenceX, px, f_exp_px, M, oo.fss, oo.Nupx, 4)
                     else:
                         fxsr     = fxs.reshape((M, oo.fss, 1))
                         fxrux = -0.5*(fxsr-uxrr)*(fxsr-uxrr)
@@ -394,8 +397,9 @@ class MarkAndRF:
                 smp_sp_hyps[oo.ky_h_f_u, iter] = f_u_
                 smp_sp_hyps[oo.ky_h_f_q2, iter] = f_q2_
 
-            #         #ttc1g = _tm.time()
-            #         #############  VARIANCE, COVARIANCE
+                ##############
+                ##############  VARIANCE, COVARIANCE
+                ##############
                 for m in xrange(M):
                     if clstsz[m] >= K:
                         ##  dof of posterior distribution of cluster covariance

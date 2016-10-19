@@ -58,28 +58,28 @@ def ig_prmsUV(sg2s, sLLkPr, s, d_sg2s, sg2s_m1, ITER=1, nSpksM=0, clstr=-1, l0=N
     
     if a_ > 10000:
         print "oops   nSpksM is %(n)d, cl %(c)d" % {"n" : nSpksM, "c" : clstr}
-        # fig = _plt.figure(figsize=(8, 4))
-        # sLLkPr -= _N.max(sLLkPr)
-        # s -= _N.max(sLLkPr)
+        if nSpksM > 0:
+            fig = _plt.figure(figsize=(8, 4))
+            sLLkPr -= _N.max(sLLkPr)
+            s -= _N.max(sLLkPr)
 
-        # plths = _N.empty((len(sLLkPr), 4))
-        # plths[:, 0] = sg2s
-        # plths[:, 1] = sLLkPr
-        # plths[:, 2] = sat
-        # plths[:, 3] = s
-        # _N.savetxt("plths.dat", plths, fmt="%.5e %.5f %.5f %.5f")
-        """
-        fig.add_subplot(2, 1, 1)
+            plths = _N.empty((len(sLLkPr), 4))
+            plths[:, 0] = sg2s
+            plths[:, 1] = sLLkPr
+            plths[:, 2] = sat
+            plths[:, 3] = s
+            _N.savetxt("plths.dat", plths, fmt="%.5e %.5f %.5f %.5f")
+            fig.add_subplot(2, 1, 1)
 
-        _plt.plot(sg2s, sLLkPr, lw=2)
-        _plt.plot(sg2s, s)
-        _plt.xscale("log")
-        fig.add_subplot(2, 1, 2)
-        _plt.plot(sg2s, sat, lw=2)
-        _plt.xscale("log")
-        _plt.savefig("%(it)d,%(cl)d" % {"it" : ITER, "cl" : clstr})
-        _plt.close()
-        """
+            _plt.plot(sg2s, sLLkPr, lw=2)
+            _plt.plot(sg2s, s)
+            _plt.xscale("log")
+            fig.add_subplot(2, 1, 2)
+            _plt.plot(sg2s, sat, lw=2)
+            _plt.xscale("log")
+            _plt.savefig("%(it)d,%(cl)d" % {"it" : ITER, "cl" : clstr})
+            _plt.close()
+
         if u > 1.5:  # wide  B / (a+1)   
             print "u > 1.5    clstr %(c)d   nSpksM %(n)d" % {"c" : clstr, "n" : nSpksM}
             return 0.1+0.2*_N.random.rand(), 1+20*_N.random.rand()   #  just wide

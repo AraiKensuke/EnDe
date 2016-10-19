@@ -50,7 +50,7 @@ cmdclass = {'build_ext' : build_ext}
 ext_modules = Extension('par_intgrls',
                     ["par_intgrls.pyx"],
                     #libraries = ['gsl', 'gslcblas'],
-                    #include_dirs=incdir1,
+                    include_dirs=incdir1,   #  include_dirs for Mac
                     extra_compile_args=extra_compile_args,
                     extra_link_args=extra_link_args)  #  linker args
 setup(
