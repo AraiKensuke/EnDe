@@ -14,7 +14,7 @@ import pickle
 from posteriorUtil import MAPvalues2
 from filter import gauKer
 import gibbsApprMxMutil as gAMxMu
-from par_intgrls  import M_times_N_f_intgrls_noOMP, M_times_N_q2_intgrls_noOMP
+from par_intgrls_f  import M_times_N_f_intgrls_noOMP, M_times_N_q2_intgrls_noOMP
 
 import clrs 
 
