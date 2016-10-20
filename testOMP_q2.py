@@ -68,6 +68,16 @@ f_intgrd  = _N.exp(fxrux*iiq2rr)   #  integrand
 f_exp_px = _N.sum(f_intgrd*pxrr, axis=2) * dSilenceX
 #  f_exp_px   is M x fss
 
+
+frr       = f.reshape((M, 1, 1))
+q2xr     = q2x.reshape((oo.q2ss, 1))
+q2xrr     = q2x.reshape((1, oo.q2ss, 1))
+iq2xrr     = 1./q2xrr
+
+q2_intgrd = _N.exp(-0.5*(frr - uxrr)*(frr-uxrr) * iq2xrr)
+q2_exp_px = _N.sum(q2_intgrd*pxrr, axis=2) * dSilenceX
+
+
 t7 = _tm.time()
 
 

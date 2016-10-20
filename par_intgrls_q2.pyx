@@ -7,7 +7,7 @@ cimport numpy as _N
 
 cdef Py_ssize_t idx, i, n = 100
 
-cdef double f_intgrl(int m, double *p_fxs, double *p_ux, double *p_px, int M, int fss, int Nupx, double dSilenceX, double IIQ2, int fi) nogil:
+cdef double q2_intgrl(int m, double *p_fxs, double *p_ux, double *p_px, int M, int fss, int Nupx, double dSilenceX, double IIQ2, int fi) nogil:
     cdef double dd, tot
     cdef int mM
 
@@ -15,7 +15,7 @@ cdef double f_intgrl(int m, double *p_fxs, double *p_ux, double *p_px, int M, in
 
     tot = 0.0
     for n in xrange(Nupx):
-        dd = p_fxs[mM + fi]-p_ux[n]
+        dd = f[m]-p_ux[n]
         tot += exp(-0.5*dd*dd*IIQ2)*p_px[n]
     tot *= dSilenceX
     return tot
@@ -23,7 +23,7 @@ cdef double f_intgrl(int m, double *p_fxs, double *p_ux, double *p_px, int M, in
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def M_times_N_f_intgrls(double[:, ::1] fxs, double[::1] ux, double[::1] iiq2, double dSilenceX, double[::1] px, double[:, ::1] f_exp_px, int M, int fss, int Nupx, int nthrds):
+def M_times_N_q2_intgrls(double[:, ::1] q2xs, double[::1] ux, double[::1] iiq2, double dSilenceX, double[::1] px, double[:, ::1] f_exp_px, int M, int q2ss, int Nupx, int nthrds):
     #  fxs       M x fss   
     #  fx                                        rux     Nupx    
     #  f_intgrd  Nupx
@@ -33,11 +33,11 @@ def M_times_N_f_intgrls(double[:, ::1] fxs, double[::1] ux, double[::1] iiq2, do
 
     with nogil, parallel(num_threads=nthrds):
         for m in prange(M):
-            IIQ2 = iiq2[m]
-            for fi in range(fss):
+            for q2i in range(q2ss):   # various values of q2
+                IIQ2 = 1./qxs[m, q2i]
                 f_exp_px_N[m, fi] = 0
                 for n in range(Nupx):
-                    dd = fxs[m, fi]-ux[n]
+                    dd = f[m]-ux[n]
                     f_exp_px_N[m, fi] += exp(-0.5*dd*dd*IIQ2)*px[n]
                 f_exp_px_N[m, fi] *= dSilenceX
             #  f_exp_px   is M x fss
@@ -45,7 +45,7 @@ def M_times_N_f_intgrls(double[:, ::1] fxs, double[::1] ux, double[::1] iiq2, do
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def M_times_N_f_intgrls_raw(double[:, ::1] fxs, double[::1] ux, double[::1] iiq2, double dSilenceX, double[::1] px, double[:, ::1] f_exp_px, int M, int fss, int Nupx, int nthrds):
+def M_times_N_f_intgrls_raw(double[::1] f, double[::1] ux, double[::1] iiq2, double dSilenceX, double[::1] px, double[:, ::1] f_exp_px, int M, int fss, int Nupx, int nthrds):
     #  fxs       M x fss   
     #  fxrux     Nupx    
     #  f_intgrd  Nupx

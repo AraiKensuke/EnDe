@@ -14,6 +14,7 @@ import pickle
 from posteriorUtil import MAPvalues2
 from filter import gauKer
 import gibbsApprMxMutil as gAMxMu
+from par_intgrls  import M_times_N_f_intgrls_raw
 
 import clrs 
 
@@ -98,7 +99,7 @@ class MarkAndRF:
         """
         gtdiffusion:  use ground truth center of place field in calculating variance of center.  Meaning of diffPerMin different
         """
-        print "normal gibbs"
+        print "RAW gibbs"
         oo = self
         twpi     = 2*_N.pi
         pcklme   = {}
@@ -176,6 +177,14 @@ class MarkAndRF:
                 oo.smp_sp_hyps = smp_sp_hyps
                 oo.smp_mk_hyps = smp_mk_hyps
 
+
+                U   = _N.empty(M)
+                FQ2 = _N.empty(M)
+                _fxs0 = _N.tile(_N.linspace(0, 1, oo.fss), M).reshape(M, oo.fss)
+
+                f_exp_px = _N.empty((M, oo.fss))
+                q2_exp_px= _N.empty((M, oo.q2ss))
+
                 if oo.nzclstr:
                     smp_nz_l0     = _N.zeros(ITERS)
                     smp_nz_hyps = _N.zeros((2, ITERS))
@@ -222,6 +231,7 @@ class MarkAndRF:
             #_iSg_Mu = _N.einsum("mjk,mk->mj", _N.linalg.inv(_u_Sg), _u_u)
 
             clusSz = _N.zeros(M, dtype=_N.int)
+            clstsz = _N.zeros(M, dtype=_N.int)
 
             _iu_Sg = _N.array(_u_Sg)
 
@@ -240,11 +250,14 @@ class MarkAndRF:
 
         #         ###############  FOR EACH CLUSTER
 
+                l_sts = []
                 for m in xrange(M):
                     minds = _N.where(gz[iter, :, m] == 1)[0]
                     sts  = Asts[minds] + t0
                     nSpksM   = len(sts)
                     clusSz[m] = nSpksM
+                    clstsz[m] = len(sts)
+                    l_sts.append(sts)
 
                     ###############
                     ###############  CONDITIONAL l0
@@ -328,64 +341,76 @@ class MarkAndRF:
 
                         u_u_ = _N.array(_u_u[m])
                     u[m] = _N.random.multivariate_normal(u_u_, u_Sg_)
-                    
+
                     smp_mk_prms[oo.ky_p_u][:, iter, m] = u[m]
                     smp_mk_hyps[oo.ky_h_u_u][:, iter, m] = u_u_
                     smp_mk_hyps[oo.ky_h_u_Sg][:, :, iter, m] = u_Sg_
 
-                    """
-                    ############################################
-                    """
-                    ###############  CONDITIONAL f
-                    #q2pr = _f_q2[m] if (_f_q2[m] > q2rate) else q2rate
+                #####################
+                #####################   f
+                #####################
+                if (epc > 0) and oo.adapt:
+                    q2pr = _f_q2 + f_q2_rate * dt
+                else:
+                    q2pr = _f_q2
                 for m in xrange(M):
-                    """
-                    delete this
-                    """
-                    minds = _N.where(gz[iter, :, m] == 1)[0]
-                    sts  = Asts[minds] + t0
-                    nSpksM   = len(sts)
-                    iiq2  = 1./q2[m]
-                    """
-                    delete this
-                    """
-
-                    if (epc > 0) and oo.adapt:
-                        q2pr = _f_q2[m] + f_q2_rate * dt
+                    sts = l_sts[m]
+                    if clstsz[m] > 0:
+                        fs  = (1./clstsz[m])*_N.sum(xt0t1[sts-t0])
+                        fq2 = q2[m]/clstsz[m]
+                        U[m]   = (fs*q2pr[m] + _f_u[m]*fq2) / (q2pr[m] + fq2)
+                        FQ2[m] = (q2pr[m]*fq2) / (q2pr[m] + fq2)
                     else:
-                        q2pr = _f_q2[m]
-                    if nSpksM > 0:  #  spiking portion likelihood x prior
-                        fs  = (1./nSpksM)*_N.sum(xt0t1[sts-t0])
-                        fq2 = q2[m]/nSpksM
-                        U   = (fs*q2pr + _f_u[m]*fq2) / (q2pr + fq2)
-                        FQ2 = (q2pr*fq2) / (q2pr + fq2)
-                    else:
-                        U   = _f_u[m]
-                        FQ2 = q2pr
+                        U[m]   = _f_u[m]
+                        FQ2[m] = q2pr[m]
 
-                    FQ    = _N.sqrt(FQ2)
-                    fx    = _N.linspace(U - FQ*15, U + FQ*15, oo.fss)
 
-                    if use_spc:
-                        fxr     = fx.reshape((oo.fss, 1))
-                        fxrux = -0.5*(fxr-ux)*(fxr-ux)  # 
-                        f_intgrd  = _N.exp((fxrux*iiq2))   #  integrand
-                        f_exp_px = _N.sum(f_intgrd*px, axis=1) * dSilenceX
-                        s = -(l0[m]*oo.dt/_N.sqrt(twpi*q2[m])) * f_exp_px  #  a function of x
-                    else:
-                        s = 0
-                    funcf   = -0.5*((fx-U)*(fx-U))/FQ2 + s
-                    funcf   -= _N.max(funcf)
-                    condPosF= _N.exp(funcf)
+                FQ    = _N.sqrt(FQ2)
+                Ur    = U.reshape((M, 1))
+                FQr   = FQ.reshape((M, 1))
+                FQ2r  = FQ2.reshape((M, 1))
 
-                    norm    = 1./_N.sum(condPosF)
-                    f_u_    = norm*_N.sum(fx*condPosF)
-                    f_q2_   = norm*_N.sum(condPosF*(fx-f_u_)*(fx-f_u_))
-                    #f[m]    = _N.sqrt(f_q2_)*_N.random.randn() + f_u_
-                    f[m]    = f_u_
-                    smp_sp_prms[oo.ky_p_f, iter, m] = f[m]
-                    smp_sp_hyps[oo.ky_h_f_u, iter, m] = f_u_
-                    smp_sp_hyps[oo.ky_h_f_q2, iter, m] = f_q2_
+                if use_spc:
+                    fxs  = _N.copy(_fxs0)
+                    fxs *= (FQr*30)
+                    fxs -= (FQr*15)
+                    fxs += Ur
+
+                    tt1     = _tm.time()
+                    iiq2_v = 1./q2
+                    M_times_N_f_intgrls_raw(fxs, ux, iiq2_v, dSilenceX, px, f_exp_px, M, oo.fss, oo.Nupx, 8)
+                    tt2     = _tm.time()
+                    l0r = l0[0:M].reshape((M, 1))  # working with sig clus
+                    q2r = q2[0:M].reshape((M, 1))
+                     #  s   is (M x fss)
+                    s = -(l0r*oo.dt/_N.sqrt(twpi*q2r)) * f_exp_px  #  a function of x
+                else:
+                    s = _N.zeros(M)
+
+                #  U, FQ2 is   dim(M)   
+                #  fxs is M x fss
+                funcf   = -0.5*((fxs-Ur)*(fxs-Ur))/FQ2r + s
+                maxes   = _N.max(funcf, axis=1)   
+                maxesr  = maxes.reshape((M, 1))
+                funcf   -= maxesr
+                condPosF= _N.exp(funcf)   #  condPosF is M x fss
+                ttB = _tm.time()
+                # print (ttB-ttA)
+                # print (tt2-tt1)
+                # print "time vector"
+
+                #  fxs   M x fss
+                #  fxs            M x fss
+                #  condPosF       M x fss
+                norm    = 1./_N.sum(condPosF, axis=1)  #  sz M
+                f_u_    = norm*_N.sum(fxs*condPosF, axis=1)  #  sz M
+                f_u_r   = f_u_.reshape((M, 1))
+                f_q2_   = norm*_N.sum(condPosF*(fxs-f_u_r)*(fxs-f_u_r), axis=1)
+                #f       = _N.sqrt(f_q2_)*_N.random.randn() + f_u_
+                f       = f_u_
+                smp_sp_prms[oo.ky_p_f, iter] = f
+                smp_sp_hyps[oo.ky_h_f_u, iter] = f_u_
+                smp_sp_hyps[oo.ky_h_f_q2, iter] = f_q2_
 
                 for m in xrange(M):
                     #ttc1g = _tm.time()
@@ -411,6 +436,7 @@ class MarkAndRF:
                     smp_mk_prms[oo.ky_p_Sg][:, :, iter, m] = Sg[m]
                     smp_mk_hyps[oo.ky_h_Sg_nu][0, iter, m] = Sg_nu_
                     smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, iter, m] = Sg_PSI_
+                
 
             #         # ###############  CONDITIONAL q2
             #         #xI = (xt0t1-f)*(xt0t1-f)*0.5*iq2xr
