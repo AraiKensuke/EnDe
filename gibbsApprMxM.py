@@ -211,7 +211,7 @@ class MarkAndRF:
             xAS  = x[Asts + t0]   #  position @ spikes
             mAS  = mks[Asts + t0]   #  position @ spikes
             xASr = xAS.reshape((1, nSpks))
-            mASr = mAS.reshape((nSpks, 1, K))
+            mASr = mAS.reshape((1, nSpks, K))
             econt = _N.empty((Mwowonz, nSpks))
             rat   = _N.zeros((Mwowonz+1, nSpks))
 

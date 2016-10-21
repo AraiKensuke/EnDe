@@ -9,7 +9,7 @@ M = 62
 
 #  Fill the U
 
-nThrds  = 16
+nThrds  = 4
 Nupx  = 300
 q2ss   = 300
 # U     = _N.random.randn(M)

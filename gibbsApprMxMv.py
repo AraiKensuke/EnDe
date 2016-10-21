@@ -161,12 +161,9 @@ class MarkAndRF:
             pxrr     = px.reshape((1, 1, oo.Nupx))
 
             Asts    = _N.where(oo.dat[t0:t1, 1] == 1)[0]   #  based at 0
-            Ants    = _N.where(oo.dat[t0:t1, 1] == 0)[0]
 
             if epc == ep1:   ###  initialize
                 labS, labH, lab, flatlabels, M, MF, hashthresh, nHSclusters = gAMxMu.initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=doSepHash, xLo=oo.xLo, xHi=oo.xHi)
-
-                signalClusters = _N.where(flatlabels < nHSclusters[0])[0]
                 Mwowonz = M if not oo.nzclstr else M + 1
 
                 u_u_  = _N.empty((M, K))
@@ -220,15 +217,12 @@ class MarkAndRF:
             xAS  = x[Asts + t0]   #  position @ spikes
             mAS  = mks[Asts + t0]   #  position @ spikes
             xASr = xAS.reshape((1, nSpks))
-            mASr = mAS.reshape((nSpks, 1, K))
+            mASr = mAS.reshape((1, nSpks, K))
             econt = _N.empty((Mwowonz, nSpks))
             rat   = _N.zeros((Mwowonz+1, nSpks))
 
             qdrMKS = _N.empty((Mwowonz, nSpks))
             ################################  GIBBS ITERS ITERS ITERS
-
-            #  linalgerror
-            #_iSg_Mu = _N.einsum("mjk,mk->mj", _N.linalg.inv(_u_Sg), _u_u)
 
             clstsz = _N.zeros(M, dtype=_N.int)
 
@@ -244,8 +238,7 @@ class MarkAndRF:
                 if (iter % 5) == 0:    
                     print "iter  %d" % iter
 
-                gAMxMu.stochasticAssignment(oo, iter, M, Mwowonz, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, ((epc > 0) and (iter == 0)))
-                ttSA = _tm.time()
+                gAMxMu.stochasticAssignment(oo, iter, M, Mwowonz, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, ((epc > 0) and (iter == 0)), nthrds=oo.nThrds)
 
                 ###############  FOR EACH CLUSTER
 
@@ -265,8 +258,6 @@ class MarkAndRF:
                 iiq2 = 1./q2
                 iiq2r= iiq2.reshape((M, 1))
                 iiq2rr= iiq2.reshape((M, 1, 1))
-                # xI = (xt0t1-f[m])*(xt0t1-f[m])*0.5*iiq2
-                # BL  = (oo.dt/_N.sqrt(twpi*q2[m]))*_N.sum(_N.exp(-xI))
 
                 l0_intgrd   = _N.exp(-0.5*(fr - ux)*(fr-ux) * iiq2r)  
 
@@ -274,11 +265,6 @@ class MarkAndRF:
                 l0_exp_px   = _N.sum(l0_intgrd*pxr, axis=1) * dSilenceX
                 BL  = (oo.dt/_N.sqrt(twpi*q2))*l0_exp_px    #  dim M
 
-                #    #  keep mode same after discount
-                #  a' - 1 / B' = MODE  # mode is a - 1 / B
-                #  B' = (a' - 1) / MODE
-                #  discount a
-                #if (epc > 0) and oo.adapt and (_l0_a[m] > 1.1):
                 if (epc > 0) and oo.adapt:
                     _md_nd= _l0_a / _l0_B
                     _Dl0_a = _l0_a * _N.exp(-dt/tau_l0)
@@ -292,25 +278,22 @@ class MarkAndRF:
                 l0_B_ = BL + _Dl0_B
                 l0 = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_))  #  check
 
-                    ###  l0 / _N.sqrt(twpi*q2) is f*dt used in createData2
                 smp_sp_prms[oo.ky_p_l0, iter] = l0
                 smp_sp_hyps[oo.ky_h_l0_a, iter] = l0_a_
                 smp_sp_hyps[oo.ky_h_l0_B, iter] = l0_B_
                 mcs = _N.empty((M, K))   # cluster sample means
 
-                tt3 = _tm.time()
+                #tt3 = _tm.time()
+
                 ###############
                 ###############     u
                 ###############
                 for m in xrange(M):
                     if clstsz[m] > 0:
-                        #try:
-                        #u_Sg_ = _N.linalg.inv(_N.linalg.inv(_u_Sg[m]) + nSpksM*iSg[m])
                         u_Sg_[m] = _N.linalg.inv(_iu_Sg[m] + clstsz[m]*iSg[m])
                         clstx    = mks[l_sts[m]]
 
                         mcs[m]       = _N.mean(clstx, axis=0)
-                        #u_u_ = _N.einsum("jk,k->j", u_Sg_, _N.dot(_N.linalg.inv(_u_Sg[m]), _u_u[m]) + nSpksM*_N.dot(iSg[m], mcs[m]))
                         u_u_[m] = _N.einsum("jk,k->j", u_Sg_[m], _N.dot(_iu_Sg[m], _u_u[m]) + clstsz[m]*_N.dot(iSg[m], mcs[m]))
                         # hyp
                         ########  POSITION
@@ -320,7 +303,6 @@ class MarkAndRF:
                         ##  mean of posterior distribution of cluster means
                     else:
                         u_Sg_[m] = _N.array(_u_Sg[m])
-
                         u_u_[m] = _N.array(_u_u[m])
 
                 ucmvnrms= _N.random.randn(M, K)
@@ -331,11 +313,11 @@ class MarkAndRF:
                 smp_mk_hyps[oo.ky_h_u_u][:, iter] = u_u_.T
                 smp_mk_hyps[oo.ky_h_u_Sg][:, :, iter] = u_Sg_.T
 
-                tt4 = _tm.time()
+                #tt4 = _tm.time()
                 ###############
                 ###############  Conditional f
                 ###############
-                #q2pr = _f_q2[m] if (_f_q2[m] > q2rate) else q2rate
+
                 if (epc > 0) and oo.adapt:
                     q2pr = _f_q2 + f_q2_rate * dt
                 else:
@@ -386,9 +368,6 @@ class MarkAndRF:
                 funcf   -= maxesr
                 condPosF= _N.exp(funcf)   #  condPosF is M x fss
                 ttB = _tm.time()
-                # print (ttB-ttA)
-                # print (tt2-tt1)
-                # print "time vector"
 
                 #  fxs   M x fss
                 #  fxs            M x fss
@@ -428,11 +407,7 @@ class MarkAndRF:
 
                 smp_mk_prms[oo.ky_p_Sg][:, :, iter] = Sg.T
 
-                # ###############  CONDITIONAL q2
-                #xI = (xt0t1-f)*(xt0t1-f)*0.5*iq2xr
-
-
-                tt6 = _tm.time()
+                # tt6 = _tm.time()
                 ##############
                 ##############  SAMPLE SPATIAL VARIANCE
                 ##############
@@ -466,9 +441,6 @@ class MarkAndRF:
 
                 for m in xrange(M):
                     if clstsz[m] > 0:
-                        ##  (1/sqrt(sg2))^S
-                        ##  (1/x)^(S/2)   = (1/x)-(a+1)
-                        ##  -S/2 = -a - 1     -a = -S/2 + 1    a = S/2-1
                         sts = l_sts[m]
                         xI = (xt0t1[sts-t0]-f[m])*(xt0t1[sts-t0]-f[m])*0.5
                         SL_a = 0.5*clstsz[m] - 1   #  spiking part of likelihood
@@ -481,9 +453,6 @@ class MarkAndRF:
                 q2_a_, q2_B_ = mltpl_ig_prmsUV(q2xr, sLLkPr.T, s.T, d_q2xr, q2x_m1r, clstsz)
                 q2 = _ss.invgamma.rvs(q2_a_ + 1, scale=q2_B_)  #  check
                 tt7 = _tm.time()
-
-
-                # #print ((1./nSpks)*_N.sum((xt0t1[sts]-f)*(xt0t1[sts]-f)))
 
                 smp_sp_prms[oo.ky_p_q2, iter]   = q2
                 smp_sp_hyps[oo.ky_h_q2_a, iter] = q2_a_

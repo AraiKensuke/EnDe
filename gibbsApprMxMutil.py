@@ -102,7 +102,7 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3):
 
 def declare_params(_M, K, nzclstr=False, uAll=None, SgAll=None):
     ######################################  INITIAL VALUE OF PARAMS
-    M        = _M if not nzclstr else _M + 1
+    M        = _M if not nzclstr else _M + 1   #  l0, q2, f, u, Sg include nzcl
     l0       = _N.array([11.,]*M)
     q2       = _N.array([0.04]*M)
     f        = _N.empty(M)
@@ -179,7 +179,7 @@ def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, Asts, t0, x, mks, flatlabel
     oo.mk_prmPstMd[oo.ky_p_u][0] = u[0:M]
     oo.mk_prmPstMd[oo.ky_p_Sg][0] = Sg[0:M]
 
-def stochasticAssignment(oo, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, cmp2Existing):
+def stochasticAssignment(oo, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, cmp2Existing, nthrds=1):
     #  Msc   Msc signal clusters
     #  M     all clusters, including nz clstr.  M == Msc when not using nzclstr
     #  Gibbs sampling
@@ -192,7 +192,7 @@ def stochasticAssignment(oo, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, 
     #rat      = _N.zeros(M+1)
     pc       = _N.zeros(M)
 
-    ur         = u.reshape((1, M, K))
+    ur         = u.reshape((M, 1, K))
     fr         = f.reshape((M, 1))    # centers
     #print q2
     iq2        = 1./q2
@@ -221,16 +221,13 @@ def stochasticAssignment(oo, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, 
 
 
     pkFRr      = pkFR.reshape((M, 1))
-    dmu        = (mASr - ur)     # mASr N x 1 x K,     ur  is 1 x M x K
+    dmu        = (mASr - ur)     # mASr 1 x N x K,     ur  is M x 1 x K
     N          = mASr.shape[0]
-    mASrr      = mASr.reshape((1, N, K))   # for _fm version of einsum
-    urr        = ur.reshape((M, 1, K))     # for _fm version of einsum
 
-    dmur       = mASrr - urr
     # t2 = _tm.time()
-    _N.einsum("nmj,mjk,nmk->mn", dmu, iSg, dmu, out=qdrMKS)
+    #_N.einsum("mnj,mjk,mnk->mn", dmu, iSg, dmu, out=qdrMKS)
     # t3 = _tm.time()
-    #_fm.multi_qdrtcs_par_func(dmur, iSg, qdrMKS, M, N, K, nthrds=4)
+    _fm.multi_qdrtcs_par_func(dmu, iSg, qdrMKS, M, N, K, nthrds=nthrds)
 
     # t4 = _tm.time()
     # print dmu.shape

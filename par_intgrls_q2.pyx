@@ -9,15 +9,15 @@ cdef Py_ssize_t idx, i, n = 100
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef double q2_intgrl(int m, double *p_f, double *p_ux, double *p_px, int M, int q2ss, int Nupx, double dSilenceX, double IIQ2, int q2i) nogil:
-    cdef double dd, tot
-    cdef int mM
+cdef double q2_intgrl(double p_fm, double *p_ux, double *p_px, int Nupx, double dSilenceX, double IIQ2) nogil:
+    cdef double dd, tot, hlfIIQ2
 
+    hlfIIQ2 = -0.5*IIQ2
     tot = 0.0
 
     for n in xrange(Nupx):
-        dd = p_f[m]-p_ux[n]
-        tot += exp(-0.5*dd*dd*IIQ2)*p_px[n]
+        dd = p_fm-p_ux[n]
+        tot += exp(dd*dd*hlfIIQ2)*p_px[n]
     tot *= dSilenceX
 
     return tot
@@ -51,7 +51,7 @@ def M_times_N_q2_intgrls_raw(double[::1] f, double[::1] ux, double[::1] iiq2xs, 
     #  fxs       M x fss   
     #  fxrux     Nupx    
     #  f_intgrd  Nupx
-    cdef int q2i, m, n
+    cdef int q2i, m, n, mq2ss
     cdef double dd, IIQ2
 
     cdef double *p_f   = &f[0]
@@ -61,7 +61,8 @@ def M_times_N_q2_intgrls_raw(double[::1] f, double[::1] ux, double[::1] iiq2xs, 
 
     with nogil, parallel(num_threads=nthrds):
         for m in prange(M):
+            mq2ss = m*q2ss
             for q2i in xrange(q2ss):     #  unrolling function makes this slower
                 IIQ2 = iiq2xs[q2i]
-                p_q2_exp_px[m*q2ss + q2i] = q2_intgrl(m, p_f, p_ux, p_px, M, q2ss, Nupx, dSilenceX, IIQ2, q2i)
+                p_q2_exp_px[mq2ss + q2i] = q2_intgrl(p_f[m], p_ux, p_px, Nupx, dSilenceX, IIQ2)
     #     #  f_exp_px   is M x fss
