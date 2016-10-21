@@ -5,11 +5,11 @@ import os
 #from par_intgrls  import M_times_N_intgrls_noOMP
 
 from par_intgrls_q2 import M_times_N_q2_intgrls, M_times_N_q2_intgrls_raw
-M = 40
+M = 62
 
 #  Fill the U
 
-nThrds  = 4
+nThrds  = 16
 Nupx  = 300
 q2ss   = 300
 # U     = _N.random.randn(M)

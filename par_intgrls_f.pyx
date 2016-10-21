@@ -7,6 +7,8 @@ cimport numpy as _N
 
 cdef Py_ssize_t idx, i, n = 100
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
 cdef double f_intgrl(int m, double *p_fxs, double *p_ux, double *p_px, int M, int fss, int Nupx, double dSilenceX, double IIQ2, int fi) nogil:
     cdef double dd, tot
     cdef int mM

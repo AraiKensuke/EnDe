@@ -6,6 +6,7 @@ from filter import gauKer
 import time as _tm
 from EnDedirs import resFN, datFN
 import matplotlib.pyplot as _plt
+import fastnum as _fm
 
 twpi = 2*_N.pi
 
@@ -183,6 +184,8 @@ def stochasticAssignment(oo, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, 
     #  M     all clusters, including nz clstr.  M == Msc when not using nzclstr
     #  Gibbs sampling
     #  parameters l0, f, q2
+    #qdrMKS2 = _N.empty(qdrMKS.shape)
+    t1 = _tm.time()
     nSpks = len(Asts)
     twpi = 2*_N.pi
 
@@ -216,10 +219,31 @@ def stochasticAssignment(oo, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, 
 
     rnds       = _N.random.rand(nSpks)
 
-    pkFRr      = pkFR.reshape((M, 1))
-    dmu        = (mASr - ur)
 
+    pkFRr      = pkFR.reshape((M, 1))
+    dmu        = (mASr - ur)     # mASr N x 1 x K,     ur  is 1 x M x K
+    N          = mASr.shape[0]
+    mASrr      = mASr.reshape((1, N, K))   # for _fm version of einsum
+    urr        = ur.reshape((M, 1, K))     # for _fm version of einsum
+
+    dmur       = mASrr - urr
+    # t2 = _tm.time()
     _N.einsum("nmj,mjk,nmk->mn", dmu, iSg, dmu, out=qdrMKS)
+    # t3 = _tm.time()
+    #_fm.multi_qdrtcs_par_func(dmur, iSg, qdrMKS, M, N, K, nthrds=4)
+
+    # t4 = _tm.time()
+    # print dmu.shape
+    # print dmur.shape
+    # print iSg.shape
+
+    # print "------"
+    # print (t2-t1)
+    # print (t3-t2)
+    # print (t4-t3)
+    # print qdrMKS
+    # print qdrMKS2
+
     qdrSPC     = (fr - xASr)*(fr - xASr)*iq2r  #  M x nSpks
 
     ###  how far is closest cluster to each newly observed mark
@@ -361,6 +385,7 @@ def stochasticAssignment(oo, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, 
     M2 = rat[0:-1] <= rnds
 
     gz[it] = (M1&M2).T
+
 
 def finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_hyps, smp_sp_prms, smp_mk_hyps, smp_mk_prms, freeClstr, M, K):
     #  finish epoch doesn't deal with noise cluster
