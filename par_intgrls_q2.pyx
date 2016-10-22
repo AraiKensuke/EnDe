@@ -15,7 +15,7 @@ cdef double q2_intgrl(double p_fm, double *p_ux, double *p_px, int Nupx, double 
     hlfIIQ2 = -0.5*IIQ2
     tot = 0.0
 
-    for n in xrange(Nupx):
+    for 0 <= n < Nupx:
         dd = p_fm-p_ux[n]
         tot += exp(dd*dd*hlfIIQ2)*p_px[n]
     tot *= dSilenceX
@@ -62,7 +62,7 @@ def M_times_N_q2_intgrls_raw(double[::1] f, double[::1] ux, double[::1] iiq2xs, 
     with nogil, parallel(num_threads=nthrds):
         for m in prange(M):
             mq2ss = m*q2ss
-            for q2i in xrange(q2ss):     #  unrolling function makes this slower
+            for 0 <= q2i < q2ss:
                 IIQ2 = iiq2xs[q2i]
                 p_q2_exp_px[mq2ss + q2i] = q2_intgrl(p_f[m], p_ux, p_px, Nupx, dSilenceX, IIQ2)
     #     #  f_exp_px   is M x fss

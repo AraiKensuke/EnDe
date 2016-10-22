@@ -86,10 +86,9 @@ def multi_qdrtcs_par(double[:, :, ::1] v, double[:, :, ::1] iSg, double[:, ::1] 
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cdef void inner_loop(double *p_v, double *p_iSg, double *p_qdr, int N, int k, int mN, int mNk, int mkk) nogil:
-    cdef int n, i, j, nk, ik, mNk_nk, mN_n, mkk_ik
+    cdef int n, i, j, ik, mNk_nk, mN_n, mkk_ik
     for n in range(N):
-        nk = n*k
-        mNk_nk = mNk + nk
+        mNk_nk = mNk + n*k
         mN_n   = mN + n
         for i in range(k):
             mkk_ik = mkk + i*k
@@ -102,8 +101,7 @@ cdef void inner_loop(double *p_v, double *p_iSg, double *p_qdr, int N, int k, in
 cdef void inner_loop2(double *p_v, double *p_iSg, double *p_qdr, int N, int k, int mN, int mNk, int mkk) nogil:
     cdef int n, i, j, nk, ik, mNk_nk, mN_n, mkk_ik
     for 0 <= n < N:
-        nk = n*k
-        mNk_nk = mNk + nk
+        mNk_nk = mNk + n*k
         mN_n   = mN + n
         for 0 <= i < k:
             mkk_ik = mkk + i*k

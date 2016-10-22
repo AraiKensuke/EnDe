@@ -111,7 +111,7 @@ def mltpl_ig_prmsUV(sg2s, sLLkPr, s, d_sg2s, sg2s_m1, clstsz, l0=None):
     agt = _N.where(a_ > 10000)[0]
 
     for im in agt:
-        print "oops   nSpksM is %(n)d, cl %(c)d" % {"n" : clstsz[im], "c" : clstr}
+        print "oops   nSpksM is %(n)d, cl %(c)d" % {"n" : clstsz[im], "c" : im}
         if u[im] > 1.5:  # wide  B / (a+1)   
             print "u > 1.5    clstr %(c)d   nSpksM %(n)d" % {"c" : im, "n" : clstsz[im]}
             a_[agt] = 0.1+0.2*_N.random.rand()

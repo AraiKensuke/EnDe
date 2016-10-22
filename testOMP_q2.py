@@ -9,9 +9,9 @@ M = 62
 
 #  Fill the U
 
-nThrds  = 4
+nThrds  = 16
 Nupx  = 300
-q2ss   = 300
+q2ss   = 500
 # U     = _N.random.randn(M)
 
 f         = _N.random.rand(M)*12-6

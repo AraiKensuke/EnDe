@@ -2,7 +2,7 @@ import time as _tm
 import os
 
 #from par_intgrls_f  import M_times_N_f_intgrls, M_times_N_f_intgrls_noOMP, M_times_N_f_intgrls_noOMP_raw, M_times_N_f_intgrls_pure, M_times_N_f_intgrls_raw, M_times_N_f_intgrls_raw_no_func
-from par_intgrls_f  import M_times_N_f_intgrls, M_times_N_f_intgrls_raw
+from par_intgrls_f  import M_times_N_f_intgrls, M_times_N_f_intgrls_raw, M_times_N_f_intgrls_raw_rldout
 M = 40
 
 os.system("taskset -p 0xffffffff %d" % os.getpid())
@@ -52,10 +52,13 @@ f_exp_px_omp_r = _N.empty((M, fss))
 M_times_N_f_intgrls_raw(fxs, ux, iiq2, dSilenceX, px, f_exp_px_omp_r, M, fss, Nupx, nThrds)
 t5 = _tm.time()
 
+f_exp_px_omp_r_rldout = _N.empty((M, fss))
+M_times_N_f_intgrls_raw_rldout(fxs, ux, iiq2, dSilenceX, px, f_exp_px_omp_r_rldout, M, fss, Nupx, nThrds)
+t6 = _tm.time()
+
 
 # f_exp_px_omp_r_nf = _N.empty((M, fss))
 # M_times_N_f_intgrls_raw_no_func(fxs, ux, iiq2, dSilenceX, px, f_exp_px_omp_r_nf, M, fss, Nupx, nThrds)
-t6 = _tm.time()
 
 # f_exp_px_pure = _N.empty((M, fss))
 # M_times_N_f_intgrls_pure(fxs, ux, iiq2, dSilenceX, px, f_exp_px_omp, M, fss, Nupx, 8)
@@ -79,8 +82,8 @@ print "OMP"
 print (t4-t3)
 print "OMP raw"
 print (t5-t4)
-# print "OMP raw no func"
-# print (t6-t5)
+print "OMP raw rolled out"
+print (t6-t5)
 print "vectorized numpy"
 print (t7-t6)
 

@@ -245,117 +245,126 @@ def stochasticAssignment(oo, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, 
 
     ###  how far is closest cluster to each newly observed mark
 
-    realCl = _N.where(freeClstr == False)[0]
-    #print qdrMKS
-    #print qdrMKS[realCl]
-    nNrstMKS_d = _N.sqrt(_N.min(qdrMKS[realCl], axis=0)/K)  #  dim len(sts)
-    nNrstSPC_d = _N.sqrt(_N.min(qdrSPC[realCl], axis=0))
-
     #  mAS = mks[Asts+t0] 
     #  xAS = x[Asts + t0]   #  position @ spikes
 
     #  CheckFarFromExistingClusters()
-    if cmp2Existing:
-        # print "---------------qdrSPC"
-        # print qdrSPC
-        # print "---------------qdrSPC"
-        # fig = _plt.figure()
-        # fig.add_subplot(2, 1, 1)
-        # _plt.hist(nNrstMKS_d, bins=30)
-        # fig.add_subplot(2, 1, 2)
-        # _plt.hist(nNrstSPC_d, bins=30)
+    # if cmp2Existing:
+    #     realCl = _N.where(freeClstr == False)[0]
 
-        # fig = _plt.figure()
-        # fig.add_subplot(1, 1, 1)
-        # _plt.hist(x[Asts+t0], bins=30)
-
-        ####  mks
-        #abvthrEachCh = mks[Asts+t0] > hashthresh
-        abvthrEachCh = mASr[:, 0] > hashthresh
-        abvthrAtLeast1Ch = _N.sum(abvthrEachCh, axis=1) > 0
-        abvthrInds   = _N.where(abvthrAtLeast1Ch)[0]
-
-        print "MKS"
-        farMKS = _N.where((nNrstMKS_d > 1) & abvthrAtLeast1Ch)[0]
-        print "SPACE"
-        farSPC  = _N.where((nNrstSPC_d > 2))[0]
-        print "len(farSPC) is %d" % len(farSPC)
-        print "len(farMK) is %d" % len(farMKS)
+    #     print "=============="
+    #     print qdrMKS[realCl]
+    #     print _N.min(qdrMKS[realCl], axis=0)
+    #     nNrstMKS_d = _N.sqrt(_N.min(qdrMKS[realCl], axis=0)/K)  #  dim len(sts)
+    #     nNrstSPC_d = _N.sqrt(_N.min(qdrSPC[realCl], axis=0))
+    #     #  for each spike, distance to nearest cluster
+    #     print nNrstMKS_d
+    #     print nNrstSPC_d
+    #     print "=============="
+    #     _N.savetxt("qdrMKS", qdrMKS)
+    #     _N.savetxt("qdrSPC", qdrSPC)
 
 
-        iused = 0  #  use up to 3
-        bDone = False
-        # fig = _plt.figure(figsize=(8, 5))
-        # fig.add_subplot(2, 1, 1)
-        # _plt.scatter(x[Asts + t0], mks[Asts+t0, 0], color="black", s=2)
-        bDoMKS = (len(farMKS) > 0)
-        bDoSPC = (len(farSPC) > 0)
+    #     # print "---------------qdrSPC"
+    #     # print qdrSPC
+    #     # print "---------------qdrSPC"
+    #     # fig = _plt.figure()
+    #     # fig.add_subplot(2, 1, 1)
+    #     # _plt.hist(nNrstMKS_d, bins=30)
+    #     # fig.add_subplot(2, 1, 2)
+    #     # _plt.hist(nNrstSPC_d, bins=30)
 
-        for m in xrange(Msc):
-            #if freeClstr[m] and (not bDone) and bDoMKS:
-            if freeClstr[m]:
-                #these     = (Asts+t0)[abvthrInds]  #  in absolute coords
-                _f_u[m] = _N.mean(xASr[0, abvthrInds], axis=0)
-                _u_u[m]   = _N.mean(mASr[abvthrInds, 0], axis=0)
-                l0[m]     = _N.random.rand()*10
-                if (iused < 2) and bDoMKS:
-                    #these     = (Asts+t0)[farMKS] #Asts + t0 is t-index from 0
-                    f[m]      = _N.mean(xASr[0, farMKS], axis=0)
-                    u[m]      = _N.mean(mASr[farMKS, 0], axis=0)
-                else:
-                    f[m]      = _N.mean(xASr[0, abvthrInds], axis=0)
-                    u[m]      = _N.mean(mASr[abvthrInds, 0], axis=0)
+    #     # fig = _plt.figure()
+    #     # fig.add_subplot(1, 1, 1)
+    #     # _plt.hist(x[Asts+t0], bins=30)
 
-                    # print "BEG far markise"
-                    # _plt.scatter(x[these], mks[these, 0], color="red", s=4)
-                    # print "f[m]=%(1)s   u[m]=%(2)s" % {"1" : str(f[m]), "2" : str(u[m])}
-                    freeClstr[m] = False
-                    iused += 1
-            # else:
-            #     print "NOTTTTTTT far markise"
-            #     print "f[m]=%(1)s   u[m]=%(2)s" % {"1" : str(f[m]), "2" : str(u[m])}
+    #     ####  mks
+    #     #abvthrEachCh = mks[Asts+t0] > hashthresh
+    #     abvthrEachCh = mASr[:, 0] > hashthresh
+    #     abvthrAtLeast1Ch = _N.sum(abvthrEachCh, axis=1) > 0
+    #     abvthrInds   = _N.where(abvthrAtLeast1Ch)[0]
 
-        bDone = False
-        # fig.add_subplot(2, 1, 2)
-        # _plt.scatter(x[Asts + t0], mks[Asts+t0, 0], color="black", s=3)
-        iused = 0
-        for m in xrange(Msc):
-            #if freeClstr[m] and (not bDone) and bDoSPC:
-            if freeClstr[m]:
-                #these     = (Asts+t0)[abvthrInds]
-                _f_u[m] = _N.mean(xASr[0, abvthrInds], axis=0)
-                _u_u[m]   = _N.mean(mASr[abvthrInds, 0], axis=0)
-                l0[m]     = _N.random.rand()*10
+    #     print "MKS"
+    #     farMKS = _N.where((nNrstMKS_d > 1) & abvthrAtLeast1Ch)[0]
+    #     print "SPACE"
+    #     farSPC  = _N.where((nNrstSPC_d > 2))[0]
+    #     print "len(farSPC) is %d" % len(farSPC)
+    #     print "len(farMK) is %d" % len(farMKS)
 
-                # _f_u[m] = _N.mean(x[these], axis=0)
-                # _u_u[m]   = _N.mean(mks[these], axis=0)
-                # l0[m]     = _N.random.rand()*10
 
-                if (iused < 2) and bDoSPC:
-                    #these     = (Asts+t0)[farMKS] #Asts + t0 is t-index from 0
-                    f[m]      = _N.mean(xASr[0, farSPC], axis=0)
-                    u[m]      = _N.mean(mASr[farSPC, 0], axis=0)
-                else:
-                    f[m]      = _N.mean(xASr[0, abvthrInds], axis=0)
-                    u[m]      = _N.mean(mASr[abvthrInds, 0], axis=0)
-                    """
-                    if (iused < 2) and bDoSPC:
-                    these     = (Asts+t0)[farSPC]
-                    f[m]      = _N.mean(x[these], axis=0)
-                    u[m]      = _N.mean(mks[these], axis=0)
-                    else:
-                    f[m]      = _N.mean(x[these], axis=0)
-                    u[m]      = _N.mean(mks[these], axis=0)
-                    """
-                    # _plt.scatter(x[these], mks[these, 0], color="red", s=4)
-                    # print "BEG far spatial"
-                    # print "f[m]=%(1)s   u[m]=%(2)s" % {"1" : str(f[m]), "2" : str(u[m])}
-                    freeClstr[m] = False
-                    iused += 1
+    #     iused = 0  #  use up to 3
+    #     bDone = False
+    #     # fig = _plt.figure(figsize=(8, 5))
+    #     # fig.add_subplot(2, 1, 1)
+    #     # _plt.scatter(x[Asts + t0], mks[Asts+t0, 0], color="black", s=2)
+    #     bDoMKS = (len(farMKS) > 0)
+    #     bDoSPC = (len(farSPC) > 0)
 
-            # else:
-            #     print "NOTTTTTTT far spatial"
-            #     print "f[m]=%(1)s   u[m]=%(2)s" % {"1" : str(f[m]), "2" : str(u[m])}
+    #     for m in xrange(Msc):
+    #         #if freeClstr[m] and (not bDone) and bDoMKS:
+    #         if freeClstr[m]:
+    #             #these     = (Asts+t0)[abvthrInds]  #  in absolute coords
+    #             _f_u[m] = _N.mean(xASr[0, abvthrInds], axis=0)
+    #             _u_u[m]   = _N.mean(mASr[abvthrInds, 0], axis=0)
+    #             l0[m]     = _N.random.rand()*10
+    #             if (iused < 2) and bDoMKS:
+    #                 #these     = (Asts+t0)[farMKS] #Asts + t0 is t-index from 0
+    #                 f[m]      = _N.mean(xASr[0, farMKS], axis=0)
+    #                 u[m]      = _N.mean(mASr[farMKS, 0], axis=0)
+    #             else:
+    #                 f[m]      = _N.mean(xASr[0, abvthrInds], axis=0)
+    #                 u[m]      = _N.mean(mASr[abvthrInds, 0], axis=0)
+
+    #                 # print "BEG far markise"
+    #                 # _plt.scatter(x[these], mks[these, 0], color="red", s=4)
+    #                 # print "f[m]=%(1)s   u[m]=%(2)s" % {"1" : str(f[m]), "2" : str(u[m])}
+    #                 freeClstr[m] = False
+    #                 iused += 1
+    #         # else:
+    #         #     print "NOTTTTTTT far markise"
+    #         #     print "f[m]=%(1)s   u[m]=%(2)s" % {"1" : str(f[m]), "2" : str(u[m])}
+
+    #     bDone = False
+    #     # fig.add_subplot(2, 1, 2)
+    #     # _plt.scatter(x[Asts + t0], mks[Asts+t0, 0], color="black", s=3)
+    #     iused = 0
+    #     for m in xrange(Msc):
+    #         #if freeClstr[m] and (not bDone) and bDoSPC:
+    #         if freeClstr[m]:
+    #             #these     = (Asts+t0)[abvthrInds]
+    #             _f_u[m] = _N.mean(xASr[0, abvthrInds], axis=0)
+    #             _u_u[m]   = _N.mean(mASr[abvthrInds, 0], axis=0)
+    #             l0[m]     = _N.random.rand()*10
+
+    #             # _f_u[m] = _N.mean(x[these], axis=0)
+    #             # _u_u[m]   = _N.mean(mks[these], axis=0)
+    #             # l0[m]     = _N.random.rand()*10
+
+    #             if (iused < 2) and bDoSPC:
+    #                 #these     = (Asts+t0)[farMKS] #Asts + t0 is t-index from 0
+    #                 f[m]      = _N.mean(xASr[0, farSPC], axis=0)
+    #                 u[m]      = _N.mean(mASr[farSPC, 0], axis=0)
+    #             else:
+    #                 f[m]      = _N.mean(xASr[0, abvthrInds], axis=0)
+    #                 u[m]      = _N.mean(mASr[abvthrInds, 0], axis=0)
+    #                 """
+    #                 if (iused < 2) and bDoSPC:
+    #                 these     = (Asts+t0)[farSPC]
+    #                 f[m]      = _N.mean(x[these], axis=0)
+    #                 u[m]      = _N.mean(mks[these], axis=0)
+    #                 else:
+    #                 f[m]      = _N.mean(x[these], axis=0)
+    #                 u[m]      = _N.mean(mks[these], axis=0)
+    #                 """
+    #                 # _plt.scatter(x[these], mks[these, 0], color="red", s=4)
+    #                 # print "BEG far spatial"
+    #                 # print "f[m]=%(1)s   u[m]=%(2)s" % {"1" : str(f[m]), "2" : str(u[m])}
+    #                 freeClstr[m] = False
+    #                 iused += 1
+
+    #         # else:
+    #         #     print "NOTTTTTTT far spatial"
+    #         #     print "f[m]=%(1)s   u[m]=%(2)s" % {"1" : str(f[m]), "2" : str(u[m])}
 
     ####  outside cmp2Existing here
     cont       = pkFRr + mkNrms - 0.5*(qdrSPC + qdrMKS)
