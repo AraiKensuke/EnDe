@@ -8,28 +8,12 @@ cimport numpy as _N
 
 ##########
 ##########
-@cython.boundscheck(False)
-@cython.wraparound(False)
-def multi_qdrtcs(double[:, :, ::1] v, double[:, :, ::1] iSg, double[:, ::1] qdr, int M, int N, int k):
-    #  fxs       M x fss   
-    #  fxrux     Nupx    
-    #  f_intgrd  Nupx
-    cdef int m, n, i, j, mNk, mkk, nk, ik
-
-    cdef double *p_v   = &v[0, 0, 0]
-    cdef double *p_iSg = &iSg[0, 0, 0]
-    cdef double *p_qdr = &qdr[0, 0]
-    cdef double lv          
-
-    for m in range(M):
-        mNk = m*N*k
-        mkk = m*k*k
-        for n in range(N):
-            nk = n*k
-            for i in range(k):
-                ik = i*k
-                for j in range(k):            
-                    p_qdr[m*N + n] += p_v[mNk + nk + i] * p_iSg[mkk + ik + j] * p_v[mNk + nk + j]
+def multi_qdrtcs_simp(v, iSg, qdr, M, N, k):
+    for m in xrange(M):
+        for n in xrange(N):
+            for i in xrange(k):
+                for j in xrange(k):            
+                    qdr[m, n] += v[m, n, i] * iSg[m, i, j] * v[m, n, j]
 
 
 @cython.boundscheck(False)

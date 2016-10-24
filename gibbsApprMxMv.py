@@ -93,7 +93,7 @@ class MarkAndRF:
         """
         gtdiffusion:  use ground truth center of place field in calculating variance of center.  Meaning of diffPerMin different
         """
-        print "gibbs"
+        print "gibbs   %.5f" % _N.random.rand()
         oo = self
         oo.nThrds = nThrds
         twpi     = 2*_N.pi
@@ -248,8 +248,9 @@ class MarkAndRF:
                 #tt1 = _tm.time()
                 iSg = _N.linalg.inv(Sg)
 
-                if (iter % 5) == 0:    
-                    print "iter  %d" % iter
+                if (iter % 10) == 0:    
+                    #print "-------iter  %(i)d   %(r).5f" % {"i" : iter, "r" : _N.random.rand()}
+                    print "-------iter  %(i)d" % {"i" : iter}
 
                 gAMxMu.stochasticAssignment(oo, iter, M, Mwowonz, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, ((epc > 0) and (iter == 0)), nthrds=oo.nThrds)
 
@@ -261,6 +262,11 @@ class MarkAndRF:
                     sts  = Asts[minds] + t0
                     clstsz[m] = len(sts)
                     l_sts.append(sts)
+                # for m in xrange(Mwowonz):   #  get the minds
+                #     minds = _N.where(gz[iter, :, m] == 1)[0]  
+                #     print "cluster %(m)d   len %(l)d    " % {"m" : m, "l" : len(minds)}
+                #     print u[m]
+                #     print f[m]
 
                 #tt2 = _tm.time()
                 ###############
@@ -326,6 +332,9 @@ class MarkAndRF:
 
                         mcs[m]       = _N.mean(clstx, axis=0)
                         u_u_[m] = _N.dot(u_Sg_[m], _N.dot(_iu_Sg[m], _u_u[m]) + clstsz[m]*_N.dot(iSg[m], mcs[m]))
+                        #print "mean of cluster %d" % m
+                        #print mcs[m]
+                        #print u_u_[m]
                         # hyp
                         ########  POSITION
                         ##  mean of posterior distribution of cluster means

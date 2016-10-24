@@ -54,10 +54,10 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3):
         splitclstrs(_x[unonhash], labS)
         mergesmallclusters(_x[unonhash], _x[hashsp], labS, labH, K+1, clstrs)
 
-        #_N.savetxt("hash", hashsp)
-        #_N.savetxt("nhash", unonhash)
-        #colorclusters(_x[hashsp], labH, clstrs[1], name="hash", xLo=xLo, xHi=xHi)
-        #colorclusters(_x[unonhash], labS, clstrs[0], name="nhash", xLo=xLo, xHi=xHi)
+        # _N.savetxt("hash", hashsp)
+        # _N.savetxt("nhash", unonhash)
+        # colorclusters(_x[hashsp], labH, clstrs[1], name="hash", xLo=xLo, xHi=xHi)
+        # colorclusters(_x[unonhash], labS, clstrs[0], name="nhash", xLo=xLo, xHi=xHi)
 
     #fig = _plt.figure(figsize=(7, 10))
     #fig.add_subplot(2, 1, 1)
@@ -225,9 +225,11 @@ def stochasticAssignment(oo, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, 
     N          = mASr.shape[0]
 
     # t2 = _tm.time()
-    #_N.einsum("mnj,mjk,mnk->mn", dmu, iSg, dmu, out=qdrMKS)
+    _N.einsum("mnj,mjk,mnk->mn", dmu, iSg, dmu, out=qdrMKS)
     # t3 = _tm.time()
-    _fm.multi_qdrtcs_par_func(dmu, iSg, qdrMKS, M, N, K, nthrds=nthrds)
+    #_fm.multi_qdrtcs_par_func(dmu, iSg, qdrMKS, M, N, K, nthrds=nthrds)
+    #_fm.multi_qdrtcs_par(dmu, iSg, qdrMKS, M, N, K)
+    #_fm.multi_qdrtcs_simp(dmu, iSg, qdrMKS, M, N, K)
 
     # t4 = _tm.time()
     # print dmu.shape
