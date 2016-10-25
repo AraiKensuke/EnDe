@@ -9,14 +9,14 @@ cdef Py_ssize_t idx, i, n = 100
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef double f_intgrl(int offset, double *p_fxs, double *p_ux, double *p_px, int Nupx, double dSilenceX, double IIQ2) nogil:
+cdef double f_intgrl(double p_fxs_offset, double *p_fxs, double *p_ux, double *p_px, int Nupx, double dSilenceX, double IIQ2) nogil:
     cdef double dd, tot
     cdef double hlfIIQ2 = -0.5*IIQ2
-
     tot = 0.0
+
     #for n in xrange(Nupx):
     for 0 <= n < Nupx:
-        dd = p_fxs[offset]-p_ux[n]
+        dd = p_fxs_offset-p_ux[n]
         tot += exp(dd*dd*hlfIIQ2)*p_px[n]
     tot *= dSilenceX
     return tot
@@ -63,7 +63,7 @@ def M_times_N_f_intgrls_raw(double[:, ::1] fxs, double[::1] ux, double[::1] iiq2
             mfss = m*fss
             IIQ2 = iiq2[m]
             for 0 <= fi < fss:     #  unrolling function makes this slower
-                p_f_exp_px[mfss + fi] = f_intgrl(mfss + fi, p_fxs, p_ux, p_px, Nupx, dSilenceX, IIQ2)
+                p_f_exp_px[mfss + fi] = f_intgrl(p_fxs[mfss + fi], p_fxs, p_ux, p_px, Nupx, dSilenceX, IIQ2)
     #     #  f_exp_px   is M x fss
 
 
@@ -76,7 +76,7 @@ def M_times_N_f_intgrls_raw_rldout(double[:, ::1] fxs, double[::1] ux, double[::
     #  fxrux     Nupx    
     #  f_intgrd  Nupx
     cdef int fi, m, n, mfss, offset
-    cdef double dd, hlfIIQ2, tot
+    cdef double dd, hlfIIQ2, tot, p_fxs_offset
 
     cdef double *p_fxs = &fxs[0, 0]
     cdef double *p_px  = &px[0]
@@ -90,8 +90,9 @@ def M_times_N_f_intgrls_raw_rldout(double[:, ::1] fxs, double[::1] ux, double[::
             for fi in xrange(fss):     #  unrolling function makes this slower
                 offset = mfss + fi
                 p_f_exp_px[offset] = 0
+                p_fxs_offset       = p_fxs[offset]
                 for n in xrange(Nupx):
-                    dd = p_fxs[offset]-p_ux[n]
+                    dd = p_fxs_offset-p_ux[n]
                     p_f_exp_px[offset] += exp(dd*dd*hlfIIQ2)*p_px[n]
                 #tot *= dSilenceX
                 p_f_exp_px[offset] *= dSilenceX

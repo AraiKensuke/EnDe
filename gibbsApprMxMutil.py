@@ -7,6 +7,7 @@ import time as _tm
 from EnDedirs import resFN, datFN
 import matplotlib.pyplot as _plt
 import fastnum as _fm
+import hc_bcast as _hcb
 
 twpi = 2*_N.pi
 
@@ -219,31 +220,32 @@ def stochasticAssignment(oo, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, 
 
     rnds       = _N.random.rand(nSpks)
 
-
     pkFRr      = pkFR.reshape((M, 1))
     dmu        = (mASr - ur)     # mASr 1 x N x K,     ur  is M x 1 x K
-    N          = mASr.shape[0]
-
-    # t2 = _tm.time()
-    _N.einsum("mnj,mjk,mnk->mn", dmu, iSg, dmu, out=qdrMKS)
-    # t3 = _tm.time()
-    #_fm.multi_qdrtcs_par_func(dmu, iSg, qdrMKS, M, N, K, nthrds=nthrds)
+    N          = mASr.shape[1]
+    #t2 = _tm.time()
+    #_N.einsum("mnj,mjk,mnk->mn", dmu, iSg, dmu, out=qdrMKS)
+    #t3 = _tm.time()
+    _fm.multi_qdrtcs_par_func(dmu, iSg, qdrMKS, M, N, K, nthrds=nthrds)
     #_fm.multi_qdrtcs_par(dmu, iSg, qdrMKS, M, N, K)
     #_fm.multi_qdrtcs_simp(dmu, iSg, qdrMKS, M, N, K)
 
-    # t4 = _tm.time()
+    #t4 = _tm.time()
     # print dmu.shape
     # print dmur.shape
     # print iSg.shape
 
     # print "------"
     # print (t2-t1)
-    # print (t3-t2)
-    # print (t4-t3)
+    #print (t3-t2)
+    #print (t4-t3)
     # print qdrMKS
     # print qdrMKS2
 
-    qdrSPC     = (fr - xASr)*(fr - xASr)*iq2r  #  M x nSpks
+    #  fr is    M x 1, xASr is 1 x N, iq2r is M x 1
+    #qdrSPC     = (fr - xASr)*(fr - xASr)*iq2r  #  M x nSpks   # 0.01s
+    qdrSPC     = _N.empty((M, N))
+    _hcb.hc_bcast1(fr, xASr, iq2r, qdrSPC, M, N)
 
     ###  how far is closest cluster to each newly observed mark
 

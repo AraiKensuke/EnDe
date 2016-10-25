@@ -89,7 +89,7 @@ class MarkAndRF:
         oo.xLo = xLo
         oo.xHi = xHi
 
-    def gibbs(self, ITERS, K, ep1=0, ep2=None, savePosterior=True, gtdiffusion=False, Mdbg=None, doSepHash=True, use_spc=True, nz_pth=0., ignoresilence=False, use_omp=False, nThrds=2):
+    def gibbs(self, ITERS, K, ep1=0, ep2=None, savePosterior=True, gtdiffusion=False, Mdbg=None, doSepHash=True, use_spc=True, nz_pth=0., smth_pth_ker=100, ignoresilence=False, use_omp=False, nThrds=2):
         """
         gtdiffusion:  use ground truth center of place field in calculating variance of center.  Meaning of diffPerMin different
         """
@@ -130,12 +130,17 @@ class MarkAndRF:
         l_sqrt_2pi_q2x = _N.log(sqrt_2pi_q2x)
 
         freeClstr = None
-        gk     = gauKer(100) # 0.1s  smoothing of motion
-        gk     /= _N.sum(gk)
-        xf     = _N.convolve(oo.dat[:, 0], gk, mode="same")
-        oo.dat[:, 0] = xf + nz_pth*_N.random.randn(len(oo.dat[:, 0]))
+        if smth_pth_ker > 0:
+            gk     = gauKer(smth_pth_ker) # 0.1s  smoothing of motion
+            gk     /= _N.sum(gk)
+            xf     = _N.convolve(oo.dat[:, 0], gk, mode="same")
+            oo.dat[:, 0] = xf + nz_pth*_N.random.randn(len(oo.dat[:, 0]))
+        else:
+            oo.dat[:, 0] += nz_pth*_N.random.randn(len(oo.dat[:, 0]))
         x      = oo.dat[:, 0]
         mks    = oo.dat[:, 2:]
+        if nz_pth > 0:
+            _N.savetxt(resFN("nzyx.txt", dir=oo.outdir), x, fmt="%.4f")
 
         f_q2_rate = (oo.diffusePerMin**2)/60000.  #  unit of minutes  
         
@@ -145,7 +150,6 @@ class MarkAndRF:
         tau_q2 = oo.t_hlf_q2/_N.log(2)
 
         for epc in xrange(ep1, ep2):
-            
             print "^^^^^^^^^^^^^^^^^^^^^^^^    epoch %d" % epc
 
             t0 = oo.intvs[epc]
@@ -245,7 +249,7 @@ class MarkAndRF:
             ttA = _tm.time()
 
             for iter in xrange(ITERS):
-                #tt1 = _tm.time()
+                tt1 = _tm.time()
                 iSg = _N.linalg.inv(Sg)
 
                 if (iter % 10) == 0:    
@@ -332,9 +336,9 @@ class MarkAndRF:
 
                         mcs[m]       = _N.mean(clstx, axis=0)
                         u_u_[m] = _N.dot(u_Sg_[m], _N.dot(_iu_Sg[m], _u_u[m]) + clstsz[m]*_N.dot(iSg[m], mcs[m]))
-                        #print "mean of cluster %d" % m
-                        #print mcs[m]
-                        #print u_u_[m]
+                        # print "mean of cluster %d" % m
+                        # print mcs[m]
+                        # print u_u_[m]
                         # hyp
                         ########  POSITION
                         ##  mean of posterior distribution of cluster means
@@ -492,7 +496,7 @@ class MarkAndRF:
 
                 q2_a_, q2_B_ = mltpl_ig_prmsUV(q2xr, sLLkPr.T, s.T, d_q2xr, q2x_m1r, clstsz)
                 q2[0:M] = _ss.invgamma.rvs(q2_a_ + 1, scale=q2_B_)  #  check
-                #tt7 = _tm.time()
+                tt7 = _tm.time()
 
                 smp_sp_prms[oo.ky_p_q2, iter]   = q2[0:M]
                 smp_sp_hyps[oo.ky_h_q2_a, iter] = q2_a_
@@ -504,7 +508,7 @@ class MarkAndRF:
                 # print (tt4-tt3)
                 # print (tt5-tt4)
                 # print (tt6-tt5)
-                # print (tt7-tt6)
+                #print (tt7-tt1)
                 # print "timing end"
 
                     

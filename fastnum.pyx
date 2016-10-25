@@ -11,6 +11,7 @@ cimport numpy as _N
 def multi_qdrtcs_simp(v, iSg, qdr, M, N, k):
     for m in xrange(M):
         for n in xrange(N):
+            qdr[m, n] = 0
             for i in xrange(k):
                 for j in xrange(k):            
                     qdr[m, n] += v[m, n, i] * iSg[m, i, j] * v[m, n, j]
@@ -35,6 +36,7 @@ def multi_qdrtcs(double[:, :, ::1] v, double[:, :, ::1] iSg, double[:, ::1] qdr,
         for n in xrange(N):
             nk = n*k
             mN_n = m*N + n
+            p_qdr[mN_n] = 0
             for i in xrange(k):
                 ik = i*k
                 mNk_nk_i = mNk + nk + i
@@ -42,8 +44,8 @@ def multi_qdrtcs(double[:, :, ::1] v, double[:, :, ::1] iSg, double[:, ::1] qdr,
                     p_qdr[mN_n] += p_v[mNk_nk_i] * p_iSg[mkk + ik + j] * p_v[mNk + nk + j]
 
                                      
-@cython.boundscheck(False)
-@cython.wraparound(False)
+#@cython.boundscheck(False)
+#@cython.wraparound(False)
 def multi_qdrtcs_par(double[:, :, ::1] v, double[:, :, ::1] iSg, double[:, ::1] qdr, int M, int N, int k, int nthrds=4):
     #  fxs       M x fss   
     #  fxrux     Nupx    
@@ -61,6 +63,7 @@ def multi_qdrtcs_par(double[:, :, ::1] v, double[:, :, ::1] iSg, double[:, ::1] 
             mkk = m*k*k
             for n in range(N):
                 nk = n*k
+                p_qdr[m*N + n] = 0
                 for i in range(k):
                     ik = i*k
                     for j in range(k):            
@@ -74,6 +77,7 @@ cdef void inner_loop(double *p_v, double *p_iSg, double *p_qdr, int N, int k, in
     for n in range(N):
         mNk_nk = mNk + n*k
         mN_n   = mN + n
+        p_qdr[mN_n] = 0
         for i in range(k):
             mkk_ik = mkk + i*k
             for j in range(k):            
@@ -87,6 +91,7 @@ cdef void inner_loop2(double *p_v, double *p_iSg, double *p_qdr, int N, int k, i
     for 0 <= n < N:
         mNk_nk = mNk + n*k
         mN_n   = mN + n
+        p_qdr[mN_n] = 0
         for 0 <= i < k:
             mkk_ik = mkk + i*k
             for 0 <= j < k:
