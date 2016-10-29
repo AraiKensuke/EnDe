@@ -4,68 +4,42 @@ from filter import gauKer
 import time as _tm
 
 
-def createSmoothedPath(cps, N, ts):
+def createSmoothedPath(cps, N):
     """
     cps = [[t1, dy1], [t2, dy2], [t3, dy3], ...]
     specify points when curve changes value.  
     N   = how many points to use
-    ts  = time scale for smoothing
     """
     if cps is None:
         return _N.zeros(N)
-    Ne  = 3*N
-    pth = _N.zeros(Ne)
-
+    pth = _N.ones(N) * cps[0, 1]
     NC  = cps.shape[0]
 
-    gk  = gauKer(int(ts*N))
-    gk  /= _N.sum(gk)
-
-    pth[0:N] = cps[0, 1]
-
-    for p in xrange(cps.shape[0]):
+    t1 = 0
+    for p in xrange(cps.shape[0]-1):
         t0 = cps[p, 0]
-        t1 = cps[p+1, 0] if (p < NC - 1) else 2
+        t1 = cps[p+1, 0] if (p < NC - 1) else 1
 
-        pth[N+int(N*t0):N+int(N*t1)] = cps[p, 1]
+        pth[int(N*t0):int(N*t1)] = _N.linspace(cps[p, 1], cps[p+1, 1], (int(N*t1) - int(N*t0)))
 
-    spth = _N.convolve(pth, gk, mode="same")
+    pth[int(N*t1):] = cps[NC-1, 1]
+    return pth
 
-    return _N.array(spth[N:2*N])
-
-def createSmoothedPathK(cps, N, K, ts, LoHis):
+def createSmoothedPathK(cps, N, K, LoHis):
     """
     cps = [[x1, y1], [x2, y2], [x3, y3], ...], yi in [0, 1]
     specify points when curve changes value.  
     N   = how many points to use
     K   = dims
     LoHis= upper and lower lim for each channel   K x 2
-    ts  = time scale for smoothing
     """
     if cps is None:
         return _N.zeros(N)
-    Ne  = 3*N
-    pth = _N.zeros((Ne, K))
-
-    gk  = gauKer(int(ts*N))
-    gk  /= _N.sum(gk)
-
-    Amps = _N.diff(LoHis, axis=1).reshape(K)
-
+    pth = _N.zeros((N, K))
     for k in xrange(K):
-        NC  = cps[k].shape[0]
-        pth[0:N, k] = LoHis[k, 0] + Amps[k]*cps[k, 0, 1]   #  
-        for p in xrange(1, cps[k].shape[0]-1):
-            cps[k, p, 0] += _N.random.randn()*0.02
-        for p in xrange(cps[k].shape[0]):
-            t0 = cps[k, p, 0]
-            t1 = cps[k, p+1, 0] if (p < NC - 1) else 2
-
-            pth[N+int(N*t0):N+int(N*t1), k] = LoHis[k, 0] + Amps[k]*cps[k, p, 1]
-
-        spth = _N.convolve(pth[:, k], gk, mode="same")
-        pth[:, k] = spth
-    return _N.array(pth[N:2*N])
+        pt = createSmoothedPath(cps[k], N) * (LoHis[k, 1]-LoHis[k, 0]) + LoHis[k, 0]
+        pth[:, k] = pt
+    return pth
 
 def generateMvt(N, vAmp=1, constV=False, pLR=0.5, nLf=None, nRh=None, Fv=0.9995, sv=0.00007):
     """

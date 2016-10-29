@@ -63,9 +63,15 @@ class MarkAndRF:
 
     nz_q2               = 500
     nz_f                = 0
+
+    q2x_L = 1e-7
+    q2x_H = 1e2
     
-    def __init__(self, outdir, fn, intvfn, xLo=0, xHi=3, seed=1041, adapt=True, nzclstr=False, t_hlf_l0_mins=None, t_hlf_q2_mins=None):
+    oneCluster = False
+    
+    def __init__(self, outdir, fn, intvfn, xLo=0, xHi=3, seed=1041, adapt=True, nzclstr=False, t_hlf_l0_mins=None, t_hlf_q2_mins=None, oneCluster=False):
         oo     = self
+        oo.oneCluster = oneCluster
         oo.adapt = adapt
         _N.random.seed(seed)
         oo.nzclstr = nzclstr
@@ -89,7 +95,7 @@ class MarkAndRF:
         oo.xLo = xLo
         oo.xHi = xHi
 
-    def gibbs(self, ITERS, K, ep1=0, ep2=None, savePosterior=True, gtdiffusion=False, Mdbg=None, doSepHash=True, use_spc=True, nz_pth=0., smth_pth_ker=100, ignoresilence=False, use_omp=False, nThrds=2):
+    def gibbs(self, ITERS, K, ep1=0, ep2=None, savePosterior=True, gtdiffusion=False, doSepHash=True, use_spc=True, nz_pth=0., smth_pth_ker=100, ignoresilence=False, use_omp=False, nThrds=2):
         """
         gtdiffusion:  use ground truth center of place field in calculating variance of center.  Meaning of diffPerMin different
         """
@@ -113,7 +119,8 @@ class MarkAndRF:
         ux = _N.linspace(oo.xLo, oo.xHi, oo.Nupx, endpoint=False)   # uniform x position   #  grid over 
         uxr = ux.reshape((1, oo.Nupx))
         uxrr= ux.reshape((1, 1, oo.Nupx))
-        q2x    = _N.exp(_N.linspace(_N.log(1e-7), _N.log(100), oo.q2ss))  #  5 orders of
+        #q2x    = _N.exp(_N.linspace(_N.log(1e-7), _N.log(100), oo.q2ss))  #  5 orders of
+        q2x    = _N.exp(_N.linspace(_N.log(oo.q2x_L), _N.log(oo.q2x_H), oo.q2ss))  #  5 orders of
         d_q2x  = _N.diff(q2x)
         q2x_m1 = _N.array(q2x[0:-1])
         lq2x    = _N.log(q2x)
@@ -170,7 +177,7 @@ class MarkAndRF:
             Asts    = _N.where(oo.dat[t0:t1, 1] == 1)[0]   #  based at 0
 
             if epc == ep1:   ###  initialize
-                labS, labH, lab, flatlabels, M, MF, hashthresh, nHSclusters = gAMxMu.initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=doSepHash, xLo=oo.xLo, xHi=oo.xHi)
+                labS, labH, lab, flatlabels, M, MF, hashthresh, nHSclusters = gAMxMu.initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=doSepHash, xLo=oo.xLo, xHi=oo.xHi, oneCluster=oo.oneCluster)
                 Mwowonz = M if not oo.nzclstr else M + 1
 
                 u_u_  = _N.empty((M, K))
@@ -496,6 +503,7 @@ class MarkAndRF:
 
                 q2_a_, q2_B_ = mltpl_ig_prmsUV(q2xr, sLLkPr.T, s.T, d_q2xr, q2x_m1r, clstsz)
                 q2[0:M] = _ss.invgamma.rvs(q2_a_ + 1, scale=q2_B_)  #  check
+                #q2[0]    = 0.36
                 tt7 = _tm.time()
 
                 smp_sp_prms[oo.ky_p_q2, iter]   = q2[0:M]
@@ -550,6 +558,10 @@ class MarkAndRF:
             pcklme["M"]           = M
             pcklme["Mwowonz"]           = Mwowonz
             if Mwowonz > M:  # or oo.nzclstr == True
+                pcklme["nz_fs"]       = f[M]
+                pcklme["nz_q2"]       = q2[M]
+                pcklme["nz_Sg"]       = Sg[M]
+                pcklme["nz_u"]        = u[M]
                 pcklme["smp_nz_l0"]  = smp_nz_l0
                 pcklme["smp_nz_hyps"]= smp_nz_hyps
                 

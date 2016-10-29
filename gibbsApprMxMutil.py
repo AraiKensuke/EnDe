@@ -11,7 +11,7 @@ import hc_bcast as _hcb
 
 twpi = 2*_N.pi
 
-def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3):
+def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneCluster=False):
     n0 = 0
     n1 = len(Asts)
 
@@ -19,70 +19,82 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3):
     _x[:, 0]    = x[Asts+t0]
     _x[:, 1:]   = mks[Asts+t0]
 
-    if not doSepHash:
+    if oneCluster:
         unonhash = _N.arange(len(Asts))
         hashsp   = _N.array([])
         hashthresh = _N.min(_x[:, 1:], axis=0)   #  no hash spikes
-        
-        ###   1 cluster
-        # labS = _N.zeros(len(Asts), dtype=_N.int)
-        # labH = _N.array([], dtype=_N.int)
-        # clstrs = _N.array([0, 1])
+
+        labS     = _N.zeros(len(Asts), dtype=_N.int)
+        labH     = _N.array([], dtype=_N.int)
+        clstrs   = _N.array([0, 1])
+        lab      = _N.array(labS.tolist() + (labH + clstrs[0]).tolist())
+        M        = 1
+        MF       = 1
+        flatlabels = _N.zeros(len(Asts), dtype=_N.int)
     else:
-        unonhash, hashsp, hashthresh = sepHash(_x, BINS=20, blksz=5, xlo=oo.xLo, xhi=oo.xHi)
-    #  hashthresh is dim 2
+        if not doSepHash:
+            unonhash = _N.arange(len(Asts))
+            hashsp   = _N.array([])
+            hashthresh = _N.min(_x[:, 1:], axis=0)   #  no hash spikes
 
-    """
-        fig = _plt.figure(figsize=(5, 10))
-        fig.add_subplot(3, 1, 1)
-        _plt.scatter(_x[hashsp, 1], _x[hashsp, 2], color="red")
-        _plt.scatter(_x[unonhash, 1], _x[unonhash, 2], color="black")
-        fig.add_subplot(3, 1, 2)
-        _plt.scatter(_x[hashsp, 0], _x[hashsp, 1], color="red")
-        _plt.scatter(_x[unonhash, 0], _x[unonhash, 1], color="black")
-        fig.add_subplot(3, 1, 3)
-        _plt.scatter(_x[hashsp, 0], _x[hashsp, 2], color="red")
-        _plt.scatter(_x[unonhash, 0], _x[unonhash, 2], color="black")
-    """
+            ###   1 cluster
+            # labS = _N.zeros(len(Asts), dtype=_N.int)
+            # labH = _N.array([], dtype=_N.int)
+            # clstrs = _N.array([0, 1])
+        else:
+            unonhash, hashsp, hashthresh = sepHash(_x, BINS=20, blksz=5, xlo=oo.xLo, xhi=oo.xHi)
+        #  hashthresh is dim 2
 
-    if (len(unonhash) > 0) and (len(hashsp) > 0):
-        labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], _x[hashsp])
-    elif len(unonhash) == 0:
-        labS, labH, clstrs = emMKPOS_sep1A(None, _x[hashsp], TR=5)
-    else:
-        labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], None, TR=5)
-    if doSepHash:
-        splitclstrs(_x[unonhash], labS)
-        mergesmallclusters(_x[unonhash], _x[hashsp], labS, labH, K+1, clstrs)
+        """
+            fig = _plt.figure(figsize=(5, 10))
+            fig.add_subplot(3, 1, 1)
+            _plt.scatter(_x[hashsp, 1], _x[hashsp, 2], color="red")
+            _plt.scatter(_x[unonhash, 1], _x[unonhash, 2], color="black")
+            fig.add_subplot(3, 1, 2)
+            _plt.scatter(_x[hashsp, 0], _x[hashsp, 1], color="red")
+            _plt.scatter(_x[unonhash, 0], _x[unonhash, 1], color="black")
+            fig.add_subplot(3, 1, 3)
+            _plt.scatter(_x[hashsp, 0], _x[hashsp, 2], color="red")
+            _plt.scatter(_x[unonhash, 0], _x[unonhash, 2], color="black")
+        """
 
-        # _N.savetxt("hash", hashsp)
-        # _N.savetxt("nhash", unonhash)
-        # colorclusters(_x[hashsp], labH, clstrs[1], name="hash", xLo=xLo, xHi=xHi)
-        # colorclusters(_x[unonhash], labS, clstrs[0], name="nhash", xLo=xLo, xHi=xHi)
+        if (len(unonhash) > 0) and (len(hashsp) > 0):
+            labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], _x[hashsp])
+        elif len(unonhash) == 0:
+            labS, labH, clstrs = emMKPOS_sep1A(None, _x[hashsp], TR=5)
+        else:
+            labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], None, TR=5)
+        if doSepHash:
+            splitclstrs(_x[unonhash], labS)
+            mergesmallclusters(_x[unonhash], _x[hashsp], labS, labH, K+1, clstrs)
 
-    #fig = _plt.figure(figsize=(7, 10))
-    #fig.add_subplot(2, 1, 1)
+            # _N.savetxt("hash", hashsp)
+            # _N.savetxt("nhash", unonhash)
+            # colorclusters(_x[hashsp], labH, clstrs[1], name="hash", xLo=xLo, xHi=xHi)
+            # colorclusters(_x[unonhash], labS, clstrs[0], name="nhash", xLo=xLo, xHi=xHi)
 
-    flatlabels = _N.ones(n1-n0, dtype=_N.int)*-1   # 
-    #cls = clrs.get_colors(clstrs[0] + clstrs[1])
-    for i in xrange(clstrs[0]):
-        these = _N.where(labS == i)[0]
+        #fig = _plt.figure(figsize=(7, 10))
+        #fig.add_subplot(2, 1, 1)
 
-        if len(these) > 0:
-            flatlabels[unonhash[these]] = i
-        #_plt.scatter(_x[unonhash[these], 0], _x[unonhash[these], 1], color=cls[i])
-    for i in xrange(clstrs[1]):
-        these = _N.where(labH == i)[0]
+        flatlabels = _N.ones(n1-n0, dtype=_N.int)*-1   # 
+        #cls = clrs.get_colors(clstrs[0] + clstrs[1])
+        for i in xrange(clstrs[0]):
+            these = _N.where(labS == i)[0]
 
-        if len(these) > 0:
-            flatlabels[hashsp[these]] = i + clstrs[0]
-        #_plt.scatter(_x[hashsp[these], 0], _x[hashsp[these], 1], color=cls[i+clstrs[0]])
+            if len(these) > 0:
+                flatlabels[unonhash[these]] = i
+            #_plt.scatter(_x[unonhash[these], 0], _x[unonhash[these], 1], color=cls[i])
+        for i in xrange(clstrs[1]):
+            these = _N.where(labH == i)[0]
 
-    MF     = clstrs[0] + clstrs[1]
-    #M = MF#int(MF * 1.1) + 2   #  20% more clusters
-    M = int(MF * 1.1) + 2   #  20% more clusters
-    print "cluters:  %d" % M
+            if len(these) > 0:
+                flatlabels[hashsp[these]] = i + clstrs[0]
+            #_plt.scatter(_x[hashsp[these], 0], _x[hashsp[these], 1], color=cls[i+clstrs[0]])
 
+        MF     = clstrs[0] + clstrs[1]
+        #M = MF#int(MF * 1.1) + 2   #  20% more clusters
+        M = int(MF * 1.1) + 2   #  20% more clusters
+        print "cluters:  %d" % M
 
     #####  MODES  - find from the sampling
     oo.sp_prmPstMd = _N.zeros((oo.epochs, 3*M))   # mode of params
@@ -118,7 +130,7 @@ def declare_prior_hyp_params(M, MF, K, x, mks, Asts, t0):
     #  inverse gamma
     #_q2_a   = _N.ones(M)*4;    _q2_B  = _N.ones(M)*1e-3
     _q2_a   = _N.ones(M)*0.5;    _q2_B  = _N.ones(M)*1e-3
-    _l0_a   = _N.ones(M)*1.1;     _l0_B  = _N.ones(M)*(1/30.)
+    _l0_a   = _N.ones(M)*0.5;     _l0_B  = _N.ones(M)*(1/30.)
     mkmn    = _N.mean(mks[Asts+t0], axis=0)
     mkcv    = _N.cov(mks[Asts+t0], rowvar=0)
     _u_u    = _N.tile(mkmn, M).T.reshape((M, K))
@@ -209,14 +221,14 @@ def stochasticAssignment(oo, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, 
         if len(is0) > 0:
             l0[is0] = 0.001
 
-        pkFR       = _N.log(l0) - 0.5*_N.log(twpi*q2)
+        pkFR       = _N.log(l0) - 0.5*_N.log(twpi*q2)   #  M
     except RuntimeWarning:
         print "WARNING"
         print l0
         print q2
 
     mkNrms = _N.log(1/_N.sqrt(twpi*_N.linalg.det(Sg)))
-    mkNrms = mkNrms.reshape((M, 1))
+    mkNrms = mkNrms.reshape((M, 1))   #  M x 1
 
     rnds       = _N.random.rand(nSpks)
 
@@ -371,7 +383,10 @@ def stochasticAssignment(oo, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, 
     #         #     print "f[m]=%(1)s   u[m]=%(2)s" % {"1" : str(f[m]), "2" : str(u[m])}
 
     ####  outside cmp2Existing here
-    cont       = pkFRr + mkNrms - 0.5*(qdrSPC + qdrMKS)
+    #   (Mx1) + (Mx1) - (MxN + MxN)
+    #cont       = pkFRr + mkNrms - 0.5*(qdrSPC + qdrMKS)
+    cont = _N.empty((M, N))
+    _hcb.hc_qdr_sum(pkFRr, mkNrms, qdrSPC, qdrMKS, cont, M, N)
 
     mcontr     = _N.max(cont, axis=0).reshape((1, nSpks))  
     cont       -= mcontr
@@ -480,13 +495,13 @@ def finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a
     ###  variance small.  That's why we will reset a cluster
 
     sq25  = 5*_N.sqrt(q2)
-    occ = _N.mean(_N.sum(gz[frm:], axis=1), axis=0)  # avg. # of marks assigned to this cluster
-    socc = _N.sort(occ)
-    minAss = (0.5*(socc[-2]+socc[-1])*0.01)  #  if we're 100 times smaller than the average of the top 2, let's consider it empty
 
-    print occ
+    if M > 1:
+        occ = _N.mean(_N.sum(gz[frm:], axis=1), axis=0)  # avg. # of marks assigned to this cluster
+        socc = _N.sort(occ)
+        minAss = (0.5*(socc[-2]+socc[-1])*0.01)  #  if we're 100 times smaller than the average of the top 2, let's consider it empty
 
-    if oo.resetClus:
+    if oo.resetClus and (M > 1):
         for m in xrange(M):
             #  Sg and q2 are treated differently.  Even if no spikes are
             #  observed, q2 is updated, while Sg is not.  
@@ -514,6 +529,7 @@ def finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a
                 _q2_B[m] = 1e-3
                 _f_q2[m] = 4
                 _u_Sg[m] = _N.identity(K)*9
+                _l0_a[m] = 1e-4
                 freeClstr[m] = True
             else:
                 freeClstr[m] = False

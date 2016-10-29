@@ -44,19 +44,19 @@ def chpts(npts, yL, yH, t0=0, ad=NEITHER):
     return cpts
 
         
-def makeCovs(nNrns, K, LoHisMk):
+def makeCovs(nNrns, K, wvfmsz):
     Covs = _N.empty((nNrns, K, K))
     for n in xrange(nNrns):
         for k1 in xrange(K):
             #Covs[n, k1, k1] = (LoHisMk[n, k1, 1] - LoHisMk[n, k1, 0])*(0.1+0.1*_N.random.rand())
-            Covs[n, k1, k1] = (LoHisMk[n, k1, 1] - LoHisMk[n, k1, 0])*0.2
+            Covs[n, k1, k1] = (wvfmsz[0] + (wvfmsz[1] - wvfmsz[0])*_N.random.rand())**2
         for k1 in xrange(K):
             for k2 in xrange(k1+1, K):
                 Covs[n, k1, k2] = 0.8 * _N.sqrt(Covs[n, k1, k1]*Covs[n, k2, k2])#(0.5 + 0.3*_N.random.rand()) * _N.sqrt(Covs[n, k1, k1]*Covs[n, k2, k2])
                 Covs[n, k2, k1] = Covs[n, k1, k2]
     return Covs
 
-def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, l0ts, l_ctr_chpts, ctrts, mk_chpts, mkts, Covs, LoHis, km, bckgrdLam=None, script="no info", addShortStops=False, stops=10, stopDur=500, thresh=None):
+def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, l_l0_chpts, l_ctr_chpts, mk_chpts, Covs, LoHis, km, bckgrdLam=None, script="no info", addShortStops=False, stops=10, stopDur=500, thresh=None):
     """
     km  tells me neuron N gives rise to clusters km[N]  (list)
     bckgrd is background spike rate  (Hz)
@@ -114,7 +114,7 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, 
     else:
         Ns[:] = N
 
-    NT     = _N.sum(Ns)
+    NT     = _N.sum(Ns)     #  total time we have data
     pths    = _N.empty(NT)
 
     x01    = _N.linspace(0, 1, len(pths))
@@ -125,7 +125,7 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, 
     #  sxt  should be (M x NT)
     sxt   = _N.empty((M, NT))
     for m in xrange(M):  # sxts time scale
-        sxt[m] = createSmoothedPath(sx_chpts[m], NT, sxts)
+        sxt[m] = createSmoothedPath(sx_chpts[m], NT)
         if len(sx_chpts[m]) > 1:  plastic = True
 
     sx    = sxt**2     #  var of firing rate function
@@ -134,7 +134,7 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, 
     #  f is NT x M
     l0   = _N.empty((M, NT))
     for m in xrange(M):
-        l0[m] = createSmoothedPath(l0_chpts[m], NT, l0ts)
+        l0[m] = createSmoothedPath(l0_chpts[m], NT)
         if len(l0_chpts[m]) > 1:  plastic = True
 
     f     = l0/_N.sqrt(2*_N.pi*sx)   #  f*dt
@@ -142,14 +142,15 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, 
     ##########  nonstationary center location
     ctr  = _N.empty((M, NT))
     for m in xrange(M):
-        ctr[m] = createSmoothedPath(ctr_chpts[m], NT, ctrts)
+        ctr[m] = createSmoothedPath(ctr_chpts[m], NT)
         if len(ctr_chpts[m]) > 1:  plastic = True
 
     if K > 0:
         ##########  nonstationary marks
         mk_MU  = _N.empty((nNrns, NT, K))
         for n in xrange(nNrns):
-            mk_MU[n] = createSmoothedPathK(mk_chpts[n], NT, K, mkts, LoHis[n])
+            mk_MU[n] = createSmoothedPathK(mk_chpts[n], NT, K, LoHis[n])
+
             if len(mk_chpts[n]) > 1:  plastic = True
 
     if mvPat == NUNIF:
@@ -211,7 +212,7 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, 
         nrn = nrnNum[m]
         if K > 0:
             for t in xrange(len(sts)):
-                dat[sts[t], 2:] = _N.random.multivariate_normal(mk_MU[nrn, t], Covs[nrn], size=1)
+                dat[sts[t], 2:] = _N.random.multivariate_normal(mk_MU[nrn, sts[t]], Covs[nrn], size=1)
 
         #  now noise spikes
         if bckgrdLam is not None:
@@ -220,7 +221,7 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, sxts, l_l0_chpts, 
             nrn = nrnNum[m]
             if K > 0:
                 for t in xrange(len(nzsts)):
-                    dat[nzsts[t], 2:] = _N.random.multivariate_normal(mk_MU[nrn, t], Covs[nrn], size=1)
+                    dat[nzsts[t], 2:] = _N.random.multivariate_normal(mk_MU[nrn, nzsts[t]], Covs[nrn], size=1)
 
     if thresh is not None:
         sts = _N.where(dat[:, 1] == 1)[0]

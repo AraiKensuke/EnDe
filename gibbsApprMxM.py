@@ -98,7 +98,7 @@ class MarkAndRF:
         """
         gtdiffusion:  use ground truth center of place field in calculating variance of center.  Meaning of diffPerMin different
         """
-        print "normal gibbs"
+        print "gibbs"
         oo = self
         twpi     = 2*_N.pi
         pcklme   = {}
@@ -211,6 +211,7 @@ class MarkAndRF:
             xAS  = x[Asts + t0]   #  position @ spikes
             mAS  = mks[Asts + t0]   #  position @ spikes
             xASr = xAS.reshape((1, nSpks))
+            #mASr = mAS.reshape((nSpks, 1, K))
             mASr = mAS.reshape((1, nSpks, K))
             econt = _N.empty((Mwowonz, nSpks))
             rat   = _N.zeros((Mwowonz+1, nSpks))
@@ -228,15 +229,13 @@ class MarkAndRF:
             for m in xrange(M):
                 _iu_Sg[m] = _N.linalg.inv(_u_Sg[m])
 
+            ttA = _tm.time()
             for iter in xrange(ITERS):
-                ttA = _tm.time()
                 iSg = _N.linalg.inv(Sg)
-                tt1 = _tm.time()
                 if (iter % 5) == 0:    
                     print "iter  %d" % iter
 
                 gAMxMu.stochasticAssignment(oo, iter, M, Mwowonz, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, ((epc > 0) and (iter == 0)))
-                ttSA = _tm.time()
 
         #         ###############  FOR EACH CLUSTER
 
@@ -246,9 +245,7 @@ class MarkAndRF:
                     nSpksM   = len(sts)
                     clusSz[m] = nSpksM
 
-                    ###############
                     ###############  CONDITIONAL l0
-                    ###############
 
                     #  _ss.gamma.rvs.  uses k, theta  k is 1/B (B is our thing)
                     iiq2 = 1./q2[m]
@@ -258,6 +255,7 @@ class MarkAndRF:
                     #  l0_intgrd   (M x Nupx)
                     l0_intgrd   = _N.exp(-0.5*(f[m] - ux)*(f[m]-ux) * iiq2)  
                     l0_exp_px   = _N.sum(l0_intgrd*px) * dSilenceX
+
                     BL  = (oo.dt/_N.sqrt(twpi*q2[m]))*l0_exp_px
 
 
@@ -328,7 +326,7 @@ class MarkAndRF:
 
                         u_u_ = _N.array(_u_u[m])
                     u[m] = _N.random.multivariate_normal(u_u_, u_Sg_)
-                    
+
                     smp_mk_prms[oo.ky_p_u][:, iter, m] = u[m]
                     smp_mk_hyps[oo.ky_h_u_u][:, iter, m] = u_u_
                     smp_mk_hyps[oo.ky_h_u_Sg][:, :, iter, m] = u_Sg_
@@ -338,18 +336,6 @@ class MarkAndRF:
                     """
                     ###############  CONDITIONAL f
                     #q2pr = _f_q2[m] if (_f_q2[m] > q2rate) else q2rate
-                for m in xrange(M):
-                    """
-                    delete this
-                    """
-                    minds = _N.where(gz[iter, :, m] == 1)[0]
-                    sts  = Asts[minds] + t0
-                    nSpksM   = len(sts)
-                    iiq2  = 1./q2[m]
-                    """
-                    delete this
-                    """
-
                     if (epc > 0) and oo.adapt:
                         q2pr = _f_q2[m] + f_q2_rate * dt
                     else:
@@ -381,13 +367,11 @@ class MarkAndRF:
                     norm    = 1./_N.sum(condPosF)
                     f_u_    = norm*_N.sum(fx*condPosF)
                     f_q2_   = norm*_N.sum(condPosF*(fx-f_u_)*(fx-f_u_))
-                    #f[m]    = _N.sqrt(f_q2_)*_N.random.randn() + f_u_
-                    f[m]    = f_u_
+                    f[m]    = _N.sqrt(f_q2_)*_N.random.randn() + f_u_
                     smp_sp_prms[oo.ky_p_f, iter, m] = f[m]
                     smp_sp_hyps[oo.ky_h_f_u, iter, m] = f_u_
                     smp_sp_hyps[oo.ky_h_f_q2, iter, m] = f_q2_
 
-                for m in xrange(M):
                     #ttc1g = _tm.time()
                     #############  VARIANCE, COVARIANCE
                     if nSpksM >= K:
@@ -412,110 +396,112 @@ class MarkAndRF:
                     smp_mk_hyps[oo.ky_h_Sg_nu][0, iter, m] = Sg_nu_
                     smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, iter, m] = Sg_PSI_
 
-            #         # ###############  CONDITIONAL q2
-            #         #xI = (xt0t1-f)*(xt0t1-f)*0.5*iq2xr
+                    # ###############  CONDITIONAL q2
+                    #xI = (xt0t1-f)*(xt0t1-f)*0.5*iq2xr
 
-            #         if use_spc:
-            #             q2_intgrd = _N.exp(-0.5*(f[m] - ux)*(f[m]-ux) * iq2xr)
-            #             q2_exp_px = _N.sum(q2_intgrd*px, axis=1) * dSilenceX
+                    if use_spc:
+                        q2_intgrd = _N.exp(-0.5*(f[m] - ux)*(f[m]-ux) * iq2xr)
+                        q2_exp_px = _N.sum(q2_intgrd*px, axis=1) * dSilenceX
 
-            #             # function of q2
-            #             s = -((l0[m]*oo.dt)/sqrt_2pi_q2x)*q2_exp_px
-            #         else:
-            #             s = 0
-            #         #  B' / (a' - 1) = MODE   #keep mode the same after discount
-            #         #  B' = MODE * (a' - 1)
-            #         if (epc > 0) and oo.adapt:
-            #             _md_nd= _q2_B[m] / (_q2_a[m] + 1)
-            #             _Dq2_a = _q2_a[m] * _N.exp(-dt/tau_q2)
-            #             _Dq2_B = _Dq2_a / _md_nd
-            #         else:
-            #             _Dq2_a = _q2_a[m]
-            #             _Dq2_B = _q2_B[m]
+                        # function of q2
+                        s = -((l0[m]*oo.dt)/sqrt_2pi_q2x)*q2_exp_px
+                    else:
+                        s = 0
+                    #  B' / (a' - 1) = MODE   #keep mode the same after discount
+                    #  B' = MODE * (a' - 1)
+                    if (epc > 0) and oo.adapt:
+                        _md_nd= _q2_B[m] / (_q2_a[m] + 1)
+                        _Dq2_a = _q2_a[m] * _N.exp(-dt/tau_q2)
+                        _Dq2_B = _Dq2_a / _md_nd
+                    else:
+                        _Dq2_a = _q2_a[m]
+                        _Dq2_B = _q2_B[m]
 
-            #         if nSpksM > 0:
-            #             ##  (1/sqrt(sg2))^S
-            #             ##  (1/x)^(S/2)   = (1/x)-(a+1)
-            #             ##  -S/2 = -a - 1     -a = -S/2 + 1    a = S/2-1
-            #             xI = (xt0t1[sts-t0]-f[m])*(xt0t1[sts-t0]-f[m])*0.5
-            #             SL_a = 0.5*nSpksM - 1   #  spiking part of likelihood
-            #             SL_B = _N.sum(xI)  #  spiking part of likelihood
-            #             #  spiking prior x prior
-            #             sLLkPr = -(_q2_a[m] + SL_a + 2)*lq2x - iq2x*(_q2_B[m] + SL_B)
-            #         else:
-            #             sLLkPr = -(_q2_a[m] + 1)*lq2x - iq2x*_q2_B[m]
-
-
-            #         sat = sLLkPr + s
-            #         sat -= _N.max(sat)
-            #         condPos = _N.exp(sat)
-            #         q2_a_, q2_B_ = ig_prmsUV(q2x, sLLkPr, s, d_q2x, q2x_m1, ITER=1, nSpksM=nSpksM, clstr=m, l0=l0[m])
-
-            #         # sat = sLLkPr + s
-            #         # sat -= _N.max(sat)
-            #         # condPos = _N.exp(sat)
-            #         # q2_a_, q2_B_ = ig_prmsUV(q2x, condPos, d_q2x, q2x_m1, ITER=1)
-            #         q2[m] = _ss.invgamma.rvs(q2_a_ + 1, scale=q2_B_)  #  check
+                    if nSpksM > 0:
+                        ##  (1/sqrt(sg2))^S
+                        ##  (1/x)^(S/2)   = (1/x)-(a+1)
+                        ##  -S/2 = -a - 1     -a = -S/2 + 1    a = S/2-1
+                        xI = (xt0t1[sts-t0]-f[m])*(xt0t1[sts-t0]-f[m])*0.5
+                        SL_a = 0.5*nSpksM - 1   #  spiking part of likelihood
+                        SL_B = _N.sum(xI)  #  spiking part of likelihood
+                        #  spiking prior x prior
+                        sLLkPr = -(_q2_a[m] + SL_a + 2)*lq2x - iq2x*(_q2_B[m] + SL_B)
+                    else:
+                        sLLkPr = -(_q2_a[m] + 1)*lq2x - iq2x*_q2_B[m]
 
 
-            #         #q2[m] = 1.1**2
+                    sat = sLLkPr + s
+                    sat -= _N.max(sat)
+                    condPos = _N.exp(sat)
+                    q2_a_, q2_B_ = ig_prmsUV(q2x, sLLkPr, s, d_q2x, q2x_m1, ITER=1, nSpksM=nSpksM, clstr=m, l0=l0[m])
 
-            #         #print ((1./nSpks)*_N.sum((xt0t1[sts]-f)*(xt0t1[sts]-f)))
+                    # sat = sLLkPr + s
+                    # sat -= _N.max(sat)
+                    # condPos = _N.exp(sat)
+                    # q2_a_, q2_B_ = ig_prmsUV(q2x, condPos, d_q2x, q2x_m1, ITER=1)
+                    q2[m] = _ss.invgamma.rvs(q2_a_ + 1, scale=q2_B_)  #  check
 
-            #         if q2[m] < 0:
-            #             print "********  q2[%(m)d] = %(q2).3f" % {"m" : m, "q2" : q2[m]}
 
-            #         smp_sp_prms[oo.ky_p_q2, iter, m]   = q2[m]
-            #         smp_sp_hyps[oo.ky_h_q2_a, iter, m] = q2_a_
-            #         smp_sp_hyps[oo.ky_h_q2_B, iter, m] = q2_B_
+                    #q2[m] = 1.1**2
+
+                    #print ((1./nSpks)*_N.sum((xt0t1[sts]-f)*(xt0t1[sts]-f)))
+
+                    if q2[m] < 0:
+                        print "********  q2[%(m)d] = %(q2).3f" % {"m" : m, "q2" : q2[m]}
+
+                    smp_sp_prms[oo.ky_p_q2, iter, m]   = q2[m]
+                    smp_sp_hyps[oo.ky_h_q2_a, iter, m] = q2_a_
+                    smp_sp_hyps[oo.ky_h_q2_B, iter, m] = q2_B_
                     
-            #         if q2[m] < 0:
-            #             print "^^^^^^^^  q2[%(m)d] = %(q2).3f" % {"m" : m, "q2" : q2[m]}
-            #             print q2[m]
-            #             print smp_sp_prms[oo.ky_p_q2, 0:iter+1, m]
-            #         iiq2 = 1./q2[m]
+                    if q2[m] < 0:
+                        print "^^^^^^^^  q2[%(m)d] = %(q2).3f" % {"m" : m, "q2" : q2[m]}
+                        print q2[m]
+                        print smp_sp_prms[oo.ky_p_q2, 0:iter+1, m]
+                    iiq2 = 1./q2[m]
 
-            #         #ttc1h = _tm.time()
-                    
-
-            #     #  nz clstr.  fixed width
-            #     if oo.nzclstr:
-            #         nz_l0_exp_px   = _N.sum(nz_l0_intgrd*px) * dSilenceX
-            #         BL  = (oo.dt/_N.sqrt(twpi*q2[Mwowonz-1]))*nz_l0_exp_px
-
-            #         minds = len(_N.where(gz[iter, :, Mwowonz-1] == 1)[0])
-            #         l0_a_ = minds + _nz_l0_a
-            #         l0_B_ = BL    + _nz_l0_B
-
-            #         l0[Mwowonz-1]  = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_)) 
-            #         smp_nz_l0[iter]       = l0[Mwowonz-1]
-            #         smp_nz_hyps[0, iter]  = l0_a_
-            #         smp_nz_hyps[1, iter]  = l0_B_
+                    #ttc1h = _tm.time()
                     
 
-            # ###  THIS LEVEL:  Finished Gibbs iters for epoch
-            # gAMxMu.finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_hyps, smp_sp_prms, smp_mk_hyps, smp_mk_prms, freeClstr, M, K)
-            # #  MAP of nzclstr
-            # if oo.nzclstr:
-            #     frm = int(0.7*ITERS)
-            #     _nz_l0_a              = _N.median(smp_nz_hyps[0, frm:])
-            #     _nz_l0_B              = _N.median(smp_nz_hyps[1, frm:])
-            # pcklme["smp_sp_hyps"] = smp_sp_hyps
-            # pcklme["smp_mk_hyps"] = smp_mk_hyps
-            # pcklme["smp_sp_prms"] = smp_sp_prms
-            # pcklme["smp_mk_prms"] = smp_mk_prms
-            # pcklme["sp_prmPstMd"] = oo.sp_prmPstMd
-            # pcklme["mk_prmPstMd"] = oo.mk_prmPstMd
-            # pcklme["intvs"]       = oo.intvs
-            # pcklme["occ"]         = gz
-            # pcklme["nz_pth"]         = nz_pth
-            # pcklme["M"]           = M
-            # pcklme["Mwowonz"]           = Mwowonz
-            # if Mwowonz > M:  # or oo.nzclstr == True
-            #     pcklme["smp_nz_l0"]  = smp_nz_l0
-            #     pcklme["smp_nz_hyps"]= smp_nz_hyps
+                #  nz clstr.  fixed width
+                if oo.nzclstr:
+                    nz_l0_exp_px   = _N.sum(nz_l0_intgrd*px) * dSilenceX
+                    BL  = (oo.dt/_N.sqrt(twpi*q2[Mwowonz-1]))*nz_l0_exp_px
+
+                    minds = len(_N.where(gz[iter, :, Mwowonz-1] == 1)[0])
+                    l0_a_ = minds + _nz_l0_a
+                    l0_B_ = BL    + _nz_l0_B
+
+                    l0[Mwowonz-1]  = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_)) 
+                    smp_nz_l0[iter]       = l0[Mwowonz-1]
+                    smp_nz_hyps[0, iter]  = l0_a_
+                    smp_nz_hyps[1, iter]  = l0_B_
+
+            ttB = _tm.time()
+            print (ttB-ttA)
+
+            ###  THIS LEVEL:  Finished Gibbs iters for epoch
+            gAMxMu.finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_hyps, smp_sp_prms, smp_mk_hyps, smp_mk_prms, freeClstr, M, K)
+            #  MAP of nzclstr
+            if oo.nzclstr:
+                frm = int(0.7*ITERS)
+                _nz_l0_a              = _N.median(smp_nz_hyps[0, frm:])
+                _nz_l0_B              = _N.median(smp_nz_hyps[1, frm:])
+            pcklme["smp_sp_hyps"] = smp_sp_hyps
+            pcklme["smp_mk_hyps"] = smp_mk_hyps
+            pcklme["smp_sp_prms"] = smp_sp_prms
+            pcklme["smp_mk_prms"] = smp_mk_prms
+            pcklme["sp_prmPstMd"] = oo.sp_prmPstMd
+            pcklme["mk_prmPstMd"] = oo.mk_prmPstMd
+            pcklme["intvs"]       = oo.intvs
+            pcklme["occ"]         = gz
+            pcklme["nz_pth"]         = nz_pth
+            pcklme["M"]           = M
+            pcklme["Mwowonz"]           = Mwowonz
+            if Mwowonz > M:  # or oo.nzclstr == True
+                pcklme["smp_nz_l0"]  = smp_nz_l0
+                pcklme["smp_nz_hyps"]= smp_nz_hyps
                 
-            # dmp = open(resFN("posteriors_%d.dmp" % epc, dir=oo.outdir), "wb")
-            # pickle.dump(pcklme, dmp, -1)
-            # dmp.close()
+            dmp = open(resFN("posteriors_%d.dmp" % epc, dir=oo.outdir), "wb")
+            pickle.dump(pcklme, dmp, -1)
+            dmp.close()
 
