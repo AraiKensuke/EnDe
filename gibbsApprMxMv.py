@@ -178,7 +178,9 @@ class MarkAndRF:
 
             if epc == ep1:   ###  initialize
                 labS, labH, lab, flatlabels, M, MF, hashthresh, nHSclusters = gAMxMu.initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=doSepHash, xLo=oo.xLo, xHi=oo.xHi, oneCluster=oo.oneCluster)
+ 
                 Mwowonz = M if not oo.nzclstr else M + 1
+                #nHSclusters.append(M - nHSclusters[0]-nHSclusters[1])   #  last are free clusters that are not the noise cluster
 
                 u_u_  = _N.empty((M, K))
                 u_Sg_ = _N.empty((M, K, K))
@@ -208,7 +210,8 @@ class MarkAndRF:
                 _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, \
                     _Sg_PSI = gAMxMu.declare_prior_hyp_params(M, MF, K, x, mks, Asts, t0)
                 fr = f[0:M].reshape((M, 1))
-                gAMxMu.init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, Asts, t0, x, mks, flatlabels, nzclstr=oo.nzclstr)
+                gAMxMu.init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, \
+                    _Sg_PSI, Asts, t0, x, mks, flatlabels, nHSclusters, nzclstr=oo.nzclstr)
 
                 U   = _N.empty(M)
                 FQ2 = _N.empty(M)
@@ -234,8 +237,11 @@ class MarkAndRF:
             oo.gz=gz
             print "spikes %d" % nSpks
 
-            #dSilenceX = (NSexp/float(oo.Nupx))*(oo.xHi-oo.xLo)
-            dSilenceX = NSexp*(xbns[1]-xbns[0])  # dx of histogram
+            dSilenceX1 = (NSexp/float(oo.Nupx))*(oo.xHi-oo.xLo)
+            dSilenceX2 = NSexp*(xbns[1]-xbns[0])  # dx of histogram
+            print "-------------------------- %(1).4f  %(2).4f" % {"1" : dSilenceX1, "2" : dSilenceX2}
+
+            dSilenceX  = dSilenceX1
 
             xAS  = x[Asts + t0]   #  position @ spikes
             mAS  = mks[Asts + t0]   #  position @ spikes
@@ -264,6 +270,7 @@ class MarkAndRF:
                     print "-------iter  %(i)d" % {"i" : iter}
 
                 gAMxMu.stochasticAssignment(oo, iter, M, Mwowonz, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, ((epc > 0) and (iter == 0)), nthrds=oo.nThrds)
+                #gAMxMu.stochasticAssignment(oo, iter, M, Mwowonz, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, iter==0, nthrds=oo.nThrds)
 
                 ###############  FOR EACH CLUSTER
 
@@ -307,7 +314,9 @@ class MarkAndRF:
                 aL  = clstsz
                 l0_a_ = aL + _Dl0_a
                 l0_B_ = BL + _Dl0_B
+                
                 try:
+                    #  mean is (l0_a_ / l0_B_)
                     l0[0:M] = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_))  #  check
                 except ValueError:
                     """
@@ -326,6 +335,7 @@ class MarkAndRF:
                     _N.savetxt("l0_intgrd", l0_intgrd)
                     raise
 
+
                 smp_sp_prms[oo.ky_p_l0, iter] = l0[0:M]
                 smp_sp_hyps[oo.ky_h_l0_a, iter] = l0_a_
                 smp_sp_hyps[oo.ky_h_l0_B, iter] = l0_B_
@@ -342,7 +352,8 @@ class MarkAndRF:
                         clstx    = mks[l_sts[m]]
 
                         mcs[m]       = _N.mean(clstx, axis=0)
-                        u_u_[m] = _N.dot(u_Sg_[m], _N.dot(_iu_Sg[m], _u_u[m]) + clstsz[m]*_N.dot(iSg[m], mcs[m]))
+                        #u_u_[m] = _N.dot(u_Sg_[m], _N.dot(_iu_Sg[m], _u_u[m]) + clstsz[m]*_N.dot(iSg[m], mcs[m]))
+                        u_u_[m] = _N.einsum("jk,k->j", u_Sg_[m], _N.dot(_iu_Sg[m], _u_u[m]) + clstsz[m]*_N.dot(iSg[m], mcs[m]))
                         # print "mean of cluster %d" % m
                         # print mcs[m]
                         # print u_u_[m]
@@ -352,6 +363,10 @@ class MarkAndRF:
                         #  sigma^2 and mu are the current Gibbs-sampled values
 
                         ##  mean of posterior distribution of cluster means
+                        # print "for cluster %(m)d with size %(sz)d" % {"m" : m, "sz" : clstsz[m]}
+                        # print mcs[m]
+                        # print u_u_[m]
+                        # print _u_u[m]
                     else:
                         u_Sg_[m] = _N.array(_u_Sg[m])
                         u_u_[m] = _N.array(_u_u[m])
@@ -391,8 +406,8 @@ class MarkAndRF:
 
                 if use_spc:
                     fxs  = _N.copy(_fxs0)
-                    fxs *= (FQr*30)
-                    fxs -= (FQr*15)
+                    fxs *= (FQr*120)
+                    fxs -= (FQr*60)
                     fxs += Ur
 
                     if use_omp:
@@ -408,6 +423,9 @@ class MarkAndRF:
                     q2r = q2[0:M].reshape((M, 1))
                      #  s   is (M x fss)
                     s = -(l0r*oo.dt/_N.sqrt(twpi*q2r)) * f_exp_px  #  a function of x
+                    #if (iter > ITERS - 40) and (iter % 5 == 0):
+                    #    print f_exp_px
+                    #    _plt.plot(fxs[0], _N.s)
                 else:
                     s = _N.zeros(M)
 
@@ -497,13 +515,15 @@ class MarkAndRF:
                         SL_a = 0.5*clstsz[m] - 1   #  spiking part of likelihood
                         SL_B = _N.sum(xI)  #  spiking part of likelihood
                         #  spiking prior x prior
+                        #sLLkPr[m] = -(SL_a + 1)*lq2x - iq2x*SL_B
                         sLLkPr[m] = -(_q2_a[m] + SL_a + 2)*lq2x - iq2x*(_q2_B[m] + SL_B)
                     else:
                         sLLkPr[m] = -(_q2_a[m] + 1)*lq2x - iq2x*_q2_B[m]
 
-                q2_a_, q2_B_ = mltpl_ig_prmsUV(q2xr, sLLkPr.T, s.T, d_q2xr, q2x_m1r, clstsz)
+                q2_a_, q2_B_ = mltpl_ig_prmsUV(q2xr, sLLkPr.T, s.T, d_q2xr, q2x_m1r, clstsz, iter)
+                    
                 q2[0:M] = _ss.invgamma.rvs(q2_a_ + 1, scale=q2_B_)  #  check
-                #q2[0]    = 0.36
+
                 tt7 = _tm.time()
 
                 smp_sp_prms[oo.ky_p_q2, iter]   = q2[0:M]

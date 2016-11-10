@@ -90,13 +90,18 @@ def ig_prmsUV(sg2s, sLLkPr, s, d_sg2s, sg2s_m1, ITER=1, nSpksM=0, clstr=-1, l0=N
 #  sg2s is the x-axis over which posterior is numerically evaluated
 #  sLLkPr  spiking likelihood + prior
 #  s is the spatial modulation due to silence
-def mltpl_ig_prmsUV(sg2s, sLLkPr, s, d_sg2s, sg2s_m1, clstsz, l0=None):
+def mltpl_ig_prmsUV(sg2s, sLLkPr, s, d_sg2s, sg2s_m1, clstsz, it, l0=None):
     sat = sLLkPr + s
     sat -= _N.max(sat, axis=0)
     y = _N.exp(sat)
 
-    # print y.shape
-    # print d_sg2s.shape
+    if it % 50 == 0:
+        d  = _N.empty((sg2s.shape[0], 4))
+        d[:, 0] = sg2s[:, 0]
+        d[:, 1] = sLLkPr[:, 4]
+        d[:, 2] = s[:, 4]
+        d[:, 3] = y[:, 4]
+        _N.savetxt("y%d" % it, d)
     # ###  does well when a is large
 
     p     = _N.array(y[0:-1]*d_sg2s)   #  p weighted by bin size
@@ -108,14 +113,14 @@ def mltpl_ig_prmsUV(sg2s, sLLkPr, s, d_sg2s, sg2s_m1, clstsz, l0=None):
     a_ = u*u /vr + 2
     B_ = (a_ - 1)*u
 
-    agt = _N.where(a_ > 10000)[0]
+    agt = _N.where(a_ > 100000)[0]
 
     for im in agt:
-        print "oops   nSpksM is %(n)d, cl %(c)d" % {"n" : clstsz[im], "c" : im}
+        print "oops   nSpksM is %(n)d, cl %(c)d    u %(u).3e   vr %(vr).3e" % {"n" : clstsz[im], "c" : im, "u" : u[im], "vr" : vr[im]}
         if u[im] > 1.5:  # wide  B / (a+1)   
             print "u > 1.5    clstr %(c)d   nSpksM %(n)d" % {"c" : im, "n" : clstsz[im]}
-            a_[agt] = 0.1+0.2*_N.random.rand()
-            B_[agt] = 1+20*_N.random.rand()
+            a_[im] = 0.1+0.2*_N.random.rand()
+            B_[im] = 1+20*_N.random.rand()
             #  just wide
         
     return a_, B_

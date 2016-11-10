@@ -110,7 +110,7 @@ class mkdecoder:
 
         #  avg. time it takes to move 1 grid is 1 / _N.mean(_N.abs(spdGrdUnts))
         #  p(i+1, i) = 1/<avg spdGrdUnts>
-        p1 = 2*_N.mean(_N.abs(spdGrdUnts))*oo.spdMult
+        p1 = 1.5*_N.mean(_N.abs(spdGrdUnts))*oo.spdMult
         #  assume Nx is even
         #k2 = 0.02
         k2 = 0.1

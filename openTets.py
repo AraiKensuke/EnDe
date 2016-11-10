@@ -129,8 +129,6 @@ def EMBICs(mks, TR=5, minK=2, maxK=15):
 def EMposBICs(pos, TR=5, minK=1, maxK=15):
     """
     """
-    print "maxK %(max)d   minK %(min)d" % {"max" : maxK, "min" : minK}
-
     bics = _N.empty(((maxK-minK), TR))
     labs = _N.empty((maxK-minK, TR, pos.shape[0]), dtype=_N.int)
 

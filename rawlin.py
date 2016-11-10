@@ -31,15 +31,15 @@ frip = "/home/karai/Dropbox (EastWestSideHippos)/BostonData/%(s3)s/%(s1)sripples
 flnp = "/home/karai/Dropbox (EastWestSideHippos)/BostonData/%(s3)s/%(s1)slinpos%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3}
 frwp = "/home/karai/Dropbox (EastWestSideHippos)/BostonData/%(s3)s/%(s1)srawpos%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3}
 
-rip = _sio.loadmat(frip)
+rip = _sio.loadmat(frip)    #  load matlab .mat files
+mLp = _sio.loadmat(flnp)
+mRp = _sio.loadmat(frwp)
 
 #  these are in seconds
 ex   = rip["ripplescons"].shape[1] - 1
 strt = rip["ripplescons"][0, ex][0, ep][0, 0]["starttime"][0,0]
 endt = rip["ripplescons"][0, ex][0, ep][0, 0]["endtime"][0,0]
 
-mLp = _sio.loadmat(flnp)
-mRp = _sio.loadmat(frwp)
 
 
 #  episodes 2, 4, 6

@@ -1,5 +1,5 @@
 import numpy as _N
-from fitutil import  emMKPOS_sep1A, sepHashEM, sepHash, colorclusters, mergesmallclusters, splitclstrs
+from fitutil import  emMKPOS_sep1A, sepHash, colorclusters, mergesmallclusters, splitclstrs, posMkCov0
 from posteriorUtil import MAPvalues2
 import clrs 
 from filter import gauKer
@@ -8,6 +8,7 @@ from EnDedirs import resFN, datFN
 import matplotlib.pyplot as _plt
 import fastnum as _fm
 import hc_bcast as _hcb
+import scipy.stats as _ss
 
 twpi = 2*_N.pi
 
@@ -43,20 +44,22 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
             # clstrs = _N.array([0, 1])
         else:
             unonhash, hashsp, hashthresh = sepHash(_x, BINS=20, blksz=5, xlo=oo.xLo, xhi=oo.xHi)
-        #  hashthresh is dim 2
+            #  hashthresh is dim 2
 
-        """
-            fig = _plt.figure(figsize=(5, 10))
-            fig.add_subplot(3, 1, 1)
-            _plt.scatter(_x[hashsp, 1], _x[hashsp, 2], color="red")
-            _plt.scatter(_x[unonhash, 1], _x[unonhash, 2], color="black")
-            fig.add_subplot(3, 1, 2)
-            _plt.scatter(_x[hashsp, 0], _x[hashsp, 1], color="red")
-            _plt.scatter(_x[unonhash, 0], _x[unonhash, 1], color="black")
-            fig.add_subplot(3, 1, 3)
-            _plt.scatter(_x[hashsp, 0], _x[hashsp, 2], color="red")
-            _plt.scatter(_x[unonhash, 0], _x[unonhash, 2], color="black")
-        """
+            # print len(unonhash)
+            # print "--------"
+            # print len(hashsp)
+            # fig = _plt.figure(figsize=(5, 10))
+            # fig.add_subplot(3, 1, 1)
+            # _plt.scatter(_x[hashsp, 1], _x[hashsp, 2], color="red")
+            # _plt.scatter(_x[unonhash, 1], _x[unonhash, 2], color="black")
+            # fig.add_subplot(3, 1, 2)
+            # _plt.scatter(_x[hashsp, 0], _x[hashsp, 1], color="red")
+            # _plt.scatter(_x[unonhash, 0], _x[unonhash, 1], color="black")
+            # fig.add_subplot(3, 1, 3)
+            # _plt.scatter(_x[hashsp, 0], _x[hashsp, 2], color="red")
+            # _plt.scatter(_x[unonhash, 0], _x[unonhash, 2], color="black")
+
 
         if (len(unonhash) > 0) and (len(hashsp) > 0):
             labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], _x[hashsp])
@@ -66,8 +69,9 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
             labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], None, TR=5)
         if doSepHash:
             splitclstrs(_x[unonhash], labS)
-            mergesmallclusters(_x[unonhash], _x[hashsp], labS, labH, K+1, clstrs)
+            posMkCov0(_x[unonhash], labS)
 
+            mergesmallclusters(_x[unonhash], _x[hashsp], labS, labH, K+1, clstrs)
             # _N.savetxt("hash", hashsp)
             # _N.savetxt("nhash", unonhash)
             # colorclusters(_x[hashsp], labH, clstrs[1], name="hash", xLo=xLo, xHi=xHi)
@@ -92,8 +96,7 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
             #_plt.scatter(_x[hashsp[these], 0], _x[hashsp[these], 1], color=cls[i+clstrs[0]])
 
         MF     = clstrs[0] + clstrs[1]
-        #M = MF#int(MF * 1.1) + 2   #  20% more clusters
-        M = int(MF * 1.1) + 2   #  20% more clusters
+        M = int(clstrs[0] * 1.2 + clstrs[1]) + 2   #  20% more clusters
         print "cluters:  %d" % M
 
     #####  MODES  - find from the sampling
@@ -128,23 +131,48 @@ def declare_prior_hyp_params(M, MF, K, x, mks, Asts, t0):
     #  priors  prefixed w/ _
     _f_u    = _N.zeros(M);    _f_q2  = _N.ones(M)*16 #  wide
     #  inverse gamma
-    #_q2_a   = _N.ones(M)*4;    _q2_B  = _N.ones(M)*1e-3
-    _q2_a   = _N.ones(M)*0.5;    _q2_B  = _N.ones(M)*1e-3
-    _l0_a   = _N.ones(M)*0.5;     _l0_B  = _N.ones(M)*(1/30.)
-    mkmn    = _N.mean(mks[Asts+t0], axis=0)
-    mkcv    = _N.cov(mks[Asts+t0], rowvar=0)
-    _u_u    = _N.tile(mkmn, M).T.reshape((M, K))
-    _u_Sg   = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*1
+    _q2_a   = _N.ones(M)*0.01;    _q2_B  = _N.ones(M)*1e-3
+    _l0_a   = _N.ones(M)*0.05;     _l0_B  = _N.ones(M)*(1/30.)
+    #_l0_a   = _N.ones(M)*0.5;     _l0_B  = _N.ones(M)
+    #mkmn    = _N.mean(mks[Asts+t0], axis=0)   #  let's use
+    #mkcv    = _N.cov(mks[Asts+t0], rowvar=0)
+    ############
+    #_u_u    = _N.tile(mkmn, M).T.reshape((M, K))
+    #_u_Sg   = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*20  #  this 
+
+    allSg   = _N.zeros((K, K))
+    sd  = _N.sort(mks[Asts], axis=0)    #  first index is tetrode
+
+    mins= _N.min(sd, axis=0);     maxs= _N.max(sd, axis=0)
+
+    Wdth= sd[-1] - sd[0]
+    ctr = sd[0] + 0.5*(sd[-1] - sd[0])
+    _u_u    = _N.tile(ctr, M).T.reshape((M, K))
+
+    _N.fill_diagonal(allSg, (5*Wdth)**2)
+
+    #  xcorr(1, 2)**2 / var1 var2
+    for ix in xrange(K):
+        for iy in xrange(ix + 1, K):
+            pc, pv = _ss.pearsonr(mks[Asts, ix], mks[Asts, iy])
+            allSg[ix, iy]  = pc*pc * _N.sqrt(allSg[ix, ix] * allSg[iy, iy])
+            allSg[iy, ix]  = allSg[ix, iy]
+
+    #_u_Sg   = _N.tile(_N.identity(K), M).T.reshape((M, K, K))  #  this 
+    _u_Sg   = _N.tile(allSg, M).T.reshape((M, K, K))  #  this 
     _u_iSg  = _N.linalg.inv(_u_Sg)
+    ############
     _Sg_nu  = _N.ones((M, 1))*(K*1.01)
     _Sg_PSI = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*0.05
 
     return _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI
 
-def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, Asts, t0, x, mks, flatlabels, nzclstr=False, signalClusters=None):
+def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, Asts, t0, x, mks, flatlabels, nHSclusters, nzclstr=False, signalClusters=None):
     """
     M is # of clusters excluding noize
     """
+    nSpks = len(flatlabels)   # 0..nHclusters[0] are non-hash, nHclusters[0]..nHcluster[0]+nHcluster[1] are hash
+
     nSpks = len(flatlabels)
     for im in xrange(MF):  #if lab < 0, these marks not used for init
         kinds = _N.where(flatlabels == im)[0]  #  inds
@@ -179,10 +207,10 @@ def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, Asts, t0, x, mks, flatlabel
         l0[M] = 10000.   #  ~ 0.1Hz    #  1000/sqrt(2*pi*300**2)  #  seems better to start high here
         q2[M] = 500**2
         if signalClusters is not None:
-            Sg[M] = _N.cov(mks[Asts[signalClusters]], rowvar=0) * 0.5
+            Sg[M] = _N.cov(mks[Asts[signalClusters]], rowvar=0) * 20
             u[M]  = _N.mean(mks[Asts[signalClusters]], axis=0)
         else:
-            Sg[M] = _N.cov(mks[Asts], rowvar=0)
+            Sg[M] = _N.cov(mks[Asts], rowvar=0)*200
             u[M]  = _N.mean(mks[Asts], axis=0)
         f[M]  = 0
 
@@ -239,20 +267,6 @@ def stochasticAssignment(oo, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, 
     #_N.einsum("mnj,mjk,mnk->mn", dmu, iSg, dmu, out=qdrMKS)
     #t3 = _tm.time()
     _fm.multi_qdrtcs_par_func(dmu, iSg, qdrMKS, M, N, K, nthrds=nthrds)
-    #_fm.multi_qdrtcs_par(dmu, iSg, qdrMKS, M, N, K)
-    #_fm.multi_qdrtcs_simp(dmu, iSg, qdrMKS, M, N, K)
-
-    #t4 = _tm.time()
-    # print dmu.shape
-    # print dmur.shape
-    # print iSg.shape
-
-    # print "------"
-    # print (t2-t1)
-    #print (t3-t2)
-    #print (t4-t3)
-    # print qdrMKS
-    # print qdrMKS2
 
     #  fr is    M x 1, xASr is 1 x N, iq2r is M x 1
     #qdrSPC     = (fr - xASr)*(fr - xASr)*iq2r  #  M x nSpks   # 0.01s
@@ -264,19 +278,34 @@ def stochasticAssignment(oo, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, 
     #  mAS = mks[Asts+t0] 
     #  xAS = x[Asts + t0]   #  position @ spikes
 
-    #  CheckFarFromExistingClusters()
-    # if cmp2Existing:
-    #     realCl = _N.where(freeClstr == False)[0]
+    #CheckFarFromExistingClusters()
+    if cmp2Existing:
+        realCl = _N.where(freeClstr == False)[0]
 
-    #     print "=============="
-    #     print qdrMKS[realCl]
-    #     print _N.min(qdrMKS[realCl], axis=0)
-    #     nNrstMKS_d = _N.sqrt(_N.min(qdrMKS[realCl], axis=0)/K)  #  dim len(sts)
-    #     nNrstSPC_d = _N.sqrt(_N.min(qdrSPC[realCl], axis=0))
-    #     #  for each spike, distance to nearest cluster
-    #     print nNrstMKS_d
-    #     print nNrstSPC_d
-    #     print "=============="
+        #    _N.mean(qdrSPC) ~ 1 if spikes from this particular cluster
+        #    
+        print "****************space"
+        print qdrSPC[realCl]   #  ^2 of units of variance
+        print _N.mean(qdrSPC[realCl])   #  ^2 of units of variance  # on avg. 1
+        print "****************marks"
+        print qdrMKS[realCl]        
+        print _N.mean(qdrMKS[realCl])   #  on avg. K
+
+        #  Msc x Nnew
+        #_N.where(qdrSPC[realCl] )
+        # find the spikes that are far from existing clusters.
+        # then cluster
+
+        # if more than 3 away in space or 
+        print "=============="
+        print qdrMKS[realCl]
+        print _N.min(qdrMKS[realCl], axis=0)
+        nNrstMKS_d = _N.sqrt(_N.min(qdrMKS[realCl], axis=0)/K)  #  dim len(sts)
+        nNrstSPC_d = _N.sqrt(_N.min(qdrSPC[realCl], axis=0))
+        #  for each spike, distance to nearest cluster
+        print nNrstMKS_d
+        print nNrstSPC_d
+        print "=============="
     #     _N.savetxt("qdrMKS", qdrMKS)
     #     _N.savetxt("qdrSPC", qdrSPC)
 
