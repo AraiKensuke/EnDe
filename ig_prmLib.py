@@ -90,18 +90,15 @@ def ig_prmsUV(sg2s, sLLkPr, s, d_sg2s, sg2s_m1, ITER=1, nSpksM=0, clstr=-1, l0=N
 #  sg2s is the x-axis over which posterior is numerically evaluated
 #  sLLkPr  spiking likelihood + prior
 #  s is the spatial modulation due to silence
-def mltpl_ig_prmsUV(sg2s, sLLkPr, s, d_sg2s, sg2s_m1, clstsz, it, l0=None):
+def mltpl_ig_prmsUV(sg2s, sLLkPr, s, d_sg2s, sg2s_m1, clstsz, it, mks, t0, xt0t1, gz, l_sts, SL_as, SL_Bs, _q2_a, _q2_B, q2_min, q2_max, l0=None):
+    """
+    xt0t1    relative coordinates
+    mks      absolute coordinates
+    """
     sat = sLLkPr + s
     sat -= _N.max(sat, axis=0)
     y = _N.exp(sat)
 
-    if it % 50 == 0:
-        d  = _N.empty((sg2s.shape[0], 4))
-        d[:, 0] = sg2s[:, 0]
-        d[:, 1] = sLLkPr[:, 4]
-        d[:, 2] = s[:, 4]
-        d[:, 3] = y[:, 4]
-        _N.savetxt("y%d" % it, d)
     # ###  does well when a is large
 
     p     = _N.array(y[0:-1]*d_sg2s)   #  p weighted by bin size
@@ -113,30 +110,39 @@ def mltpl_ig_prmsUV(sg2s, sLLkPr, s, d_sg2s, sg2s_m1, clstsz, it, l0=None):
     a_ = u*u /vr + 2
     B_ = (a_ - 1)*u
 
-    agt = _N.where(a_ > 100000)[0]
+    #agt = _N.where(a_ > 100000)[0]
 
+    modes = B_ / (a_ + 1)
+    agt  = _N.where((modes < q2_min) | (modes > q2_max))[0]
+    for im in agt:
+        print "hit min or max  cluster %(cl)d  %(md).3e   replace with %(lmd).3e" % {"cl" : im, "md" : modes[im], "lmd" : (SL_Bs[im] / (SL_as[im] + 1))}
+        a_[im]  = SL_as[im]
+        B_[im]  = SL_Bs[im]
+
+    """
     for im in agt:
         print "oops   nSpksM is %(n)d, cl %(c)d    u %(u).3e   vr %(vr).3e" % {"n" : clstsz[im], "c" : im, "u" : u[im], "vr" : vr[im]}
+
+        d  = _N.empty((sg2s.shape[0], 4))
+        d[:, 0] = sg2s[:, 0]
+        d[:, 1] = sLLkPr[:, im]
+        d[:, 2] = s[:, im]
+        d[:, 3] = y[:, im]
+        _N.savetxt("y%(m)d_%(it)d" % {"it" : it, "m" : im}, d)
+
+        posmks = _N.empty((clstsz[im], 5))
+        sts    = l_sts[im]
+        posmks[:, 0]  = xt0t1[sts - t0]
+        posmks[:, 1:] = mks[sts]
+        cmt = "#  %(SL_a).3e  %(SL_B).3e  %(q2_a).3e  %(q2_B).3e" % {"SL_a" : SL_as[im], "SL_B" : SL_Bs[im], "q2_a" : _q2_a[im], "q2_B" : _q2_B[im]}
+        _U.savetxtWCom("posmks%(m)d_%(it)d" % {"it" : it, "m" : im}, posmks, fmt="%.4e % .4e % .4e % .4e % .4e", com=cmt)
+
         if u[im] > 1.5:  # wide  B / (a+1)   
             print "u > 1.5    clstr %(c)d   nSpksM %(n)d" % {"c" : im, "n" : clstsz[im]}
             a_[im] = 0.1+0.2*_N.random.rand()
             B_[im] = 1+20*_N.random.rand()
             #  just wide
+    """
         
     return a_, B_
-
-
-def ig_prmsMU(sg2s, y, d_sg2s, sg2s_m1, ITER=1):
-    mode  = sg2s[_N.where(y == _N.max(y))[0][0]]  #  find mode
-
-    p     = _N.array(y[0:-1]*d_sg2s)   #  p weighted by bin size
-    p     /= _N.sum(p)
-
-    u= _N.sum(sg2s[0:-1] * p)
-
-    a_ = (mode+u)/(u-mode)
-    B_ = (2*mode*u) / (u-mode)
-
-    return a_, B_
-
 

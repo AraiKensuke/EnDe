@@ -47,14 +47,14 @@ if "--use_openmp" in sys.argv:
 
 cmdclass = {'build_ext' : build_ext}
 #  Output to be named _LogitWrapper.so
-ext_modules = Extension('hc_bcast',
-                    ["hc_bcast.pyx"],
+ext_modules = Extension('fastnum',
+                    ["fastnum.pyx"],
                     #libraries = ['gsl', 'gslcblas'],
                     include_dirs=incdir1,   #  include_dirs for Mac
                     extra_compile_args=extra_compile_args,
                     extra_link_args=extra_link_args)  #  linker args
 setup(
-    name='hc_bcast',
+    name='fastnum',
     cmdclass = cmdclass,
     #ext_modules = 
     ext_modules=[ext_modules],

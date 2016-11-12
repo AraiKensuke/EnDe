@@ -220,7 +220,7 @@ def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, 
     oo.mk_prmPstMd[oo.ky_p_u][0] = u[0:M]
     oo.mk_prmPstMd[oo.ky_p_Sg][0] = Sg[0:M]
 
-def stochasticAssignment(oo, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, cmp2Existing, nthrds=1):
+def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, cmp2Existing, nthrds=1):
     #  Msc   Msc signal clusters
     #  M     all clusters, including nz clstr.  M == Msc when not using nzclstr
     #  Gibbs sampling
@@ -306,8 +306,12 @@ def stochasticAssignment(oo, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, 
         print nNrstMKS_d
         print nNrstSPC_d
         print "=============="
-    #     _N.savetxt("qdrMKS", qdrMKS)
-    #     _N.savetxt("qdrSPC", qdrSPC)
+        s = _N.empty((N, 2))
+        #  for each spike, distance to nearest cluster
+        s[:, 0] = nNrstMKS_d
+        s[:, 1] = nNrstSPC_d
+        _N.savetxt(resFN("qdrMKSSPC%d" % epc), s, fmt="%.3e %.3e")
+        #  take all the neurons that are far from any cluster
 
 
     #     # print "---------------qdrSPC"

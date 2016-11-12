@@ -66,6 +66,9 @@ class MarkAndRF:
 
     q2x_L = 1e-7
     q2x_H = 1e2
+
+    q2_min = 5e-5
+    q2_max = 1e5
     
     oneCluster = False
     
@@ -269,7 +272,7 @@ class MarkAndRF:
                     #print "-------iter  %(i)d   %(r).5f" % {"i" : iter, "r" : _N.random.rand()}
                     print "-------iter  %(i)d" % {"i" : iter}
 
-                gAMxMu.stochasticAssignment(oo, iter, M, Mwowonz, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, ((epc > 0) and (iter == 0)), nthrds=oo.nThrds)
+                gAMxMu.stochasticAssignment(oo, epc, iter, M, Mwowonz, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, ((epc > 0) and (iter == 0)), nthrds=oo.nThrds)
                 #gAMxMu.stochasticAssignment(oo, iter, M, Mwowonz, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, iter==0, nthrds=oo.nThrds)
 
                 ###############  FOR EACH CLUSTER
@@ -277,7 +280,7 @@ class MarkAndRF:
                 l_sts = []
                 for m in xrange(M):   #  get the minds
                     minds = _N.where(gz[iter, :, m] == 1)[0]  
-                    sts  = Asts[minds] + t0
+                    sts  = Asts[minds] + t0   #  sts is in absolute time
                     clstsz[m] = len(sts)
                     l_sts.append(sts)
                 # for m in xrange(Mwowonz):   #  get the minds
@@ -508,19 +511,24 @@ class MarkAndRF:
                     _Dq2_a = _q2_a
                     _Dq2_B = _q2_B
 
+                SL_Bs = _N.empty(M)
+                SL_as = _N.empty(M)
+
                 for m in xrange(M):
                     if clstsz[m] > 0:
                         sts = l_sts[m]
                         xI = (xt0t1[sts-t0]-f[m])*(xt0t1[sts-t0]-f[m])*0.5
                         SL_a = 0.5*clstsz[m] - 1   #  spiking part of likelihood
                         SL_B = _N.sum(xI)  #  spiking part of likelihood
+                        SL_Bs[m] = SL_B
+                        SL_as[m] = SL_a
                         #  spiking prior x prior
                         #sLLkPr[m] = -(SL_a + 1)*lq2x - iq2x*SL_B
                         sLLkPr[m] = -(_q2_a[m] + SL_a + 2)*lq2x - iq2x*(_q2_B[m] + SL_B)
                     else:
                         sLLkPr[m] = -(_q2_a[m] + 1)*lq2x - iq2x*_q2_B[m]
 
-                q2_a_, q2_B_ = mltpl_ig_prmsUV(q2xr, sLLkPr.T, s.T, d_q2xr, q2x_m1r, clstsz, iter)
+                q2_a_, q2_B_ = mltpl_ig_prmsUV(q2xr, sLLkPr.T, s.T, d_q2xr, q2x_m1r, clstsz, iter, mks, t0, xt0t1, gz, l_sts, SL_as, SL_Bs, _q2_a, _q2_B, oo.q2_min, oo.q2_max)
                     
                 q2[0:M] = _ss.invgamma.rvs(q2_a_ + 1, scale=q2_B_)  #  check
 
@@ -554,11 +562,8 @@ class MarkAndRF:
                     smp_nz_hyps[0, iter]  = l0_a_
                     smp_nz_hyps[1, iter]  = l0_B_
 
-            ttB = _tm.time()                    
+            ttB = _tm.time()
             print (ttB-ttA)
-                #ttc1h = _tm.time()
-
-
 
             gAMxMu.finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_hyps, smp_sp_prms, smp_mk_hyps, smp_mk_prms, freeClstr, M, K)
             #  MAP of nzclstr
