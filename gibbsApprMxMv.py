@@ -272,7 +272,7 @@ class MarkAndRF:
                     #print "-------iter  %(i)d   %(r).5f" % {"i" : iter, "r" : _N.random.rand()}
                     print "-------iter  %(i)d" % {"i" : iter}
 
-                gAMxMu.stochasticAssignment(oo, epc, iter, M, Mwowonz, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, ((epc > 0) and (iter == 0)), nthrds=oo.nThrds)
+                gAMxMu.stochasticAssignment(oo, epc, iter, M, Mwowonz, K, l0, f, q2, u, Sg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, ((epc > 0) and (iter == 0)), nthrds=oo.nThrds)
                 #gAMxMu.stochasticAssignment(oo, iter, M, Mwowonz, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, iter==0, nthrds=oo.nThrds)
 
                 ###############  FOR EACH CLUSTER

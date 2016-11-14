@@ -40,6 +40,7 @@ class kde:
 
         oo.kde = _N.zeros(nard)
         oo.kde = oo.kde.reshape(oo.Nx, Nm**mdim)
+
         print "kde.shape"
         print oo.kde.shape
 
@@ -114,6 +115,7 @@ class kde:
         print oo.kde.shape
         oo.kde /= denom
 
-        dmp = open(_edd.resFN(filename, dir=oo.setname, create=True), "wb")
-        pickle.dump(oo, dmp)
-        dmp.close()
+        # dmp = open(_edd.resFN(filename, dir=oo.setname, create=True), "wb")
+        # pickle.dump(oo, dmp)
+        # dmp.close()
+        

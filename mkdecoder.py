@@ -116,7 +116,7 @@ class mkdecoder:
         k2 = 0.1
         k3 = 0.1
 
-
+        """
         for i in xrange(0, oo.Nx):  #  indexing of xTrs  [to, from]
             oo.xTrs[i, i] = 1-p1   
             if i == 0:
@@ -162,7 +162,7 @@ class mkdecoder:
         for i in xrange(oo.Nx):
             A = _N.trapz(oo.xTrs[:, i])*((oo.xHi-oo.xLo)/float(oo.Nx))
             oo.xTrs[:, i] /= A
-        """
+
 
     def init_pX_Nm(self, t):
         oo = self

@@ -220,7 +220,7 @@ def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, 
     oo.mk_prmPstMd[oo.ky_p_u][0] = u[0:M]
     oo.mk_prmPstMd[oo.ky_p_Sg][0] = Sg[0:M]
 
-def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, cmp2Existing, nthrds=1):
+def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, cmp2Existing, nthrds=1):
     #  Msc   Msc signal clusters
     #  M     all clusters, including nz clstr.  M == Msc when not using nzclstr
     #  Gibbs sampling
@@ -278,142 +278,139 @@ def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, A
     #  mAS = mks[Asts+t0] 
     #  xAS = x[Asts + t0]   #  position @ spikes
 
-    #CheckFarFromExistingClusters()
-    if cmp2Existing:
-        realCl = _N.where(freeClstr == False)[0]
+    if cmp2Existing:   #  compare only non-hash spikes and non-hash clusters
+        # realCl = _N.where(freeClstr == False)[0]
+        # print freeClstr.shape
+        # print realCl.shape
 
-        #    _N.mean(qdrSPC) ~ 1 if spikes from this particular cluster
-        #    
-        print "****************space"
-        print qdrSPC[realCl]   #  ^2 of units of variance
-        print _N.mean(qdrSPC[realCl])   #  ^2 of units of variance  # on avg. 1
-        print "****************marks"
-        print qdrMKS[realCl]        
-        print _N.mean(qdrMKS[realCl])   #  on avg. K
+        abvthrEachCh = mASr[0] > hashthresh    #  should be NxK of
+        abvthrAtLeast1Ch = _N.sum(abvthrEachCh, axis=1) > 0   # N x K
+        newNonHashSpks   = _N.where(abvthrAtLeast1Ch)[0]
 
-        #  Msc x Nnew
-        #_N.where(qdrSPC[realCl] )
-        # find the spikes that are far from existing clusters.
-        # then cluster
+        #print "spikes not hash"
+        #print abvthrInds
+        abvthrEachCh = u[0:Msc] > hashthresh  #  M x K  (M includes noise)
+        abvthrAtLeast1Ch = _N.sum(abvthrEachCh, axis=1) > 0
+        
+        knownNonHclstrs   = _N.where(abvthrAtLeast1Ch & (freeClstr == False))[0]
 
-        # if more than 3 away in space or 
-        print "=============="
-        print qdrMKS[realCl]
-        print _N.min(qdrMKS[realCl], axis=0)
-        nNrstMKS_d = _N.sqrt(_N.min(qdrMKS[realCl], axis=0)/K)  #  dim len(sts)
-        nNrstSPC_d = _N.sqrt(_N.min(qdrSPC[realCl], axis=0))
+        #print "clusters not hash"
+
+        #  Place prior for freeClstr near new non-hash spikes that are far 
+        #  from known clusters that are not hash clusters 
+
+
+        nNrstMKS_d = _N.sqrt(_N.min(qdrMKS[knownNonHclstrs], axis=0)/K)  #  dim len(sts)
+        nNrstSPC_d = _N.sqrt(_N.min(qdrSPC[knownNonHclstrs], axis=0))
         #  for each spike, distance to nearest cluster
-        print nNrstMKS_d
-        print nNrstSPC_d
-        print "=============="
-        s = _N.empty((N, 2))
+        # print nNrstMKS_d
+        # print nNrstSPC_d
+        # print "=============="
+        s = _N.empty((len(newNonHashSpks), 3))
         #  for each spike, distance to nearest cluster
-        s[:, 0] = nNrstMKS_d
-        s[:, 1] = nNrstSPC_d
-        _N.savetxt(resFN("qdrMKSSPC%d" % epc), s, fmt="%.3e %.3e")
-        #  take all the neurons that are far from any cluster
+        s[:, 0] = newNonHashSpks
+        s[:, 1] = nNrstMKS_d[newNonHashSpks]
+        s[:, 2] = nNrstSPC_d[newNonHashSpks]
+        _N.savetxt(resFN("qdrMKSSPC%d" % epc, dir=oo.outdir), s, fmt="%d %.3e %.3e")
+
+        dMK     = nNrstMKS_d[newNonHashSpks]
+        dSP     = nNrstSPC_d[newNonHashSpks]
+
+        farMKinds = _N.where(dMK > 4)[0]    # 
+        #  mean of prior for center - mean of farMKinds
+        #  cov  of prior for center - how certain am I of mean?  
+
+        #print "farMKinds"
+        #print farMKinds
+        farSPinds = _N.where(dSP > 4)[0]  #  4 std. deviations away
+        #print "farSPinds"
+        #print farSPinds
+
+        ##  kernel density estimate
+        xs  = _N.linspace(-6, 6, 101)
+        xsr = xs.reshape(101, 1)
+        isg2= 1/(0.1**2)   #  spatial kernel bandwidth
+
+        # fig = _plt.figure(figsize=(6, 9))
+        # fig.add_subplot(1, 2, 1)
+        # _plt.scatter(xASr[0, newNonHashSpks[farMKinds]], mASr[0, newNonHashSpks[farMKinds], 0])
+        # fig.add_subplot(1, 2, 2)
+        # _plt.scatter(xASr[0, newNonHashSpks[farSPinds]], mASr[0, newNonHashSpks[farSPinds], 0])
+
+        freeClstrs = _N.where(freeClstr == True)[0]
+        L = len(freeClstrs)
+        jjj = 0
+        if (len(farSPinds) > 10) and (len(farMKinds) > 10):
+            jjj = 1
+            l1 = L/2
+
+            for l in xrange(l1):  # mASr  is 1 x N x K
+                im = freeClstrs[l]   # Asts + t0 gives absolute time
+                _u_u[im]  = _N.mean(mASr[0, newNonHashSpks[farMKinds]], axis=0)
+                y   = _N.exp(-0.5*(xsr - xASr[0, newNonHashSpks[farMKinds]])**2 * isg2)
+                yc  = _N.sum(y, axis=1)
+                ix  = _N.where(yc == _N.max(yc))[0][0]
+                _f_u[im]  = xs[ix]
+                _u_Sg[im] = _N.cov(mASr[0, newNonHashSpks[farMKinds]], rowvar=0)*8
+                _f_q2[im] = _N.std(xASr[0, newNonHashSpks[farMKinds]], axis=0)**2 * 8
+            # _plt.figure()
+            # _plt.plot(xs, yc)
+
+            for l in xrange(l1, L):
+                im = freeClstrs[l]   # Asts + t0 gives absolute time
+                _u_u[im]  = _N.mean(mASr[0, newNonHashSpks[farSPinds]], axis=0)
+                y   = _N.exp(-0.5*(xsr - xASr[0, newNonHashSpks[farSPinds]])**2 * isg2)
+                yc  = _N.sum(y, axis=1)
+                ix  = _N.where(yc == _N.max(yc))[0][0]
+                _f_u[im]  = xs[ix]
+                _u_Sg[im] = _N.cov(mASr[0, newNonHashSpks[farSPinds]], rowvar=0)*8
+                _f_q2[im] = _N.std(xASr[0, newNonHashSpks[farSPinds]], axis=0)**2 * 8
+            # _plt.figure()
+            # _plt.plot(xs, yc)
+
+        elif (len(farSPinds) > 10) and (len(farMKinds) < 10):
+            jjj = 2
+            for l in xrange(L):
+                im = freeClstrs[l]   # Asts + t0 gives absolute time
+                _u_u[im]  = _N.mean(mASr[0, newNonHashSpks[farSPinds]], axis=0)
+                y   = _N.exp(-0.5*(xsr - xASr[0, newNonHashSpks[farSPinds]])**2 * isg2)
+                yc  = _N.sum(y, axis=1)
+                ix  = _N.where(yc == _N.max(yc))[0][0]
+                _f_u[im]  = xs[ix]
+                _u_Sg[im] = _N.cov(mASr[0, newNonHashSpks[farSPinds]], rowvar=0)*8
+                _f_q2[im] = _N.std(xASr[0, newNonHashSpks[farSPinds]], axis=0)**2 * 8
+            # _plt.figure()
+            # _plt.plot(xs, yc)
+
+        elif (len(farSPinds) < 10) and (len(farMKinds) > 10):
+            jjj = 3
+            for l in xrange(L):
+                im = freeClstrs[l]   # Asts + t0 gives absolute time
+                _u_u[im]  = _N.mean(mASr[0, newNonHashSpks[farMKinds]], axis=0)
+                y   = _N.exp(-0.5*(xsr - xASr[0, newNonHashSpks[farMKinds]])**2 * isg2)
+                yc  = _N.sum(y, axis=1)
+                ix  = _N.where(yc == _N.max(yc))[0][0]
+                _f_u[im]  = xs[ix]
+                _u_Sg[im] = _N.cov(mASr[0, newNonHashSpks[farMKinds]], rowvar=0)*8
+                _f_q2[im] = _N.std(xASr[0, newNonHashSpks[farMKinds]], axis=0)**2 * 8
+            # _plt.figure()
+            # _plt.plot(xs, yc)
+
+        """
+        print "^^^^^^^^"
+        print freeClstrs
+        print "set priors for freeClstrs   %d" % jjj
+        #print _u_u[freeClstrs]
+        #print _u_Sg[freeClstrs]
+        print _f_u[freeClstrs]
+        print _f_q2[freeClstrs]
+        """
+
+        #if len(farSPinds) > 10:
 
 
-    #     # print "---------------qdrSPC"
-    #     # print qdrSPC
-    #     # print "---------------qdrSPC"
-    #     # fig = _plt.figure()
-    #     # fig.add_subplot(2, 1, 1)
-    #     # _plt.hist(nNrstMKS_d, bins=30)
-    #     # fig.add_subplot(2, 1, 2)
-    #     # _plt.hist(nNrstSPC_d, bins=30)
+        #  set the priors of the freeClusters to be near the far spikes
 
-    #     # fig = _plt.figure()
-    #     # fig.add_subplot(1, 1, 1)
-    #     # _plt.hist(x[Asts+t0], bins=30)
-
-    #     ####  mks
-    #     #abvthrEachCh = mks[Asts+t0] > hashthresh
-    #     abvthrEachCh = mASr[:, 0] > hashthresh
-    #     abvthrAtLeast1Ch = _N.sum(abvthrEachCh, axis=1) > 0
-    #     abvthrInds   = _N.where(abvthrAtLeast1Ch)[0]
-
-    #     print "MKS"
-    #     farMKS = _N.where((nNrstMKS_d > 1) & abvthrAtLeast1Ch)[0]
-    #     print "SPACE"
-    #     farSPC  = _N.where((nNrstSPC_d > 2))[0]
-    #     print "len(farSPC) is %d" % len(farSPC)
-    #     print "len(farMK) is %d" % len(farMKS)
-
-
-    #     iused = 0  #  use up to 3
-    #     bDone = False
-    #     # fig = _plt.figure(figsize=(8, 5))
-    #     # fig.add_subplot(2, 1, 1)
-    #     # _plt.scatter(x[Asts + t0], mks[Asts+t0, 0], color="black", s=2)
-    #     bDoMKS = (len(farMKS) > 0)
-    #     bDoSPC = (len(farSPC) > 0)
-
-    #     for m in xrange(Msc):
-    #         #if freeClstr[m] and (not bDone) and bDoMKS:
-    #         if freeClstr[m]:
-    #             #these     = (Asts+t0)[abvthrInds]  #  in absolute coords
-    #             _f_u[m] = _N.mean(xASr[0, abvthrInds], axis=0)
-    #             _u_u[m]   = _N.mean(mASr[abvthrInds, 0], axis=0)
-    #             l0[m]     = _N.random.rand()*10
-    #             if (iused < 2) and bDoMKS:
-    #                 #these     = (Asts+t0)[farMKS] #Asts + t0 is t-index from 0
-    #                 f[m]      = _N.mean(xASr[0, farMKS], axis=0)
-    #                 u[m]      = _N.mean(mASr[farMKS, 0], axis=0)
-    #             else:
-    #                 f[m]      = _N.mean(xASr[0, abvthrInds], axis=0)
-    #                 u[m]      = _N.mean(mASr[abvthrInds, 0], axis=0)
-
-    #                 # print "BEG far markise"
-    #                 # _plt.scatter(x[these], mks[these, 0], color="red", s=4)
-    #                 # print "f[m]=%(1)s   u[m]=%(2)s" % {"1" : str(f[m]), "2" : str(u[m])}
-    #                 freeClstr[m] = False
-    #                 iused += 1
-    #         # else:
-    #         #     print "NOTTTTTTT far markise"
-    #         #     print "f[m]=%(1)s   u[m]=%(2)s" % {"1" : str(f[m]), "2" : str(u[m])}
-
-    #     bDone = False
-    #     # fig.add_subplot(2, 1, 2)
-    #     # _plt.scatter(x[Asts + t0], mks[Asts+t0, 0], color="black", s=3)
-    #     iused = 0
-    #     for m in xrange(Msc):
-    #         #if freeClstr[m] and (not bDone) and bDoSPC:
-    #         if freeClstr[m]:
-    #             #these     = (Asts+t0)[abvthrInds]
-    #             _f_u[m] = _N.mean(xASr[0, abvthrInds], axis=0)
-    #             _u_u[m]   = _N.mean(mASr[abvthrInds, 0], axis=0)
-    #             l0[m]     = _N.random.rand()*10
-
-    #             # _f_u[m] = _N.mean(x[these], axis=0)
-    #             # _u_u[m]   = _N.mean(mks[these], axis=0)
-    #             # l0[m]     = _N.random.rand()*10
-
-    #             if (iused < 2) and bDoSPC:
-    #                 #these     = (Asts+t0)[farMKS] #Asts + t0 is t-index from 0
-    #                 f[m]      = _N.mean(xASr[0, farSPC], axis=0)
-    #                 u[m]      = _N.mean(mASr[farSPC, 0], axis=0)
-    #             else:
-    #                 f[m]      = _N.mean(xASr[0, abvthrInds], axis=0)
-    #                 u[m]      = _N.mean(mASr[abvthrInds, 0], axis=0)
-    #                 """
-    #                 if (iused < 2) and bDoSPC:
-    #                 these     = (Asts+t0)[farSPC]
-    #                 f[m]      = _N.mean(x[these], axis=0)
-    #                 u[m]      = _N.mean(mks[these], axis=0)
-    #                 else:
-    #                 f[m]      = _N.mean(x[these], axis=0)
-    #                 u[m]      = _N.mean(mks[these], axis=0)
-    #                 """
-    #                 # _plt.scatter(x[these], mks[these, 0], color="red", s=4)
-    #                 # print "BEG far spatial"
-    #                 # print "f[m]=%(1)s   u[m]=%(2)s" % {"1" : str(f[m]), "2" : str(u[m])}
-    #                 freeClstr[m] = False
-    #                 iused += 1
-
-    #         # else:
-    #         #     print "NOTTTTTTT far spatial"
-    #         #     print "f[m]=%(1)s   u[m]=%(2)s" % {"1" : str(f[m]), "2" : str(u[m])}
 
     ####  outside cmp2Existing here
     #   (Mx1) + (Mx1) - (MxN + MxN)
