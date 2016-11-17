@@ -114,9 +114,9 @@ def EMBICs(mks, TR=5, minK=2, maxK=15):
         for tr in xrange(TR):
             gmm = mixture.GMM(n_components=K, covariance_type="full")
             
-            gmm.fit(mks[:, 1:])
-            bics[K-minK, tr] = gmm.bic(mks[:, 1:])
-            labs[K-minK, tr] = gmm.predict(mks[:, 1:])
+            gmm.fit(mks)
+            bics[K-minK, tr] = gmm.bic(mks)
+            labs[K-minK, tr] = gmm.predict(mks)
 
     coords = _N.where(bics == _N.min(bics))
     bestLab = labs[coords[0][0], coords[1][0]]

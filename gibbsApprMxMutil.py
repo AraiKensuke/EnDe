@@ -9,8 +9,11 @@ import matplotlib.pyplot as _plt
 import fastnum as _fm
 import hc_bcast as _hcb
 import scipy.stats as _ss
+import openTets as _oT
+import utilities as _U
 
 twpi = 2*_N.pi
+wdSpc = 1
 
 def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneCluster=False):
     n0 = 0
@@ -204,14 +207,23 @@ def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, 
         print "using the noise cluster"
         #  l0 / sqrt(2*pi*50**2)
         print "M   ''''''''''''    %d" % M
-        l0[M] = 10000.   #  ~ 0.1Hz    #  1000/sqrt(2*pi*300**2)  #  seems better to start high here
+        l0[M] = 1000000.   #  ~ 0.1Hz    #  1000/sqrt(2*pi*300**2)  #  seems better to start high here
         q2[M] = 500**2
         if signalClusters is not None:
             Sg[M] = _N.cov(mks[Asts[signalClusters]], rowvar=0) * 20
             u[M]  = _N.mean(mks[Asts[signalClusters]], axis=0)
         else:
-            Sg[M] = _N.cov(mks[Asts], rowvar=0)*200
-            u[M]  = _N.mean(mks[Asts], axis=0)
+            sd  = _N.sort(mks[Asts], axis=0)    #  first index is tetrode
+            mins= _N.min(sd, axis=0);     maxs= _N.max(sd, axis=0)
+            Wdth= sd[-1] - sd[0]
+            ctr = sd[0] + 0.5*(sd[-1] - sd[0])
+            u[M]    = ctr
+
+            _N.fill_diagonal(Sg[M], (5*Wdth)**2)
+            #Sg[M] = _N.cov(mks[Asts], rowvar=0)*10000
+            #u[M]  = _N.mean(mks[Asts], axis=0)
+
+            print Sg[M]
         f[M]  = 0
 
     oo.sp_prmPstMd[0, oo.ky_p_l0::3] = l0[0:M]
@@ -230,6 +242,7 @@ def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _
     nSpks = len(Asts)
     twpi = 2*_N.pi
 
+    Kp1      = K+1
     #rat      = _N.zeros(M+1)
     pc       = _N.zeros(M)
 
@@ -292,7 +305,7 @@ def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _
         abvthrEachCh = u[0:Msc] > hashthresh  #  M x K  (M includes noise)
         abvthrAtLeast1Ch = _N.sum(abvthrEachCh, axis=1) > 0
         
-        knownNonHclstrs   = _N.where(abvthrAtLeast1Ch & (freeClstr == False))[0]
+        knownNonHclstrs  = _N.where(abvthrAtLeast1Ch & (freeClstr == False) & (q2[0:Msc] < wdSpc))[0]
 
         #print "clusters not hash"
 
@@ -319,82 +332,135 @@ def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _
         farMKinds = _N.where(dMK > 4)[0]    # 
         #  mean of prior for center - mean of farMKinds
         #  cov  of prior for center - how certain am I of mean?  
-
-        #print "farMKinds"
-        #print farMKinds
         farSPinds = _N.where(dSP > 4)[0]  #  4 std. deviations away
-        #print "farSPinds"
-        #print farSPinds
 
-        ##  kernel density estimate
-        xs  = _N.linspace(-6, 6, 101)
-        xsr = xs.reshape(101, 1)
-        isg2= 1/(0.1**2)   #  spatial kernel bandwidth
+        farMKSPinds = _N.union1d(farMKinds, farSPinds)
 
-        # fig = _plt.figure(figsize=(6, 9))
-        # fig.add_subplot(1, 2, 1)
-        # _plt.scatter(xASr[0, newNonHashSpks[farMKinds]], mASr[0, newNonHashSpks[farMKinds], 0])
-        # fig.add_subplot(1, 2, 2)
-        # _plt.scatter(xASr[0, newNonHashSpks[farSPinds]], mASr[0, newNonHashSpks[farSPinds], 0])
+        farMKSP = _N.empty((len(farMKSPinds), K+1))
+        farMKSP[:, 0]  = xASr[0, farMKSPinds]
+        farMKSP[:, 1:] = mASr[0, farMKSPinds]
 
-        freeClstrs = _N.where(freeClstr == True)[0]
-        L = len(freeClstrs)
-        jjj = 0
-        if (len(farSPinds) > 10) and (len(farMKinds) > 10):
-            jjj = 1
-            l1 = L/2
+        # farSP = _N.empty((len(farSPinds), K+1))
+        # farMK = _N.empty((len(farMKinds), K+1))
+        # farSP[:, 0]  = xASr[0, farSPinds]
+        # farSP[:, 1:] = mASr[0, farSPinds]
+        # farMK[:, 0]  = xASr[0, farMKinds]
+        # farMK[:, 1:] = mASr[0, farMKinds]
 
-            for l in xrange(l1):  # mASr  is 1 x N x K
-                im = freeClstrs[l]   # Asts + t0 gives absolute time
-                _u_u[im]  = _N.mean(mASr[0, newNonHashSpks[farMKinds]], axis=0)
-                y   = _N.exp(-0.5*(xsr - xASr[0, newNonHashSpks[farMKinds]])**2 * isg2)
-                yc  = _N.sum(y, axis=1)
-                ix  = _N.where(yc == _N.max(yc))[0][0]
-                _f_u[im]  = xs[ix]
-                _u_Sg[im] = _N.cov(mASr[0, newNonHashSpks[farMKinds]], rowvar=0)*8
-                _f_q2[im] = _N.std(xASr[0, newNonHashSpks[farMKinds]], axis=0)**2 * 8
-            # _plt.figure()
-            # _plt.plot(xs, yc)
+        minK = 1
+        maxK = farMKSPinds.shape[0] / K
+        maxK = maxK if (maxK < 6) else 6
 
-            for l in xrange(l1, L):
-                im = freeClstrs[l]   # Asts + t0 gives absolute time
-                _u_u[im]  = _N.mean(mASr[0, newNonHashSpks[farSPinds]], axis=0)
-                y   = _N.exp(-0.5*(xsr - xASr[0, newNonHashSpks[farSPinds]])**2 * isg2)
-                yc  = _N.sum(y, axis=1)
-                ix  = _N.where(yc == _N.max(yc))[0][0]
-                _f_u[im]  = xs[ix]
-                _u_Sg[im] = _N.cov(mASr[0, newNonHashSpks[farSPinds]], rowvar=0)*8
-                _f_q2[im] = _N.std(xASr[0, newNonHashSpks[farSPinds]], axis=0)**2 * 8
-            # _plt.figure()
-            # _plt.plot(xs, yc)
 
-        elif (len(farSPinds) > 10) and (len(farMKinds) < 10):
-            jjj = 2
-            for l in xrange(L):
-                im = freeClstrs[l]   # Asts + t0 gives absolute time
-                _u_u[im]  = _N.mean(mASr[0, newNonHashSpks[farSPinds]], axis=0)
-                y   = _N.exp(-0.5*(xsr - xASr[0, newNonHashSpks[farSPinds]])**2 * isg2)
-                yc  = _N.sum(y, axis=1)
-                ix  = _N.where(yc == _N.max(yc))[0][0]
-                _f_u[im]  = xs[ix]
-                _u_Sg[im] = _N.cov(mASr[0, newNonHashSpks[farSPinds]], rowvar=0)*8
-                _f_q2[im] = _N.std(xASr[0, newNonHashSpks[farSPinds]], axis=0)**2 * 8
-            # _plt.figure()
-            # _plt.plot(xs, yc)
+        if maxK >= 2:
+            cls = ["red", "black", "blue", "brown", "pink", "green", "orange", "grey"]
+            print "coming in here"
+            labs, bics, bestLab, nClstrs = _oT.EMBICs(farMKSP, minK=minK, maxK=maxK, TR=1)
+            _U.savetxtWCom(resFN("newSpksMKSP%d" % epc, dir=oo.outdir), farMKSP, fmt="%.3e %.3e %.3e %.3e %.3e", com=("# number of clusters %d" % nClstrs))
 
-        elif (len(farSPinds) < 10) and (len(farMKinds) > 10):
-            jjj = 3
-            for l in xrange(L):
-                im = freeClstrs[l]   # Asts + t0 gives absolute time
-                _u_u[im]  = _N.mean(mASr[0, newNonHashSpks[farMKinds]], axis=0)
-                y   = _N.exp(-0.5*(xsr - xASr[0, newNonHashSpks[farMKinds]])**2 * isg2)
-                yc  = _N.sum(y, axis=1)
-                ix  = _N.where(yc == _N.max(yc))[0][0]
-                _f_u[im]  = xs[ix]
-                _u_Sg[im] = _N.cov(mASr[0, newNonHashSpks[farMKinds]], rowvar=0)*8
-                _f_q2[im] = _N.std(xASr[0, newNonHashSpks[farMKinds]], axis=0)**2 * 8
-            # _plt.figure()
-            # _plt.plot(xs, yc)
+            freeClstrs = _N.where(freeClstr == True)[0]
+            L = len(freeClstrs)
+            
+            unqLabs = _N.unique(bestLab)
+
+            upto    = nClstrs if nClstrs < L else L
+            ii  = -1
+            fig = _plt.figure()
+            for fid in unqLabs[0:upto]:
+                ii += 1
+                im = freeClstrs[ii]   # Asts + t0 gives absolute time
+                ths = newNonHashSpks[farMKSPinds[_N.where(bestLab == fid)[0]]]
+                _u_u[im]  = _N.mean(mASr[0, ths], axis=0)
+                _f_u[im]  = _N.mean(xASr[0, ths], axis=0)
+                _f_q2[im] = _N.std(xASr[0, ths], axis=0)**2 * 16                
+                for w in xrange(4):
+                    fig.add_subplot(2, 2, w+1)
+                    _plt.scatter(xASr[0, ths], mASr[0, ths, w], color=cls[ii])
+
+                print "new   "
+                print _u_u[im]
+                print _f_u[im]
+                print _f_q2[im]
+                _u_Sg[im] = _N.cov(mASr[0, ths], rowvar=0)*16
+            _plt.savefig("newspks%d" % epc)
+        else:
+            im = freeClstrs[0]   # Asts + t0 gives absolute time
+
+            _u_u[im]  = _N.mean(mASr[0, newNonHashSpks[farMKSPinds]], axis=0)
+            _f_u[im]  = _N.mean(xASr[0, newNonHashSpks[farMKSPinds]], axis=0)
+            _u_Sg[im] = _N.cov(mASr[0, newNonHashSpks[farMKSPinds]], rowvar=0)*16
+            _f_q2[im] = _N.std(xASr[0, newNonHashSpks[farMKSPinds]], axis=0)**2 * 16
+
+        # ##  kernel density estimate
+        # xs  = _N.linspace(-6, 6, 101)
+        # xsr = xs.reshape(101, 1)
+        # isg2= 1/(0.1**2)   #  spatial kernel bandwidth
+
+        # # fig = _plt.figure(figsize=(6, 9))
+        # # fig.add_subplot(1, 2, 1)
+        # # _plt.scatter(xASr[0, newNonHashSpks[farMKinds]], mASr[0, newNonHashSpks[farMKinds], 0])
+        # # fig.add_subplot(1, 2, 2)
+        # # _plt.scatter(xASr[0, newNonHashSpks[farSPinds]], mASr[0, newNonHashSpks[farSPinds], 0])
+
+        # freeClstrs = _N.where(freeClstr == True)[0]
+        # L = len(freeClstrs)
+
+        # jjj = 0
+        # if (len(farSPinds) >= Kp1) and (len(farMKinds) >= Kp1):
+        #     jjj = 1
+        #     l1 = L/2
+
+        #     for l in xrange(l1):  # mASr  is 1 x N x K
+        #         im = freeClstrs[l]   # Asts + t0 gives absolute time
+        #         _u_u[im]  = _N.mean(mASr[0, newNonHashSpks[farMKinds]], axis=0)
+        #         y   = _N.exp(-0.5*(xsr - xASr[0, newNonHashSpks[farMKinds]])**2 * isg2)
+        #         yc  = _N.sum(y, axis=1)
+        #         ix  = _N.where(yc == _N.max(yc))[0][0]
+        #         _f_u[im]  = xs[ix]
+        #         _u_Sg[im] = _N.cov(mASr[0, newNonHashSpks[farMKinds]], rowvar=0)*30
+        #         _f_q2[im] = _N.std(xASr[0, newNonHashSpks[farMKinds]], axis=0)**2 * 30
+        #     # _plt.figure()
+        #     # _plt.plot(xs, yc)
+
+        #     for l in xrange(l1, L):
+        #         im = freeClstrs[l]   # Asts + t0 gives absolute time
+        #         _u_u[im]  = _N.mean(mASr[0, newNonHashSpks[farSPinds]], axis=0)
+        #         y   = _N.exp(-0.5*(xsr - xASr[0, newNonHashSpks[farSPinds]])**2 * isg2)
+        #         yc  = _N.sum(y, axis=1)
+        #         ix  = _N.where(yc == _N.max(yc))[0][0]
+        #         _f_u[im]  = xs[ix]
+        #         _u_Sg[im] = _N.cov(mASr[0, newNonHashSpks[farSPinds]], rowvar=0)*30
+        #         _f_q2[im] = _N.std(xASr[0, newNonHashSpks[farSPinds]], axis=0)**2 * 30
+        #     # _plt.figure()
+        #     # _plt.plot(xs, yc)
+
+        # elif (len(farSPinds) >= Kp1) and (len(farMKinds) < Kp1):
+        #     jjj = 2
+        #     for l in xrange(L):
+        #         im = freeClstrs[l]   # Asts + t0 gives absolute time
+        #         _u_u[im]  = _N.mean(mASr[0, newNonHashSpks[farSPinds]], axis=0)
+        #         y   = _N.exp(-0.5*(xsr - xASr[0, newNonHashSpks[farSPinds]])**2 * isg2)
+        #         yc  = _N.sum(y, axis=1)
+        #         ix  = _N.where(yc == _N.max(yc))[0][0]
+        #         _f_u[im]  = xs[ix]
+        #         _u_Sg[im] = _N.cov(mASr[0, newNonHashSpks[farSPinds]], rowvar=0)*30
+        #         _f_q2[im] = _N.std(xASr[0, newNonHashSpks[farSPinds]], axis=0)**2 * 30
+        #     # _plt.figure()
+        #     # _plt.plot(xs, yc)
+
+        # elif (len(farSPinds) < Kp1) and (len(farMKinds) >= Kp1):
+        #     jjj = 3
+        #     for l in xrange(L):
+        #         im = freeClstrs[l]   # Asts + t0 gives absolute time
+        #         _u_u[im]  = _N.mean(mASr[0, newNonHashSpks[farMKinds]], axis=0)
+        #         y   = _N.exp(-0.5*(xsr - xASr[0, newNonHashSpks[farMKinds]])**2 * isg2)
+        #         yc  = _N.sum(y, axis=1)
+        #         ix  = _N.where(yc == _N.max(yc))[0][0]
+        #         _f_u[im]  = xs[ix]
+        #         _u_Sg[im] = _N.cov(mASr[0, newNonHashSpks[farMKinds]], rowvar=0)*30
+        #         _f_q2[im] = _N.std(xASr[0, newNonHashSpks[farMKinds]], axis=0)**2 * 30
+        #     # _plt.figure()
+        #     # _plt.plot(xs, yc)
 
         """
         print "^^^^^^^^"
