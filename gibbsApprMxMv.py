@@ -268,7 +268,7 @@ class MarkAndRF:
                 tt1 = _tm.time()
                 iSg = _N.linalg.inv(Sg)
 
-                if (iter % 10) == 0:    
+                if (iter % 100) == 0:    
                     #print "-------iter  %(i)d   %(r).5f" % {"i" : iter, "r" : _N.random.rand()}
                     print "-------iter  %(i)d" % {"i" : iter}
 

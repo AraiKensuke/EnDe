@@ -449,19 +449,23 @@ def emMKPOS_sep1A(nhmks, hmks, TR=5, wfNClstrs=[[2, 8], [1, 4]], spNClstrs=[[1, 
 
                 inThisClstr = _N.where(bestLab == nc)[0]
                 LiTC        = len(inThisClstr)
-                pbestLab = _N.ones(LiTC, dtype=_N.int) * -1   #  poslabs
-                pos = mks[inThisClstr, 0]
-                _N.savetxt("clstr%(nh)d_%(iRM)d" % {"nh" : iNH, "iRM" : iRMv_ME}, mks[inThisClstr], fmt="%.4f %4f %.4f %4f %.4f")
-                iRMv_ME += 1
-                pos = pos.reshape(LiTC, 1)
 
-                #  1 spk / clstr maxK == LiTC   want a few more than 1 / clstr
-                #  maxK is at most _maxK unless LiTC
-                maxK = _maxK if LiTC > _maxK else LiTC-1
+                if LiTC > 2:   #  at least 2 spikes from this neuron
+                    pbestLab = _N.ones(LiTC, dtype=_N.int) * -1   #  poslabs
+                    pos = mks[inThisClstr, 0]
+                    _N.savetxt("clstr%(nh)d_%(iRM)d" % {"nh" : iNH, "iRM" : iRMv_ME}, mks[inThisClstr], fmt="%.4f %4f %.4f %4f %.4f")
+                    iRMv_ME += 1
+                    pos = pos.reshape(LiTC, 1)
 
-                plabs, pbics, pbestLab, pClstrs = _oT.EMposBICs(pos, minK=minK, maxK=maxK, TR=2)
-                pClstrs = contiguous_pack2(pbestLab)
+                    #  1 spk / clstr maxK == LiTC   want a few more than 1 / clstr
+                    #  maxK is at most _maxK unless LiTC
+                    maxK = _maxK if LiTC > _maxK else LiTC-1
 
+                    plabs, pbics, pbestLab, pClstrs = _oT.EMposBICs(pos, minK=minK, maxK=maxK, TR=2)
+                    pClstrs = contiguous_pack2(pbestLab)
+                else:   #  only 2 in this waveform cluster
+                    pClstrs = 1
+                    pbestLab= _N.zeros(LiTC, dtype=_N.int)
                 pbestLab[_N.where(pbestLab >= 0)[0]] += startCl  #  only the ones used for init
                 startCl += pClstrs
                 bestLabMP[inThisClstr] = pbestLab

@@ -115,7 +115,7 @@ def mltpl_ig_prmsUV(sg2s, sLLkPr, s, d_sg2s, sg2s_m1, clstsz, it, mks, t0, xt0t1
     modes = B_ / (a_ + 1)
     agt  = _N.where((modes < q2_min) | (modes > q2_max))[0]
     for im in agt:
-        print "hit min or max  cluster %(cl)d  %(md).3e   replace with %(lmd).3e" % {"cl" : im, "md" : modes[im], "lmd" : (SL_Bs[im] / (SL_as[im] + 1))}
+        print "iter %(it)d    hit min or max  cluster %(cl)d  %(md).3e   replace with %(lmd).3e" % {"cl" : im, "md" : modes[im], "lmd" : (SL_Bs[im] / (SL_as[im] + 1)), "it" : it}
         a_[im]  = SL_as[im]
         B_[im]  = SL_Bs[im]
 
