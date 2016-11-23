@@ -11,6 +11,7 @@ from sklearn.preprocessing import StandardScaler
 import openTets as _oT
 import clrs
 import scipy.stats as _ss
+import matplotlib.pyplot as _plt
 
 _qrtrd_  = 0
 _halved_ = 1
@@ -362,58 +363,38 @@ def mergesmallclusters(nhmks, hmks, slabs, hlabs, pmdim, clstrSzs):
             contiguous_pack2(labs)
             clstrSzs[hh] = len(_N.unique(labs))
 
-def smallclustersAreNoise(nhmks, hmks, slabs, hlabs, pmdim, clstrSzs):
+def findsmallclusters(nhmks, slabs, pmdim):
     """
     slabs, hlabs are contiguous labels (both start from 0) of hash and nonhash
     """
     #  EM init sometimes creates very small clusters.  Merge these with the 
     #  larger clusters EM finds
 
-    for hh in xrange(2):
-        if hh == 0:
-            labs = slabs
-            mks  = nhmks
+    labs = slabs
+    mks  = nhmks
+    smallClstrs = []
+    s_smallClstrs = []    # spike indices
+    largeClstrs = []
+    ulabs    = _N.unique(labs)   # labs contiguous
+    lctrs      = []
+    lcovs      = []
+
+    for i in xrange(len(ulabs)):  # how many "neurons" did we find?
+        sts = _N.where(labs == i)[0]
+        sz  = len(sts)
+        #print "for %(i)d   there are %(n)d" % {"i" : i, "n" : sz}
+        if sz <= pmdim:
+            smallClstrs.append(i)
+            s_smallClstrs.extend(sts)
         else:
-            labs = hlabs
-            mks  = hmks
-        smallOnes = []
-        largeClstrs = []
-        ulabs    = _N.unique(labs)   # labs contiguous
-        lctrs      = []
-        lcovs      = []
+            largeClstrs.append(i)
+            lctrs.append(_N.mean(mks[sts], axis=0))
+            lcovs.append(_N.cov(mks[sts], rowvar=0))
+    ctrs = _N.array(lctrs)
+    covs = _N.array(lcovs)
 
-        for i in xrange(len(ulabs)):  # how many "neurons" did we find?
-            sts = _N.where(labs == i)[0]
-            sz  = len(sts)
-            #print "for %(i)d   there are %(n)d" % {"i" : i, "n" : sz}
-            if sz <= pmdim:
-                smallOnes.extend(sts)
-            else:
-                largeClstrs.append(i)
-                lctrs.append(_N.mean(mks[sts], axis=0))
-                lcovs.append(_N.cov(mks[sts], rowvar=0))
-        ctrs = _N.array(lctrs)
-        covs = _N.array(lcovs)
-
-        if len(smallOnes) > 0:
-            smind   = _N.array(smallOnes)
-            sngls   = mks[smind].reshape((smind.shape[0], 1, pmdim))
-            rctrs   = ctrs.reshape((1, len(largeClstrs), pmdim))
-
-            dmu     = (sngls - rctrs)
-            iSg     = _N.linalg.inv(covs)
-            qdrMKS  = _N.empty((len(largeClstrs), smind.shape[0]))
-            _N.einsum("nmj,mjk,nmk->mn", dmu, iSg, dmu, out=qdrMKS)
-
-            #  for each column, find the row with the smallest distance.  
-            #  largeClstrs[row] is the cluster # that data point should be assigned to
-            clst_clstr, nrn_nmb = _N.where(_N.min(qdrMKS, axis=0) == qdrMKS)
-
-            for ii in xrange(len(nrn_nmb)):   # nrn_nmb out of order, [0...len(nrn_nmb)]
-                #print "for neuron %(1)d   closest cluster is %(2)d" % {"1" : smallOnes[nrn_nmb[ii]], "2" : clst_clstr[ii]}
-                labs[smallOnes[nrn_nmb[ii]]] = largeClstrs[clst_clstr[ii]]
-            contiguous_pack2(labs)
-            clstrSzs[hh] = len(_N.unique(labs))
+    _plt.scatter(mks[_N.array(s_smallClstrs), 0], mks[_N.array(s_smallClstrs), 1])
+    return smallClstrs, s_smallClstrs
 
 def emMKPOS_sep1A(nhmks, hmks, TR=5, wfNClstrs=[[2, 8], [1, 4]], spNClstrs=[[1, 7], [1, 3]]):
     #  wfNClstrs   [ non-hash(min, max), hash(min, max)  by waveform clustering
