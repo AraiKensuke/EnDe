@@ -1,5 +1,5 @@
 import numpy as _N
-from fitutil import  emMKPOS_sep1A, sepHash, colorclusters, mergesmallclusters, splitclstrs, posMkCov0
+from fitutil import  emMKPOS_sep1A, emMKPOS_sep1B, sepHash, colorclusters, mergesmallclusters, splitclstrs, posMkCov0
 from posteriorUtil import MAPvalues2
 import clrs 
 from filter import gauKer
@@ -99,7 +99,7 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
             #_plt.scatter(_x[hashsp[these], 0], _x[hashsp[these], 1], color=cls[i+clstrs[0]])
 
         MF     = clstrs[0] + clstrs[1]
-        M = int(clstrs[0] * 1.2 + clstrs[1]) + 2   #  20% more clusters
+        M = int(clstrs[0] * 1.3 + clstrs[1]) + 2   #  20% more clusters
         print "cluters:  %d" % M
 
     #####  MODES  - find from the sampling
@@ -361,7 +361,7 @@ def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _
         if maxK >= 2:
             print "coming in here"
             #labs, bics, bestLab, nClstrs = _oT.EMBICs(farMKSP, minK=minK, maxK=maxK, TR=1)
-            labs, labsH, clstrs = emMKPOS_sep1A(farMKSP, None, TR=1, wfNClstrs=[[1, 4], [1, 4]], spNClstrs=[[1, 4], [1, 3]])
+            labs, labsH, clstrs = emMKPOS_sep1B(farMKSP, None, TR=1, wfNClstrs=[[1, 4], [1, 4]], spNClstrs=[[1, 4], [1, 3]])
             nClstrs = clstrs[0]
             bestLab    = labs
 

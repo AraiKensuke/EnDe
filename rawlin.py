@@ -12,10 +12,10 @@ import EnDedirs as _edd
 
 #  for bond day4, ex = 2, 4, 6
 #  for day3, ex 
-day    = 6
+day    = 4
 sdy    = ("0%d" % day) if (day < 10) else "%d" % day
-ep=2-1;
-"""
+ep=4-1;
+
 anim1 = "bon"
 anim2 = "bond"
 anim3 = "Bon"
@@ -23,7 +23,7 @@ anim3 = "Bon"
 anim1 = "fra"
 anim2 = "frank"
 anim3 = "Fra"
-
+"""
 
 #  experimental data mark, position container
 

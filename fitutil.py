@@ -450,7 +450,9 @@ def emMKPOS_sep1A(nhmks, hmks, TR=5, wfNClstrs=[[2, 8], [1, 4]], spNClstrs=[[1, 
                 inThisClstr = _N.where(bestLab == nc)[0]
                 LiTC        = len(inThisClstr)
 
+                print LiTC
                 if LiTC > 2:   #  at least 2 spikes from this neuron
+
                     pbestLab = _N.ones(LiTC, dtype=_N.int) * -1   #  poslabs
                     pos = mks[inThisClstr, 0]
                     _N.savetxt("clstr%(nh)d_%(iRM)d" % {"nh" : iNH, "iRM" : iRMv_ME}, mks[inThisClstr], fmt="%.4f %4f %.4f %4f %.4f")
@@ -478,6 +480,90 @@ def emMKPOS_sep1A(nhmks, hmks, TR=5, wfNClstrs=[[2, 8], [1, 4]], spNClstrs=[[1, 
 
     return bestLabs[0], bestLabs[1], startClstrs
 
+def emMKPOS_sep1B(nhmks, hmks, TR=5, wfNClstrs=[[2, 8], [1, 4]], spNClstrs=[[1, 7], [1, 3]]):
+    #  wfNClstrs   [ non-hash(min, max), hash(min, max)  by waveform clustering
+    TR = 2
+
+    iNH = -1
+    sNH = ["nh", "h"]
+
+    bestLabs = []
+
+    minSz = 5
+    startClstrs = _N.empty(2, dtype=_N.int)
+    iRMv_ME   = 0
+    for mks in [nhmks, hmks]:
+        iNH += 1
+        minK, maxK = wfNClstrs[iNH]
+        startCl = 0 
+        bestLabMP = None
+        if mks is not None:
+            labs, bics, bestLab, nClstrs = _oT.EMwfBICs(mks, minK=minK, maxK=maxK, TR=TR)
+            bestLab = _N.array(bestLab, dtype=_N.int)
+
+            #    if mks == nhmks:
+
+            ##  non-hash, do spatial clustering
+
+            bestLabMP = _N.array(bestLab)
+            #for i in _N.unique(bestLab):  # how many "neurons" did we find?
+            #    print "for %(i)d   there are %(n)d" % {"i" : i, "n" : len(_N.where(bestLab == i)[0])}
+            print "neurons for iNH=%(nh)d   WF nclusters %(nc)d" % {"nh" : iNH, "nc" : nClstrs}
+            for nc in xrange(nClstrs):
+                minK, _maxK = spNClstrs[iNH]
+
+                inThisClstr = _N.where(bestLab == nc)[0]
+                LiTC        = len(inThisClstr)
+
+                print LiTC
+                if LiTC > 2:   #  at least 2 spikes from this neuron
+                    pbestLab = _N.ones(LiTC, dtype=_N.int) * -1   #  poslabs
+                    pos = mks[inThisClstr, 0]
+                    _N.savetxt("clstr%(nh)d_%(iRM)d" % {"nh" : iNH, "iRM" : iRMv_ME}, mks[inThisClstr], fmt="%.4f %4f %.4f %4f %.4f")
+                    iRMv_ME += 1
+                    posr = pos.reshape(1, LiTC)
+
+                    #  1 spk / clstr maxK == LiTC   want a few more than 1 / clstr
+                    #  at resolution of 0.02
+                    bns = int(12/0.02)
+                    xp = _N.linspace(-6, 6, bns + 1)
+                    xpr = xp.reshape((xp.shape[0], 1))
+                    sg2=0.05**2    #  resoultion x 5
+                    densI = _N.exp(-0.5*(xpr-posr)*(xpr-posr)/sg2)
+                    dens  = _N.sum(densI, axis=1)
+
+                    #  we're summing things of height 1.  1, 2, 3  SDs 0.6, 0.14, 0.01, 0.000335
+                    ddens = _N.diff(dens)
+                    septx = _N.where(((ddens[0:-1] < 0) & (ddens[1:] >= 0)) & (dens[1:-1] < 3.35e-4))[0]
+
+                    #  where are we at least 3 SDs from a lone spike
+
+                    edges = _N.zeros(len(septx)+2, dtype=_N.int)
+                    edges[1:-1] = septx
+                    edges[-1]   = bns
+                    #plabels = _N.ones(pos.shape[0], dtype=_N.int) * -1
+
+                    for ib in xrange(len(edges)-1):
+                        inrns = _N.where((pos >= xp[edges[ib]]) & (pos < xp[edges[ib+1]]))[0]
+                        pbestLab[inrns] = ib
+                    print pbestLab
+
+                    pClstrs = len(edges)-1
+                    print "pClstrs   %d" % pClstrs
+                else:   #  only 2 in this waveform cluster
+                    pClstrs = 1
+                    pbestLab= _N.zeros(LiTC, dtype=_N.int)
+                pbestLab[_N.where(pbestLab >= 0)[0]] += startCl  #  only the ones used for init
+                startCl += pClstrs
+                bestLabMP[inThisClstr] = pbestLab
+        startClstrs[iNH] = startCl
+
+        if bestLabMP is None:
+            bestLabs.append(_N.array([], dtype=_N.int))
+        else:
+            bestLabs.append(_N.array(bestLabMP))
+
+    return bestLabs[0], bestLabs[1], startClstrs
 
 def splitclstrs(posmk, labS):
     #  for each cluster, see if its better as 1 or 2 cluster
