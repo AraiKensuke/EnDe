@@ -393,7 +393,7 @@ def findsmallclusters(nhmks, slabs, pmdim):
     ctrs = _N.array(lctrs)
     covs = _N.array(lcovs)
 
-    _plt.scatter(mks[_N.array(s_smallClstrs), 0], mks[_N.array(s_smallClstrs), 1])
+    #_plt.scatter(mks[_N.array(s_smallClstrs), 0], mks[_N.array(s_smallClstrs), 1])
     return smallClstrs, s_smallClstrs
 
 def emMKPOS_sep1A(nhmks, hmks, TR=5, wfNClstrs=[[2, 8], [1, 4]], spNClstrs=[[1, 7], [1, 3]]):

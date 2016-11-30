@@ -1,5 +1,5 @@
 import numpy as _N
-from fitutil import  emMKPOS_sep1A, emMKPOS_sep1B, sepHash, colorclusters, findsmallclusters, splitclstrs, posMkCov0
+from fitutil import  emMKPOS_sep1A, emMKPOS_sep1B, sepHash, colorclusters, findsmallclusters, splitclstrs, posMkCov0, contiguous_pack2
 from posteriorUtil import MAPvalues2
 import clrs 
 from filter import gauKer
@@ -15,7 +15,7 @@ import utilities as _U
 twpi = 2*_N.pi
 wdSpc = 1
 
-def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneCluster=False):
+def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneCluster=False, nzclstr=False):
     n0 = 0
     n1 = len(Asts)
 
@@ -64,7 +64,9 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
             # _plt.scatter(_x[unonhash, 0], _x[unonhash, 2], color="black")
 
 
-        if (len(unonhash) > 0) and (len(hashsp) > 0):
+        # len(hashsp)==len(labH)
+        # len(unonhash)==len(labS)
+        if (len(unonhash) > 0) and (len(hashsp) > 0): 
             labS, labH, clstrs = emMKPOS_sep1B(_x[unonhash], _x[hashsp])
         elif len(unonhash) == 0:
             labS, labH, clstrs = emMKPOS_sep1B(None, _x[hashsp], TR=5)
@@ -76,57 +78,93 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
 
             #mergesmallclusters(_x[unonhash], _x[hashsp], labS, labH, K+1, clstrs)
             smallClstrID, spksInSmallClstrs = findsmallclusters(_x[unonhash], labS, K+1)
-            clstrs[0] = len(_N.unique(labS))# labS [0...#S]   labH [#S...#S+#H]
-            clstrs[1] = len(_N.unique(labH))    
-            #  relabel the non-hash small ones to a large number
-            #  labS[spksInSmallClstrs]  -> remove these from labS
-            #  contiguous_pack2(labS)   
-            #  labN[spksInSmallClstrs] = H + S
 
-            # _N.savetxt("hash", hashsp)
-            # _N.savetxt("nhash", unonhash)
-            # colorclusters(_x[hashsp], labH, clstrs[1], name="hash", xLo=xLo, xHi=xHi)
-            # colorclusters(_x[unonhash], labS, clstrs[0], name="nhash", xLo=xLo, xHi=xHi)
+            print smallClstrID
+            _N.savetxt("labSb4", labS, fmt="%d")
+            for nid in smallClstrID:
+                ths = _N.where(labS == nid)[0]
+                labS[ths] = -1#clstrs[0]+clstrs[1]-1  # -1 first for easy cpack2
+            _N.savetxt("labS", labS, fmt="%d")
+
+            # 0...clstrs[0]-1     clstrs[0]...clstrs[0]+clstrs[1]-1  (no nz)
+            # 0...clstrs[0]-2     clstrs[0]-1...clstrs[0]+clstrs[1]-2  (no nz)
+            contiguous_pack2(labS, startAt=-1)
+
+            clstrs[0] = len(_N.unique(labS)) 
+            clstrs[1] = len(_N.unique(labH))
+
+            print "----------"
+            print clstrs
+            print "----------"
+            # labS [0...#S]   labH [#S...#S+#H]
+            
+            nzspks = _N.where(labS == -1)[0]
+            labS[nzspks] = clstrs[0]+clstrs[1]-1   #  highest ID
+
+            contiguous_pack2(labH, startAt=(clstrs[0]-1))
+            _N.savetxt("labH", labH, fmt="%d")
+            _N.savetxt("labS", labS, fmt="%d")
+
+            #contiguous_pack2(labH, startAt=(_N.max(labS)+1))
+
+            nonnz = _N.where(labS < clstrs[0]-1)[0]
+            nz    = _N.where(labS == clstrs[0]+clstrs[1]-1)[0]
+            _plt.scatter(_x[hashsp, 0], _x[hashsp, 1], color="black")
+            _plt.scatter(_x[unonhash[nonnz], 0], _x[unonhash[nonnz], 1], color="blue")
+            _plt.scatter(_x[unonhash[nz], 0], _x[unonhash[nz], 1], color="red")
+
+            #colorclusters(_x[hashsp], labH, clstrs[1], name="hash", xLo=xLo, xHi=xHi)
+            #colorclusters(_x[unonhash], labS, clstrs[0], name="nhash", xLo=xLo, xHi=xHi)
 
 
     #     #fig = _plt.figure(figsize=(7, 10))
     #     #fig.add_subplot(2, 1, 1)
 
-    #     flatlabels = _N.ones(n1-n0, dtype=_N.int)*-1   # 
-    #     #cls = clrs.get_colors(clstrs[0] + clstrs[1])
-    #     for i in xrange(clstrs[0]):
-    #         these = _N.where(labS == i)[0]
+        flatlabels = _N.ones(n1-n0, dtype=_N.int)*-1   # 
+        #cls = clrs.get_colors(clstrs[0] + clstrs[1])
 
-    #         if len(these) > 0:
-    #             flatlabels[unonhash[these]] = i
-    #         #_plt.scatter(_x[unonhash[these], 0], _x[unonhash[these], 1], color=cls[i])
-    #     for i in xrange(clstrs[1]):
-    #         these = _N.where(labH == i)[0]
+        for i in labS:
+            these = _N.where(labS == i)[0]
 
-    #         if len(these) > 0:
-    #             flatlabels[hashsp[these]] = i + clstrs[0]
-    #         #_plt.scatter(_x[hashsp[these], 0], _x[hashsp[these], 1], color=cls[i+clstrs[0]])
+            if len(these) > 0:
+                flatlabels[unonhash[these]] = i
+            #_plt.scatter(_x[unonhash[these], 0], _x[unonhash[these], 1], color=cls[i])
+        #for i in xrange(clstrs[1]):
+        for i in labH:
+            these = _N.where(labH == i)[0]
 
-    #     MF     = clstrs[0] + clstrs[1]
-    #     M = int(clstrs[0] * 1.3 + clstrs[1]) + 2   #  20% more clusters
-    #     print "cluters:  %d" % M
+            if len(these) > 0:
+                flatlabels[hashsp[these]] = i 
+            #_plt.scatter(_x[hashsp[these], 0], _x[hashsp[these], 1], color=cls[i+clstrs[0]])
 
-    # #####  MODES  - find from the sampling
-    # oo.sp_prmPstMd = _N.zeros((oo.epochs, 3*M))   # mode of params
-    # oo.sp_hypPstMd  = _N.zeros((oo.epochs, (2+2+2)*M)) # hyperparam
-    # oo.mk_prmPstMd = [_N.zeros((oo.epochs, M, K)),
-    #                   _N.zeros((oo.epochs, M, K, K))]
-    #                   # mode of params
-    # oo.mk_hypPstMd  = [_N.zeros((oo.epochs, M, K)),
-    #                    _N.zeros((oo.epochs, M, K, K)), # hyperparam
-    #                    _N.zeros((oo.epochs, M, 1)), # hyperparam
-    #                    _N.zeros((oo.epochs, M, K, K))]
+        MF     = clstrs[0] + clstrs[1]   #  includes noise
+        if nzclstr:
+            ths = _N.where(flatlabels == -1)[0]
+            flatlabels[ths] = MF - 1
+            M = int((clstrs[0]-1) * 1.3 + clstrs[1]) + 2   #  20% more clusters
+        else:
+            M = int(clstrs[0] * 1.3 + clstrs[1]) + 2   #  20% more clusters
+        print "cluters:  %d" % M
 
-    # ##################
-    # lab      = _N.array(labS.tolist() + (labH + clstrs[0]).tolist())
+    Mwonz     = M if (nzclstr is False) else M-1
+    #####  MODES  - find from the sampling
+    oo.sp_prmPstMd = _N.zeros((oo.epochs, 3*Mwonz))   # mode of params
+    oo.sp_hypPstMd  = _N.zeros((oo.epochs, (2+2+2)*Mwonz)) # hyperparam
+    oo.mk_prmPstMd = [_N.zeros((oo.epochs, Mwonz, K)),
+                      _N.zeros((oo.epochs, Mwonz, K, K))]
+                      # mode of params
+    oo.mk_hypPstMd  = [_N.zeros((oo.epochs, Mwonz, K)),
+                       _N.zeros((oo.epochs, Mwonz, K, K)), # hyperparam
+                       _N.zeros((oo.epochs, Mwonz, 1)), # hyperparam
+                       _N.zeros((oo.epochs, Mwonz, K, K))]
 
-    # # flatlabels + lab = same content, but flatlabels are temporally correct
-    # return labS, labH, lab, flatlabels, M, MF, hashthresh, clstrs
+    print labS
+    print labH
+    _N.savetxt("flatlabels", flatlabels, fmt="%d")
+    ##################
+
+    # flatlabels + lab = same content, but flatlabels are temporally correct
+    return labS, labH, flatlabels, Mwonz, MF, hashthresh, clstrs
 
 def declare_params(_M, K, nzclstr=False, uAll=None, SgAll=None):
     ######################################  INITIAL VALUE OF PARAMS
@@ -314,6 +352,7 @@ def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _
         abvthrAtLeast1Ch = _N.sum(abvthrEachCh, axis=1) > 0
         
         knownNonHclstrs  = _N.where(abvthrAtLeast1Ch & (freeClstr == False) & (q2[0:Msc] < wdSpc))[0]
+        
 
         #print "clusters not hash"
 
@@ -323,7 +362,7 @@ def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _
 
         nNrstMKS_d = _N.sqrt(_N.min(qdrMKS[knownNonHclstrs], axis=0)/K)  #  dim len(sts)
         nNrstSPC_d = _N.sqrt(_N.min(qdrSPC[knownNonHclstrs], axis=0))
-        #  for each spike, distance to nearest cluster
+        #  for each spike, distance to nearest non-hash cluster
         # print nNrstMKS_d
         # print nNrstSPC_d
         # print "=============="
@@ -345,10 +384,18 @@ def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _
         farSPinds = _N.where(dSP > 4)[0]  #  4 std. deviations away
 
         farMKSPinds = _N.union1d(farMKinds, farSPinds)
+        print farMKinds
+        print newNonHashSpks
+        
+        ##  points in newNonHashSpks but not in farMKinds
+        notFarMKSPinds = _N.setdiff1d(_N.arange(newNonHashSpks.shape[0]), farMKSPinds)
 
         farMKSP = _N.empty((len(farMKSPinds), K+1))
         farMKSP[:, 0]  = xASr[0, newNonHashSpks[farMKSPinds]]
         farMKSP[:, 1:] = mASr[0, newNonHashSpks[farMKSPinds]]
+        notFarMKSP = _N.empty((len(notFarMKSPinds), K+1))
+        notFarMKSP[:, 0]  = xASr[0, newNonHashSpks[notFarMKSPinds]]
+        notFarMKSP[:, 1:] = mASr[0, newNonHashSpks[notFarMKSPinds]]
 
         # farSP = _N.empty((len(farSPinds), K+1))
         # farMK = _N.empty((len(farMKinds), K+1))
@@ -361,7 +408,6 @@ def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _
         maxK = farMKSPinds.shape[0] / K
         maxK = maxK if (maxK < 6) else 6
 
-
         freeClstrs = _N.where(freeClstr == True)[0]
         if maxK >= 2:
             print "coming in here"
@@ -373,7 +419,7 @@ def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _
             cls = clrs.get_colors(nClstrs)
 
             _U.savetxtWCom(resFN("newSpksMKSP%d" % epc, dir=oo.outdir), farMKSP, fmt="%.3e %.3e %.3e %.3e %.3e", com=("# number of clusters %d" % nClstrs))
-
+            _U.savetxtWCom(resFN("newSpksMKSP_nf%d" % epc, dir=oo.outdir), notFarMKSP, fmt="%.3e %.3e %.3e %.3e %.3e", com=("# number of clusters %d" % nClstrs))
 
             L = len(freeClstrs)
             
@@ -413,7 +459,42 @@ def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _
                     print "too small    this prob. doesn't represent a cluster"
 
             _plt.savefig("newspks%d" % epc)
-        else:
+
+
+            #######  known clusters
+            for fid in unqLabs[0:upto]:
+                iths = farMKSPinds[_N.where(bestLab == fid)[0]]
+                ths = newNonHashSpks[iths]
+
+                for w in xrange(K):
+                    fig.add_subplot(2, 2, w+1)
+                    _plt.scatter(xASr[0, ths], mASr[0, ths, w], color=cls[ii])
+
+                if len(ths) > K:
+                    ii += 1
+                    im = freeClstrs[ii]   # Asts + t0 gives absolute time
+                    newNonHashSpksMemClstr[iths] = im
+
+                    _u_u[im]  = _N.mean(mASr[0, ths], axis=0)
+                    u[im]     = _u_u[im]
+                    _f_u[im]  = _N.mean(xASr[0, ths], axis=0)
+                    f[im]     = _f_u[im]
+                    q2[im]    = _N.std(xASr[0, ths], axis=0)**2 * 9
+                    #  l0 = Hz * sqrt(2*_N.pi*q2)
+                    l0[im]    =   10*_N.sqrt(q2[im])
+                    _f_q2[im] = 1
+                    _u_Sg[im] = _N.cov(mASr[0, ths], rowvar=0)*25
+                    print "ep %(ep)d  new   cluster #  %(m)d" % {"ep" : epc, "m" : im}
+                    print _u_u[im]
+                    print _f_u[im]
+                    print _f_q2[im]
+                else:
+                    print "too small    this prob. doesn't represent a cluster"
+
+            _plt.savefig("newspks%d" % epc)
+
+
+        else:  #  just one cluster
             im = freeClstrs[0]   # Asts + t0 gives absolute time
 
             _u_u[im]  = _N.mean(mASr[0, newNonHashSpks[farMKSPinds]], axis=0)
