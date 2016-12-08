@@ -49,7 +49,7 @@ def makeCovs(nNrns, K, wvfmsz):
     for n in xrange(nNrns):
         for k1 in xrange(K):
             #Covs[n, k1, k1] = (LoHisMk[n, k1, 1] - LoHisMk[n, k1, 0])*(0.1+0.1*_N.random.rand())
-            Covs[n, k1, k1] = (wvfmsz[0] + (wvfmsz[1] - wvfmsz[0])*_N.random.rand())**2
+            Covs[n, k1, k1] = (wvfmsz[n, k1, 0] + (wvfmsz[n, k1, 1] - wvfmsz[n, k1, 0])*_N.random.rand())**2
         for k1 in xrange(K):
             for k2 in xrange(k1+1, K):
                 Covs[n, k1, k2] = 0.8 * _N.sqrt(Covs[n, k1, k1]*Covs[n, k2, k2])#(0.5 + 0.3*_N.random.rand()) * _N.sqrt(Covs[n, k1, k1]*Covs[n, k2, k2])

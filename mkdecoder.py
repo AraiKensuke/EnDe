@@ -207,9 +207,6 @@ class mkdecoder:
                     fxdMks[:, 1:] = oo.mkpos[nt][t, 2:]
                     #oo.Lklhd[nt, t] *= _ku.evalAtFxdMks_new(fxdMks, l0s, us, covs, iSgs, i2pidcovsr)*oo.lmd0[nt] * oo.dt
                     oo.Lklhd[nt, t] *= _ku.evalAtFxdMks_new(fxdMks, l0s, us, covs, iSgs, i2pidcovsr)* oo.dt
-                    if t == 135554:
-                        print "nt is %d" % nt
-                        print _ku.evalAtFxdMks_new(fxdMks, l0s, us, covs, iSgs, i2pidcovsr)
 
             ttt1 =0
             ttt2 =0
@@ -310,6 +307,7 @@ class mkdecoder:
         occ    = 1./oo.iocc
         iBx2   = 1. / (oo.Bx * oo.Bx)
         sptl   =  []
+
         for nt in xrange(oo.nTets):
             sptl.append(-0.5*iBx2*(oo.xpr - oo.tr_pos[nt])**2)  #  this piece doesn't need to be evalu
         for t in xrange(t0+1,t1): # start at 1 because initial condition

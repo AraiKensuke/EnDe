@@ -8,13 +8,15 @@ def kerFr(atMark, sptl, tr_mks, mdim, Bx, cBm, bx):
 
     fld_x is    (1, dimNx)      return firing rate at these x values
     #tr_pos is dim (nSpks, 1)    training positions
+    sptl          training positions
     tr_mks        (nSpks x k)   training marks
-    atMark        (1 x k)       look at only spikes w/ this mark
+    atMark        (1 x k)       mark of spike to be decoded
     all_pos
     """
     iB2    = 1/(cBm*cBm)
 
     nSpks  = tr_mks.shape[0]
+
     q4mk   = -0.5*_N.sum((tr_mks - atMark) * (tr_mks - atMark), axis=1)*iB2
     #  fld_x - tr_pos  gives array (# positions to evaluate x # of trainingated for every new spike
     #occ    = _N.sum(_N.exp(-0.5*iBx2*(fld_x - all_pos)**2), axis=1)  #  this piece doesn't need to be evaluated for every new spike

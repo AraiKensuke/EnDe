@@ -461,37 +461,37 @@ def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _
             _plt.savefig("newspks%d" % epc)
 
 
-            #######  known clusters
-            for fid in unqLabs[0:upto]:
-                iths = farMKSPinds[_N.where(bestLab == fid)[0]]
-                ths = newNonHashSpks[iths]
+            # #######  known clusters
+            # for fid in unqLabs[0:upto]:
+            #     iths = farMKSPinds[_N.where(bestLab == fid)[0]]
+            #     ths = newNonHashSpks[iths]
 
-                for w in xrange(K):
-                    fig.add_subplot(2, 2, w+1)
-                    _plt.scatter(xASr[0, ths], mASr[0, ths, w], color=cls[ii])
+            #     for w in xrange(K):
+            #         fig.add_subplot(2, 2, w+1)
+            #         _plt.scatter(xASr[0, ths], mASr[0, ths, w], color=cls[ii])
 
-                if len(ths) > K:
-                    ii += 1
-                    im = freeClstrs[ii]   # Asts + t0 gives absolute time
-                    newNonHashSpksMemClstr[iths] = im
+            #     if len(ths) > K:
+            #         ii += 1
+            #         im = freeClstrs[ii]   # Asts + t0 gives absolute time
+            #         newNonHashSpksMemClstr[iths] = im
 
-                    _u_u[im]  = _N.mean(mASr[0, ths], axis=0)
-                    u[im]     = _u_u[im]
-                    _f_u[im]  = _N.mean(xASr[0, ths], axis=0)
-                    f[im]     = _f_u[im]
-                    q2[im]    = _N.std(xASr[0, ths], axis=0)**2 * 9
-                    #  l0 = Hz * sqrt(2*_N.pi*q2)
-                    l0[im]    =   10*_N.sqrt(q2[im])
-                    _f_q2[im] = 1
-                    _u_Sg[im] = _N.cov(mASr[0, ths], rowvar=0)*25
-                    print "ep %(ep)d  new   cluster #  %(m)d" % {"ep" : epc, "m" : im}
-                    print _u_u[im]
-                    print _f_u[im]
-                    print _f_q2[im]
-                else:
-                    print "too small    this prob. doesn't represent a cluster"
+            #         _u_u[im]  = _N.mean(mASr[0, ths], axis=0)
+            #         u[im]     = _u_u[im]
+            #         _f_u[im]  = _N.mean(xASr[0, ths], axis=0)
+            #         f[im]     = _f_u[im]
+            #         q2[im]    = _N.std(xASr[0, ths], axis=0)**2 * 9
+            #         #  l0 = Hz * sqrt(2*_N.pi*q2)
+            #         l0[im]    =   10*_N.sqrt(q2[im])
+            #         _f_q2[im] = 1
+            #         _u_Sg[im] = _N.cov(mASr[0, ths], rowvar=0)*25
+            #         print "ep %(ep)d  new   cluster #  %(m)d" % {"ep" : epc, "m" : im}
+            #         print _u_u[im]
+            #         print _f_u[im]
+            #         print _f_q2[im]
+            #     else:
+            #         print "too small    this prob. doesn't represent a cluster"
 
-            _plt.savefig("newspks%d" % epc)
+            # _plt.savefig("newspks%d" % epc)
 
 
         else:  #  just one cluster
