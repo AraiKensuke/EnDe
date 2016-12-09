@@ -60,8 +60,12 @@ class mkdecoder:
         #  read mkfns
         _sts   = []#  a mark on one of the several tetrodes
         for fn in mkfns:
-            dat = _N.loadtxt(datFN("%s.dat" % fn))
-            K   = dat.shape[1] - 2
+            _dat = _N.loadtxt(datFN("%s.dat" % fn))
+            if K is None:
+                K   = _dat.shape[1] - 2
+                dat = _dat
+            else:
+                dat = _dat[:, 0:2+K]
             oo.mkpos.append(dat)
             _sts.extend(_N.where(dat[:, 1] == 1)[0])
         oo.sts = _N.unique(_sts)

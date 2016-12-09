@@ -20,15 +20,17 @@ def kerFr(atMark, sptl, tr_mks, mdim, Bx, cBm, bx, dxp, occ):
 
     #  q4mk  shape (nSpks, )   treat as (1, nSpks) when q4mk + sptl
     #  sptl  shape (Nx, nSpks)
+
     q4mk   = -0.5*_N.sum((tr_mks - atMark) * (tr_mks - atMark), axis=1)*iB2
 
     #  fld_x - tr_pos  gives array (# positions to evaluate x # of trainingated for every new spike
     #occ    = _N.sum(_N.exp(-0.5*iBx2*(fld_x - all_pos)**2), axis=1)  #  this piece doesn't need to be evaluated for every new spike
     #occ    = _N.sum(_N.exp(-0.5*ibx2*(oo.xpr - oo.all_pos)**2), axis=1)  #  this piece doesn't need to be evaluated for every new spike
 
-    #fr1= (isqrt2pi * isqrt2pi**mdim)*(1./nSpks)*(1./Bx)*(1./cBm**mdim)*_N.sum(_N.exp(sptl + q4mk), axis=1) / (occ * 0.001)  #  return me # of positions to evaluate
+    #  if H diagonal with diagonal cB**2
+    #  det(H) == cB^(2^mdim), so |det(H)|^(mdim/2) == cB^(mdim*mdim)
 
-    fr1= (isqrt2pi * isqrt2pi**mdim)*(1./Bx)*(1./cBm**mdim)*_N.sum(_N.exp(sptl + q4mk), axis=1)*dxp / (occ * 0.001)  #  return me # of positions to evaluate
+    fr1= (isqrt2pi * isqrt2pi**mdim)*(1./Bx)*(1./nSpks)*(1./cBm**(mdim*mdim))*_N.sum(_N.exp(sptl + q4mk), axis=1)*dxp / (occ * 0.001)  #  return me # of positions to evaluate
 
 
     """   EQUIVALENT TO
