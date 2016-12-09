@@ -256,13 +256,15 @@ class mkdecoder:
 
         if oo.kde:  #  also calculate the occupation. Nothing to do with LMoMks
             ibx2 = 1./ (oo.bx*oo.bx)        
-            occ    = _N.sum(_N.exp(-0.5*ibx2*(oo.xpr - oo.pos[enc_t0:enc_t1])**2), axis=1)  #  this piece doesn't need to be evaluated for every new spike
-            Tot_occ  = _N.sum(occ)
-            oo.iocc = 1./occ
+            occ    = _N.sum((1/_N.sqrt(2*_N.pi*oo.bx*oo.bx))*_N.exp(-0.5*ibx2*(oo.xpr - oo.pos[enc_t0:enc_t1])**2), axis=1)*oo.dxp  #  this piece doesn't need to be evaluated for every new spike
+            #  _plt.hist(mkd.pos, bins=mkd.xp) == _plt.plot(mkd.xp, occ)  
+            #  len(occ) = total time of observation in ms.
+            oo.occ = occ  
+            oo.iocc = 1./occ  
 
             ###  Lam_MoMks  is a function of space
             for nt in xrange(oo.nTets):
-                oo.Lam_MoMks[:, nt] = _ku.Lambda(oo.xpr, oo.tr_pos[nt], oo.pos[enc_t0:enc_t1], oo.Bx, oo.bx, oo.dxp)
+                oo.Lam_MoMks[:, nt] = _ku.Lambda(oo.xpr, oo.tr_pos[nt], oo.pos[enc_t0:enc_t1], oo.Bx, oo.bx, oo.dxp, occ)
         else:  #####  fit mix gaussian
             for nt in xrange(oo.nTets):
                 l0s   = prms[nt][0][uFE]    #  M x 1
@@ -304,12 +306,11 @@ class mkdecoder:
 
         tStart = _tm.time()
 
-        occ    = 1./oo.iocc
-        iBx2   = 1. / (oo.Bx * oo.Bx)
+        ibx2   = 1. / (oo.bx * oo.bx)
         sptl   =  []
 
         for nt in xrange(oo.nTets):
-            sptl.append(-0.5*iBx2*(oo.xpr - oo.tr_pos[nt])**2)  #  this piece doesn't need to be evalu
+            sptl.append(-0.5*ibx2*(oo.xpr - oo.tr_pos[nt])**2)  #  this piece doesn't need to be evalu
         for t in xrange(t0+1,t1): # start at 1 because initial condition
             #tt1 = _tm.time()
             for nt in xrange(oo.nTets):
@@ -318,7 +319,7 @@ class mkdecoder:
                 if (oo.mkpos[nt][t, 1] == 1):
                     fxdMks[:, 1:] = oo.mkpos[nt][t, 2:]
                         #(atMark, fld_x, tr_pos, tr_mks, all_pos, mdim, Bx, cBm, bx)
-                    oo.Lklhd[nt, t] *= _ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx)* oo.iocc*oo.dt
+                    oo.Lklhd[nt, t] *= _ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx, oo.dxp, oo.occ)
 
             ttt1 =0
             ttt2 =0

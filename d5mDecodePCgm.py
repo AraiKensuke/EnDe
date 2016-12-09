@@ -30,7 +30,7 @@ def parWrapFit(args):
 
     if initPriors:
         mvNrm.init0(stpos, marks, n12s[0], n12s[1])
-    mvNrm.fit(M, stpos, marks, n12s[0], n12s[1], init=initPriors)
+    mvNrm.fit(M, stpos, marks, n12s[0], n12s[1], init)
     mvNrm.set_priors_and_initial_values(telapse=telapse)
 
     return mvNrm
@@ -46,6 +46,10 @@ class simDecode():
     mltMk = 1    #  multiply mark values to 
     AR    = 0.5
     AR0    = 1
+
+    marksObserved = None   #  observed in this encode epoch
+
+    weighted_occ = False
 
     #  xp   position grid.  need this in decode
     xp    = None
@@ -85,7 +89,7 @@ class simDecode():
     snpsht_gz  = []
     spdMult   = 0.5
 
-    def init(self, kde=False, bx=None, Bx=None, Bm=None):
+    def init(self, kde=False, bx=None, Bx=None, Bm=None, makeMarks=None):
         oo = self
         oo.kde = kde
         with open(oo.tetfile, "rb") as f:
@@ -94,6 +98,8 @@ class simDecode():
 
         if oo.usetets is None:
             oo.tetlist = lm.tetlist
+            if makeMarks is not None:
+                lm.makeMarks(marktype=makeMarks)
             oo.marks = lm.marks
             oo.utets_str = "all"
         else:
@@ -204,11 +210,12 @@ class simDecode():
         dat = _N.empty(oo.N, dtype=list)       # include times when no mvt.
         stpos  = []   #  pos  @ time of spikes
         marks  = []   #  mark @ time of spikes
-        nspks  = _N.zeros(oo.nTets, dtype=_N.int)
+        oo.marksObserved  = _N.zeros(oo.nTets, dtype=_N.int)
+
         for nt in xrange(oo.nTets):
             marks.append([])
             stpos.append([])
-            nspks[nt]  = 0
+            oo.marksObserved[nt]  = 0
             for ein in xrange(encIntvs.shape[0]):
                 t0, t1 = encIntvs[ein]
 
@@ -218,9 +225,10 @@ class simDecode():
                         for l in xrange(len(themarks)):
                             stpos[nt].append(oo.pos[n])
                             marks[nt].append(themarks[l])
-                            nspks[nt] += 1
+                            oo.marksObserved[nt] += 1
+                            
 
-            print "nspikes tet %(tet)d %(s)d  from %(t0)d   %(t1)d" % {"t0" : t0, "t1" : t1, "s" : nspks[nt], "tet" : nt}
+            print "nspikes tet %(tet)d %(s)d  from %(t0)d   %(t1)d" % {"t0" : t0, "t1" : t1, "s" : oo.marksObserved[nt], "tet" : nt}
 
         oo.tr_pos   = []
         oo.tr_marks = []
@@ -231,6 +239,8 @@ class simDecode():
             oo.tr_marks.append(_N.array(marks[nt]))
 
 
+        currenc_pos = None if not oo.weighted_occ else oo.pos[encIntvs[ein,0]:encIntvs[ein,1]]
+            
         if not oo.kde:
             # oo.snpsht_us.append([])
             # oo.snpsht_covs.append([])
@@ -241,10 +251,13 @@ class simDecode():
             if oo.procs == 1:
                 if initPriors:
                     for nt in xrange(oo.nTets):
-                        oo.mvNrm[nt].init0(stpos[nt], marks[nt], 0, nspks[nt])
+                        oo.mvNrm[nt].init0(stpos[nt], marks[nt], 0, oo.marksObserved[nt])
                 for nt in xrange(oo.nTets):
                     print "encode Doing fit tetrode %d" % nt
-                    oo.mvNrm[nt].fit(oo.mvNrm[nt].M, stpos[nt], marks[nt], 0, nspks[nt], init=initPriors)
+                    #if oo.restrctdClstrs:
+                    #    oo.mvNrm[nt].restrctdFit(oo.mvNrm[nt].M, stpos[nt], marks[nt], 0, nspks[nt], currenc_pos, initPriors)
+                    #else:
+                    oo.mvNrm[nt].fit(oo.mvNrm[nt].M, stpos[nt], marks[nt], 0, oo.marksObserved[nt], currenc_pos, initPriors)
                     oo.mvNrm[nt].set_priors_and_initial_values(telapse=telapse)
             else:
                 print "multiprocess"
@@ -257,7 +270,7 @@ class simDecode():
                     Ms[nt] = oo.mvNrm[nt].M
                     IPs[nt] = initPriors
                     tes[nt] = telapse
-                    n12s[nt] = 0, nspks[nt]
+                    n12s[nt] = 0, oo.marksObserved[nt]
                 tpl_args = zip(oo.mvNrm, Ms, stpos, marks, IPs, tes, n12s)
     
                 sxv = pool.map(parWrapFit, tpl_args)
@@ -270,7 +283,7 @@ class simDecode():
             tt2 = _tm.time()
             print "time for init0 + fit:  %.3f" % (tt2-tt1)
 
-        oo.setLmd0(nspks)
+        oo.setLmd0(oo.marksObserved)
 
     def decode(self, t0, t1):
         oo = self

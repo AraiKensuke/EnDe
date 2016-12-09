@@ -9,10 +9,15 @@ import matplotlib.pyplot as _plt
 
 ###  For this one, we allow for 
 
+_non_hash_ = 0
+_hash_     = 1
+_both_     = 2
+
 class mixNormDatPoi:
     k      = 2      #  data dimensionality
     N      = 500    #  no of datas
     M      = 3      #  no components
+    Mh_strt      = 0      #  start component for hash clusters
 
     um      = None   #  mean of marks for each neuron
     Cov     = None   #  cov  of marks for each neuron
@@ -20,6 +25,9 @@ class mixNormDatPoi:
     uP      = None  #  mean of place fields for each neuron
     stdP    = None  #  std  of place fields for each neuron
     stdPMags= None  #
+
+    marksH  = None
+    marksNH = None
 
     lmd     = None  #  
 
@@ -62,7 +70,7 @@ class mixNormDatPoi:
 
     tetlist= ["01"]
 
-    def create(self, setname, pos=None):
+    def create(self, setname, pos=None, thresh=-1000000):
         #  time series to model ratio of the states
         oo  = self
         k   = oo.k
@@ -160,10 +168,16 @@ class mixNormDatPoi:
                 oo.alp[m] = _N.log(_N.interp(ts, _ts, _N.abs(oo._alp[m])))
 
         ######  now create spikes
-        oo.marks    = _N.empty((oo.N, 1), dtype=list)
+        oo.marksH     = _N.empty((oo.N, 1), dtype=list)
+        oo.marksNH    = _N.empty((oo.N, 1), dtype=list)
 
         nspks = 0
+        cut   = 0
         for m in xrange(M):#  For each cluster
+            if m < oo.Mh_strt:
+                marks = oo.marksNH
+            else:
+                marks = oo.marksH
             mkid = oo.markIDs[m]     #  for the mark
             fr          = _N.zeros(oo.N)
             wdP     = 2*oo.stdP[m]**2
@@ -178,20 +192,45 @@ class mixNormDatPoi:
             for n in xrange(len(thrX)):   # iterate over time
                 tm = thrX[n]
                 mk    = mvn(oo.um[mkid, tm], oo.Cov[mkid], size=1)[0]
-                if oo.marks[tm, 0] is None:
-                    oo.marks[tm, 0] = [mk]
+                if (_N.sum(mk < thresh) == oo.k):
+                    oo.neurIDs[thrX[n], m] = 0
+                    cut += 1
                 else:
-                    oo.marks[tm, 0].append(mk)
-                nspks += 1
+                    if marks[tm, 0] is None:      #  separate hash, non-hash
+                        marks[tm, 0] = [mk]
+                    else:
+                        marks[tm, 0].append(mk)
+
+                    nspks += 1
 
         #kde = _kde.kde(setname)
         #oo.marks = None
         #kde.est(oo.pos, oo.marks, oo.k, oo.xA, oo.mA, oo.Nx, oo.Nm, oo.Bx, oo.Bm, oo.bx, t0=t0, t1=t1, filename="kde.dump")
 
-        print "total spikes created %d" % nspks
+        print "tot spikes created %(n)d   cut %(c)d" % {"n" : nspks, "c" : cut}
         dmp = open(_edd.resFN("marks.pkl", dir=setname, create=True), "wb")
         pickle.dump(oo, dmp, -1)
         dmp.close()
+
+    def makeMarks(self, marktype=_both_):
+        """
+        combine hash, non_hash marks
+        """
+        oo = self
+        oo.marks      = _N.empty((oo.N, 1), dtype=list)
+
+        if (marktype == _both_) or (marktype == _non_hash_):
+            nonhashMks       = _N.equal(oo.marksNH[:, 0], None)
+            inds             = _N.where(nonhashMks == False)[0]
+            oo.marks[inds, 0] = oo.marksNH[inds, 0]
+        if (marktype == _both_) or (marktype == _hash_):
+            hashMks       = _N.equal(oo.marksH[:, 0], None)
+            inds             = _N.where(hashMks == False)[0]
+            for t in inds:
+                if oo.marks[t, 0] is not None:
+                    oo.marks[t, 0].extend(oo.marksH[t, 0])
+                else:
+                    oo.marks[t, 0] = oo.marksH[t, 0]
 
     def evalAtFxdMks(self, fxdMks, t):
         oo     = self

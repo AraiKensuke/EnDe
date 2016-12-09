@@ -1,8 +1,9 @@
 import numpy as _N
+import matplotlib.pyplot as _plt
 
 isqrt2pi = 1/_N.sqrt(2*_N.pi)
 
-def kerFr(atMark, sptl, tr_mks, mdim, Bx, cBm, bx):
+def kerFr(atMark, sptl, tr_mks, mdim, Bx, cBm, bx, dxp, occ):
     """
     Return me firing rate if I were to only to count spikes w/ mark "atMark"
 
@@ -17,13 +18,18 @@ def kerFr(atMark, sptl, tr_mks, mdim, Bx, cBm, bx):
 
     nSpks  = tr_mks.shape[0]
 
+    #  q4mk  shape (nSpks, )   treat as (1, nSpks) when q4mk + sptl
+    #  sptl  shape (Nx, nSpks)
     q4mk   = -0.5*_N.sum((tr_mks - atMark) * (tr_mks - atMark), axis=1)*iB2
+
     #  fld_x - tr_pos  gives array (# positions to evaluate x # of trainingated for every new spike
     #occ    = _N.sum(_N.exp(-0.5*iBx2*(fld_x - all_pos)**2), axis=1)  #  this piece doesn't need to be evaluated for every new spike
     #occ    = _N.sum(_N.exp(-0.5*ibx2*(oo.xpr - oo.all_pos)**2), axis=1)  #  this piece doesn't need to be evaluated for every new spike
 
-    fr1= (isqrt2pi * isqrt2pi**mdim)*(1./nSpks)*(1./Bx)*(1./cBm**mdim)*_N.sum(_N.exp(sptl + q4mk), axis=1)  #  return me # of positions to evaluate
-    #fr1 /= (occ + Tot_occ*0.01)
+    #fr1= (isqrt2pi * isqrt2pi**mdim)*(1./nSpks)*(1./Bx)*(1./cBm**mdim)*_N.sum(_N.exp(sptl + q4mk), axis=1) / (occ * 0.001)  #  return me # of positions to evaluate
+
+    fr1= (isqrt2pi * isqrt2pi**mdim)*(1./Bx)*(1./cBm**mdim)*_N.sum(_N.exp(sptl + q4mk), axis=1)*dxp / (occ * 0.001)  #  return me # of positions to evaluate
+
 
     """   EQUIVALENT TO
     fr2     = _N.zeros(fld_x.shape[0])
@@ -34,33 +40,25 @@ def kerFr(atMark, sptl, tr_mks, mdim, Bx, cBm, bx):
 
     return fr1
 
-def Lambda(fld_x, tr_pos, all_pos, Bx, bx, dxp):
+def Lambda(fld_x, tr_pos, all_pos, Bx, bx, dxp, occ):
     """
     return me a function of position.  Call for each new received mark.
 
-    fld_x is    (1, dimNx)   likelihood at these x values
-    tr_pos is dim (nSpks, 1) 
+    fld_x is    (dimNx x 1)   likelihood at these x values
+    tr_pos is dim (nSpks)      #  these get treated as if (1 x nSpks)
     tr_mks        (nSpks x k)
     atMark        (1 x k)
     """
     iBx2   = 1/(bx*bx)
 
-    nSpks  = tr_pos.shape[0]
+    #      sptl    is Nx x nSpks (= tr_pos.shape[0])
     sptl   = -0.5*iBx2*(fld_x - tr_pos)**2  #  this piece doesn't need to be evaluated for every new spike
-    #occ    = (1/_N.sum(_N.exp(-0.5*iBx2*(fld_x - all_pos)**2), axis=1)  #  this piece doesn't need to be evaluated for every new spike
-    occ    = (1/_N.sqrt(2*_N.pi*bx*bx))*_N.sum(_N.exp(-0.5*iBx2*(fld_x - all_pos)**2), axis=1) #  this piece doesn't need to be evaluated for every new spike
+    #occ    = (1/_N.sqrt(2*_N.pi*bx*bx))*_N.sum(_N.exp(-0.5*iBx2*(fld_x - all_pos)**2), axis=1)*dxp #  this piece doesn't need to be evaluated for every new spike
+    #  occ[i]: amount time in ms spent in bin i. sum(occ) = total time in ms
 
-    occ    /= _N.mean(occ)
-
-    Lam    = isqrt2pi*(1./Bx)*_N.sum(_N.exp(sptl), axis=1)*dxp*50  #  return me # of positions to evaluate
-    # print "^^^^^^^^^^^^^^^^"
-    # print _N.sum(Lam)
-    # print nSpks
-    # print (len(all_pos)*0.001)
-    # print "^^^^^^^^^^^^^^^^"
-    Lam    /= (len(all_pos)*0.001)
-    Lam    /= occ
-    #print occ
+    CtsPrBin    = isqrt2pi*(1./bx)*_N.sum(_N.exp(sptl), axis=1)*dxp  #  sum(Lam)*dxp == number of spikes observed all bins
+    Lam    = CtsPrBin / (occ*0.001)  #  divide by time (s) in each bin
+    #  sum(occupancy) == time spent in each bin
 
     return Lam
 

@@ -73,7 +73,7 @@ class multiRecptvFld:
         #_f_u   = _N.zeros(M);    _f_q2  = _N.ones(M) #  wide
         _f_u   = _N.linspace(oo.xLo+1, oo.xHi-1, M);    _f_q2  = _N.ones(M) #  wide
         #  inverse gamma
-        _q2_a  = _N.ones(M)*2.1;    _q2_B  = _N.ones(M)*1e-3
+        _q2_a  = _N.ones(M)*2.1;    _q2_B  = _N.ones(M)*1e-2
         #_plt.plot(q2x, q2x**(-_q2_a-1)*_N.exp(-_q2_B / q2x))
         _l0_a = _N.ones(M);     _l0_B  = _N.zeros(M)*(1/30.)
 
@@ -113,7 +113,7 @@ class multiRecptvFld:
 
         #  numerical grid
         ux = _N.linspace(oo.xLo, oo.xHi, oo.Nupx, endpoint=False)   # uniform x position
-        q2x    = _N.exp(_N.linspace(_N.log(0.0001), _N.log(400), oo.q2ss))  #  5 orders of
+        q2x    = _N.exp(_N.linspace(_N.log(0.000001), _N.log(400), oo.q2ss))  #  5 orders of
         #q2x    = _N.exp(_N.linspace(_N.log(0.0001), _N.log(100), oo.q2ss))  #  5 orders of
         d_q2x  = _N.diff(q2x)
         q2x_m1 = _N.array(q2x[0:-1])
@@ -274,6 +274,21 @@ class multiRecptvFld:
                     sat -= _N.max(sat)
                     condPos = _N.exp(sat)
                     q2_a_, q2_B_ = ig_prmsUV(q2x, condPos, d_q2x, q2x_m1, ITER=1)
+                    if q2_a_ > 10000:
+                        putit = _N.empty((oo.q2ss, 4))
+                        putit[:, 0] = q2x
+                        putit[:, 1] = sLLkPr
+                        putit[:, 2] = slnc
+                        putit[:, 3] = condPos
+                        _N.savetxt("putit", putit, fmt="%.4e %.4e %.4e %.4e")
+                        print _q2_a[m]
+                        print SL_a
+                        print _q2_B[m]
+                        print SL_B
+                        
+                        print "------------    %d" % nSpksM
+                        assert q2_a_ < 10000, "q2_a_ too big"
+
                     print "it %(it)d   q2 m: %(m)d  nS: %(ns)d    q2_a_   %(a) .3e, q2_B_ %(B) .3e" % {"a" : q2_a_, "B" : q2_B_, "m" : m, "ns" : nSpksM, "it" : iter}
                     #  domain error when q2_a_ and q2_B_ is nan
 

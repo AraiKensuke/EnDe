@@ -33,7 +33,8 @@ class fitMvNorm:
     M      = 15
 
     ITERS = 1
-    
+
+    aAR   = 0.6
     AR    = 0.5   #  % increase per 1 minute
     AR0   = 1     #  baseline AR - for messier fit, AR > 1 can still stop adaptation?
 
@@ -360,12 +361,10 @@ class fitMvNorm:
 
             maxwocc = _N.max(wocc)
 
-            inds = _N.where((wocc < 0.01 * maxwocc) & (sumGz[m] < 1))[0]
+            inds = _N.where((wocc < 0.01 * maxwocc) & (sumGz < 1))[0]
             for m in inds:
-                if it == 0:
-                    wGz[m] = oo.po_alpha[it, m]
-                else:
-                    wGz[m] = oo.po_alpha[it, m] - oo.PR_m_alp[m]
+                wGz[m] = oo.po_alpha[it, m] if (it == 0) else \
+                         oo.po_alpha[it, m] - oo.PR_m_alp[m]
 
             #  if wocc is large, it means we can trust this as measure of firing
             #  if wocc is small, it means we can trust this as a reasonable measure
@@ -418,7 +417,7 @@ class fitMvNorm:
             for im in xrange(M):  # 3333333333333333
                 Nm = Nms[im,0,0]
 
-                if Nm >= oo.pmdim:
+                if Nm >= 2:
                     clstx = clstxs[im]
                     ##  dof of posterior distribution of cluster covariance
                     oo.po_cov_nu[it+1, im] = oo.PR_cov_nu[im] + Nm
@@ -471,7 +470,11 @@ class fitMvNorm:
         #  hyperparameters describe the priors, and are estimated from the 
         #  posterior of the parameter
         #  the posteriors are now priors
-        oo.PR_m_alp[:] = _N.mean(oo.po_alpha[mid:], axis=0)*0.8
+        oo.PR_m_alp[:] = _N.mean(oo.po_alpha[mid:], axis=0)*oo.aAR
+
+        with open('po_alpha.txt', 'a') as fh:
+            _N.savetxt(fh, oo.PR_m_alp.reshape(1, oo.M), fmt=("%.3e " * oo.M))
+        fh.close()
         print "=========   set_priors"
         print oo.PR_m_alp
         #  prior of cluster center is current

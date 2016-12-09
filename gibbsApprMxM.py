@@ -67,8 +67,11 @@ class MarkAndRF:
     nz_q2               = 500
     nz_f                = 0
 
-    def __init__(self, outdir, fn, intvfn, xLo=0, xHi=3, seed=1041, adapt=True, nzclstr=False, t_hlf_l0_mins=None, t_hlf_q2_mins=None):
+    oneCluster = False
+    
+    def __init__(self, outdir, fn, intvfn, xLo=0, xHi=3, seed=1041, adapt=True, nzclstr=False, t_hlf_l0_mins=None, t_hlf_q2_mins=None, oneCluster=False):
         oo     = self
+        oo.oneCluster = oneCluster
         oo.adapt = adapt
         _N.random.seed(seed)
         oo.nzclstr = nzclstr
@@ -94,7 +97,7 @@ class MarkAndRF:
         oo.t_hlf_l0 = int(1000*60*t_hlf_l0_mins) if (t_hlf_l0_mins is not None) else oo.t_hlf_l0
         oo.t_hlf_q2 = int(1000*60*t_hlf_q2_mins) if (t_hlf_q2_mins is not None) else oo.t_hlf_q2
 
-    def gibbs(self, ITERS, K, ep1=0, ep2=None, savePosterior=True, gtdiffusion=False, Mdbg=None, doSepHash=True, use_spc=True, nz_pth=0., ignoresilence=False):
+    def gibbs(self, ITERS, K, ep1=0, ep2=None, savePosterior=True, gtdiffusion=False, Mdbg=None, doSepHash=True, use_spc=True, nz_pth=0., ignoresilence=False, use_omp=False):
         """
         gtdiffusion:  use ground truth center of place field in calculating variance of center.  Meaning of diffPerMin different
         """
@@ -158,7 +161,7 @@ class MarkAndRF:
             Ants    = _N.where(oo.dat[t0:t1, 1] == 0)[0]
 
             if epc == ep1:   ###  initialize
-                labS, labH, lab, flatlabels, M, MF, hashthresh, nHSclusters = gAMxMu.initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=doSepHash, xLo=oo.xLo, xHi=oo.xHi)  # nHSclusters  is # of clusters in hash and signal 
+                labS, labH, lab, flatlabels, M, MF, hashthresh, nHSclusters = gAMxMu.initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=doSepHash, xLo=oo.xLo, xHi=oo.xHi, oneCluster=oo.oneCluster)  # nHSclusters  is # of clusters in hash and signal 
 
                 signalClusters = _N.where(flatlabels < nHSclusters[0])[0]
                 Mwowonz = M if not oo.nzclstr else M + 1
@@ -314,7 +317,7 @@ class MarkAndRF:
 
                         mcs[m]       = _N.mean(clstx, axis=0)
                         #u_u_ = _N.einsum("jk,k->j", u_Sg_, _N.dot(_N.linalg.inv(_u_Sg[m]), _u_u[m]) + nSpksM*_N.dot(iSg[m], mcs[m]))
-                        u_u_ = _N.einsum("jk,k->j", u_Sg_, _N.dot(_iu_Sg[m], _u_u[m]) + nSpksM*_N.dot(iSg[m], mcs[m]))
+                        #u_u_ = _N.einsum("jk,k->j", u_Sg_, _N.dot(_iu_Sg[m], _u_u[m]) + nSpksM*_N.dot(iSg[m], mcs[m]))
                         # hyp
                         ########  POSITION
                         ##  mean of posterior distribution of cluster means

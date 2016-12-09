@@ -102,7 +102,7 @@ class simDecode():
         oo.Nx = lm.Nx;        oo.Nm = lm.Nm
         oo.xA = lm.xA;        oo.mA = lm.mA
             
-        oo.mdim  = lm.k#kde.mdim
+        oo.mdim  = lm.k       #kde.mdim
 
         try:
             if lm.minds is not None:
@@ -117,7 +117,7 @@ class simDecode():
         oo.dxp   = oo.xp[1] - oo.xp[0]
         oo.xb    = _N.empty(oo.Nx+1)
         oo.xb[0:oo.Nx] = oo.xp - 0.5*oo.dxp
-        oo.xb[oo.Nx] = oo.xp[-1]+ 0.5*oo.dxp\
+        oo.xb[oo.Nx] = oo.xp[-1]+ 0.5*oo.dxp
         ####
 
         shp  = [oo.Nx]    #  shape of kde
@@ -311,15 +311,12 @@ class simDecode():
         pNkmk0   = _N.exp(-oo.dt * oo.Lam_xk)  #  one for each tetrode
         pNkmk    = _N.ones(oo.Nx)
 
-        dims     = _N.ones(oo.mdim, dtype=_N.int)*oo.Nm
-
         fxdMks = _N.empty((oo.Nx, oo.mdim+1))  #  for each pos, a fixed mark
         fxdMks[:, 0] = oo.xp
 
         pNkmk = _N.empty((oo.Nx, oo.nTets))
 
         tStart = _tm.time()
-
 
         if oo.kde:
             occ    = 1./oo.iocc
