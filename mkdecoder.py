@@ -192,7 +192,7 @@ class mkdecoder:
             M     = covs.shape[0]
 
             iSgs  = _N.linalg.inv(covs)
-            i2pidcovs = 1/_N.sqrt(2*_N.pi*_N.linalg.det(covs))
+            i2pidcovs = (1/_N.sqrt(2*_N.pi))**(oo.mdim+1)*(1./_N.sqrt(_N.linalg.det(covs)))
             i2pidcovsr= i2pidcovs.reshape((M, 1))
 
         oo.init_pX_Nm(t0)   #  flat pX_Nm  init cond at start of decode
@@ -200,8 +200,10 @@ class mkdecoder:
         pNkmk0   = _N.exp(-oo.dt * oo.Lam_MoMks)  #  one for each tetrode
 
         fxdMks = _N.empty((oo.Nx, oo.mdim+1))  #  for each pos, a fixed mark
+        #fxdMks = _N.empty(oo.mdim)  #  for each pos, a fixed mark
         fxdMks[:, 0] = oo.xp
 
+        dens = []
         for t in xrange(t0+1,t1): # start at 1 because initial condition
             #tt1 = _tm.time()
             for nt in xrange(oo.nTets):
@@ -209,8 +211,8 @@ class mkdecoder:
 
                 if (oo.mkpos[nt][t, 1] == 1):
                     fxdMks[:, 1:] = oo.mkpos[nt][t, 2:]
-                    #oo.Lklhd[nt, t] *= _ku.evalAtFxdMks_new(fxdMks, l0s, us, covs, iSgs, i2pidcovsr)*oo.lmd0[nt] * oo.dt
-                    oo.Lklhd[nt, t] *= _ku.evalAtFxdMks_new(fxdMks, l0s, us, covs, iSgs, i2pidcovsr)* oo.dt
+                    oo.Lklhd[nt, t] *= _ku.evalAtFxdMks_new(fxdMks, l0s, us, covs, iSgs, i2pidcovsr)*oo.dt
+                    #dens.append(_ku.evalAtFxdMks_new(fxdMks, l0s, us, covs, iSgs, i2pidcovsr))
 
             ttt1 =0
             ttt2 =0
@@ -247,6 +249,7 @@ class mkdecoder:
             #print "%(1).3e   %(2).3e" % {"1" : ttt1, "2" : ttt2}
         tEnd = _tm.time()
         #print "decode   %(1).3e" % {"1" : (tEnd-tStart)}
+        #_N.savetxt("densGT", _N.array(dens))
 
     def LmdMargOvrMrks(self, enc_t0, enc_t1, uFE=None, prms=None):
         """
@@ -255,7 +258,7 @@ class mkdecoder:
         """
         oo = self
         #####  
-        #oo.lmd0 = _N.empty(oo.nTets)
+        oo.lmd0 = _N.empty(oo.nTets)
         oo.Lam_MoMks = _N.ones((oo.Nx, oo.nTets))
 
         if oo.kde:  #  also calculate the occupation. Nothing to do with LMoMks
@@ -313,6 +316,7 @@ class mkdecoder:
         ibx2   = 1. / (oo.bx * oo.bx)
         sptl   =  []
 
+        dens   = []
         for nt in xrange(oo.nTets):
             sptl.append(-0.5*ibx2*(oo.xpr - oo.tr_pos[nt])**2)  #  this piece doesn't need to be evalu
         for t in xrange(t0+1,t1): # start at 1 because initial condition
@@ -323,6 +327,7 @@ class mkdecoder:
                 if (oo.mkpos[nt][t, 1] == 1):
                     fxdMks[:, 1:] = oo.mkpos[nt][t, 2:]
                         #(atMark, fld_x, tr_pos, tr_mks, all_pos, mdim, Bx, cBm, bx)
+                    #dens.append(_ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx, oo.dxp, oo.occ))
                     oo.Lklhd[nt, t] *= _ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx, oo.dxp, oo.occ)
 
             ttt1 =0
@@ -347,6 +352,7 @@ class mkdecoder:
             #print "%(1).3e   %(2).3e" % {"1" : ttt1, "2" : ttt2}
         tEnd = _tm.time()
         print "decode   %(1).3e" % {"1" : (tEnd-tStart)}
+        #_N.savetxt("densKDE", _N.array(dens))
 
     def prepareDecKDE(self, t0, t1, telapse=0):
         #preparae decoding step for KDE
