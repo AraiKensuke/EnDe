@@ -30,7 +30,13 @@ def kerFr(atMark, sptl, tr_mks, mdim, Bx, cBm, bx, dxp, occ):
     #  if H diagonal with diagonal cB**2
     #  det(H) == cB^(2^mdim), so |det(H)|^(mdim/2) == cB^(mdim*mdim)
 
-    fr1= (isqrt2pi * isqrt2pi**mdim)*(1./Bx)*(1./nSpks)*(1./cBm**(mdim*mdim))*_N.sum(_N.exp(sptl + q4mk), axis=1)*dxp / (occ * 0.001)  #  return me # of positions to evaluate
+    #fr1= (isqrt2pi * isqrt2pi**mdim)*(1./Bx)*(1./nSpks)*(1./cBm**mdim)*_N.sum(_N.exp(sptl + q4mk), axis=1)*dxp / (occ * 0.001)  #  return me # of positions to evaluate
+    #fr1= (isqrt2pi * isqrt2pi**mdim)*(1./Bx)*(1./nSpks)*(1./cBm**mdim)*_N.sum(_N.exp(sptl + q4mk), axis=1)*dxp / (occ * 0.001)  #  return me # of positions to evaluate
+
+    
+    mkdens = ((isqrt2pi**mdim)*(1./nSpks)*(1./cBm**mdim)*_N.sum(_N.exp(q4mk)))
+
+    fr1= isqrt2pi*(1./Bx)*_N.sum(_N.exp(sptl), axis=1)*dxp * mkdens / (occ*0.001)  #  return me # of positions to evaluate
 
 
     """   EQUIVALENT TO
@@ -66,6 +72,7 @@ def Lambda(fld_x, tr_pos, all_pos, Bx, bx, dxp, occ):
 
 def evalAtFxdMks_new(fxdMks, l0, us, Sgs, iSgs, i2pidcovsr):
     Nx, pmdim     = fxdMks.shape
+    """
     fxdMksr= fxdMks.reshape(Nx, 1, pmdim)
 
     cmps = i2pidcovsr*_N.exp(-0.5*_N.einsum("xmj,xmj->mx", fxdMksr-us, _N.einsum("mjk,xmk->xmj", iSgs, fxdMksr - us)))
@@ -73,3 +80,18 @@ def evalAtFxdMks_new(fxdMks, l0, us, Sgs, iSgs, i2pidcovsr):
     zs = _N.sum(l0*cmps, axis=0)
 
     return zs
+    """
+
+    fld = fxdMks[:, 0].reshape(Nx, 1)    #  fld is (Nx, 1)
+
+    ll  = _N.zeros(Nx)
+    mdim= pmdim - 1
+
+    for n in xrange(us.shape[0]):
+        atMk= fxdMks[n, 1:]
+        x = us[n, 0]
+        m = us[n, 1:]
+        #ll += (l0[n, 0]*(1/_N.sqrt(2*_N.pi*Sgs[n,0, 0])) * _N.exp(-0.5*(fld - us[n, 0])*(fld - us[n, 0])*iSgs[n,0, 0]))[:, 0]
+        ll += (l0[n, 0]*(1/_N.sqrt(2*_N.pi*Sgs[n,0, 0])) * _N.exp(-0.5*(fld - x)*(fld - x)*iSgs[n,0, 0]) * (1/_N.sqrt(2*_N.pi)**mdim)*(1./_N.sqrt(_N.linalg.det(Sgs[n,1:, 1:]))) * _N.exp(-0.5*_N.dot((atMk - m), _N.dot(iSgs[n, 1:, 1:], (atMk - m)))))[:, 0] 
+
+    return ll

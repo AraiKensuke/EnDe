@@ -202,6 +202,7 @@ class mkdecoder:
         fxdMks = _N.empty((oo.Nx, oo.mdim+1))  #  for each pos, a fixed mark
         fxdMks[:, 0] = oo.xp
 
+
         for t in xrange(t0+1,t1): # start at 1 because initial condition
             #tt1 = _tm.time()
             for nt in xrange(oo.nTets):
@@ -209,7 +210,7 @@ class mkdecoder:
 
                 if (oo.mkpos[nt][t, 1] == 1):
                     fxdMks[:, 1:] = oo.mkpos[nt][t, 2:]
-                    #oo.Lklhd[nt, t] *= _ku.evalAtFxdMks_new(fxdMks, l0s, us, covs, iSgs, i2pidcovsr)*oo.lmd0[nt] * oo.dt
+                    out = _ku.evalAtFxdMks_new(fxdMks, l0s, us, covs, iSgs, i2pidcovsr)* oo.dt
                     oo.Lklhd[nt, t] *= _ku.evalAtFxdMks_new(fxdMks, l0s, us, covs, iSgs, i2pidcovsr)* oo.dt
 
             ttt1 =0
@@ -323,7 +324,7 @@ class mkdecoder:
                 if (oo.mkpos[nt][t, 1] == 1):
                     fxdMks[:, 1:] = oo.mkpos[nt][t, 2:]
                         #(atMark, fld_x, tr_pos, tr_mks, all_pos, mdim, Bx, cBm, bx)
-                    oo.Lklhd[nt, t] *= _ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx, oo.dxp, oo.occ)
+                    oo.Lklhd[nt, t] *= _ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx, oo.dxp, oo.occ) * oo.dt
 
             ttt1 =0
             ttt2 =0
