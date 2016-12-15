@@ -16,7 +16,7 @@ def kerFr(atMark, sptl, tr_mks, mdim, Bx, cBm, bx, dxp, occ):
     """
     iB2    = 1/(cBm*cBm)
 
-    nSpks  = tr_mks.shape[0]
+    nTrSpks  = tr_mks.shape[0]
 
     #  q4mk  shape (nSpks, )   treat as (1, nSpks) when q4mk + sptl
     #  sptl  shape (Nx, nSpks)
@@ -31,12 +31,13 @@ def kerFr(atMark, sptl, tr_mks, mdim, Bx, cBm, bx, dxp, occ):
     #  det(H) == cB^(2^mdim), so |det(H)|^(mdim/2) == cB^(mdim*mdim)
 
     #fr1= (isqrt2pi * isqrt2pi**mdim)*(1./Bx)*(1./nSpks)*(1./cBm**mdim)*_N.sum(_N.exp(sptl + q4mk), axis=1)*dxp / (occ * 0.001)  #  return me # of positions to evaluate
-    #fr1= (isqrt2pi * isqrt2pi**mdim)*(1./Bx)*(1./nSpks)*(1./cBm**mdim)*_N.sum(_N.exp(sptl + q4mk), axis=1)*dxp / (occ * 0.001)  #  return me # of positions to evaluate
 
-    
-    mkdens = ((isqrt2pi**mdim)*(1./nSpks)*(1./cBm**mdim)*_N.sum(_N.exp(q4mk)))
+    fr1 = _N.zeros(sptl.shape[0])
 
-    fr1= isqrt2pi*(1./Bx)*_N.sum(_N.exp(sptl), axis=1)*dxp * mkdens / (occ*0.001)  #  return me # of positions to evaluate
+    for n in xrange(nTrSpks):
+        fr1 += _N.exp(q4mk[n])*_N.exp(sptl[:, n])
+    fr1 *= (isqrt2pi * isqrt2pi**mdim)*(1./Bx)*(1./nTrSpks)*(1./cBm**mdim)*dxp / (occ * 0.001)*2000
+    #  sptl
 
 
     """   EQUIVALENT TO
