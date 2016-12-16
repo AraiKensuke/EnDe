@@ -9,7 +9,7 @@ def kerFr(atMark, sptl, tr_mks, mdim, Bx, cBm, bx, dxp, occ):
 
     fld_x is    (1, dimNx)      return firing rate at these x values
     #tr_pos is dim (nSpks, 1)    training positions
-    sptl          training positions
+    sptl          (training positions - field positions)**2
     tr_mks        (nSpks x k)   training marks
     atMark        (1 x k)       mark of spike to be decoded
     all_pos
@@ -21,6 +21,7 @@ def kerFr(atMark, sptl, tr_mks, mdim, Bx, cBm, bx, dxp, occ):
     #  q4mk  shape (nSpks, )   treat as (1, nSpks) when q4mk + sptl
     #  sptl  shape (Nx, nSpks)
 
+    #  sum over mark dims
     q4mk   = -0.5*_N.sum((tr_mks - atMark) * (tr_mks - atMark), axis=1)*iB2
 
     #  fld_x - tr_pos  gives array (# positions to evaluate x # of trainingated for every new spike
@@ -28,7 +29,7 @@ def kerFr(atMark, sptl, tr_mks, mdim, Bx, cBm, bx, dxp, occ):
     #occ    = _N.sum(_N.exp(-0.5*ibx2*(oo.xpr - oo.all_pos)**2), axis=1)  #  this piece doesn't need to be evaluated for every new spike
 
     #  if H diagonal with diagonal cB**2
-    #  det(H) == cB^(2^mdim), so |det(H)|^(mdim/2) == cB^(mdim*mdim)
+    #  det(H) == (cB^2)^mdim), so |det(H)|^(1/2) == cB^(2*mdim*0.5) == cB^mdim
 
     fr1= (isqrt2pi * isqrt2pi**mdim)*(1./Bx)*(1./nTrSpks)*(1./cBm**mdim)*_N.sum(_N.exp(sptl + q4mk), axis=1) / (occ * 0.001)  #  return me # of positions to evaluate
 
