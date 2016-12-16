@@ -120,7 +120,7 @@ class mkdecoder:
         k2 = 0.1
         k3 = 0.1
 
-        """
+        ##  circular maze
         for i in xrange(0, oo.Nx):  #  indexing of xTrs  [to, from]
             oo.xTrs[i, i] = 1-p1   
             if i == 0:
@@ -166,7 +166,7 @@ class mkdecoder:
         for i in xrange(oo.Nx):
             A = _N.trapz(oo.xTrs[:, i])*((oo.xHi-oo.xLo)/float(oo.Nx))
             oo.xTrs[:, i] /= A
-
+        """
 
     def init_pX_Nm(self, t):
         oo = self
@@ -324,7 +324,7 @@ class mkdecoder:
                 if (oo.mkpos[nt][t, 1] == 1):
                     fxdMks[:, 1:] = oo.mkpos[nt][t, 2:]
                         #(atMark, fld_x, tr_pos, tr_mks, all_pos, mdim, Bx, cBm, bx)
-                    oo.Lklhd[nt, t] *= _ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx, oo.dxp, oo.occ) * oo.dt
+                    oo.Lklhd[nt, t] *= _ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx, oo.dxp, oo.occ)
 
             ttt1 =0
             ttt2 =0

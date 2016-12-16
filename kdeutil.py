@@ -30,13 +30,13 @@ def kerFr(atMark, sptl, tr_mks, mdim, Bx, cBm, bx, dxp, occ):
     #  if H diagonal with diagonal cB**2
     #  det(H) == cB^(2^mdim), so |det(H)|^(mdim/2) == cB^(mdim*mdim)
 
-    #fr1= (isqrt2pi * isqrt2pi**mdim)*(1./Bx)*(1./nSpks)*(1./cBm**mdim)*_N.sum(_N.exp(sptl + q4mk), axis=1)*dxp / (occ * 0.001)  #  return me # of positions to evaluate
+    fr1= (isqrt2pi * isqrt2pi**mdim)*(1./Bx)*(1./nTrSpks)*(1./cBm**mdim)*_N.sum(_N.exp(sptl + q4mk), axis=1) / (occ * 0.001)  #  return me # of positions to evaluate
 
-    fr1 = _N.zeros(sptl.shape[0])
+    # fr1 = _N.zeros(sptl.shape[0])
 
-    for n in xrange(nTrSpks):
-        fr1 += _N.exp(q4mk[n])*_N.exp(sptl[:, n])
-    fr1 *= (isqrt2pi * isqrt2pi**mdim)*(1./Bx)*(1./nTrSpks)*(1./cBm**mdim)*dxp / (occ * 0.001)*2000
+    # for n in xrange(nTrSpks):
+    #     fr1 += _N.exp(q4mk[n])*_N.exp(sptl[:, n])
+    # fr1 *= (isqrt2pi * isqrt2pi**mdim)*(1./Bx)*(1./nTrSpks)*(1./cBm**mdim)*dxp / (occ * 0.001)*2000
     #  sptl
 
 
