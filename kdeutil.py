@@ -74,7 +74,7 @@ def Lambda(fld_x, tr_pos, all_pos, Bx, bx, dxp, occ):
 
 def evalAtFxdMks_new(fxdMks, l0, us, Sgs, iSgs, i2pidcovsr):
     Nx, pmdim     = fxdMks.shape
-    """
+
     fxdMksr= fxdMks.reshape(Nx, 1, pmdim)
 
     cmps = i2pidcovsr*_N.exp(-0.5*_N.einsum("xmj,xmj->mx", fxdMksr-us, _N.einsum("mjk,xmk->xmj", iSgs, fxdMksr - us)))
@@ -95,5 +95,6 @@ def evalAtFxdMks_new(fxdMks, l0, us, Sgs, iSgs, i2pidcovsr):
         m = us[n, 1:]
         #ll += (l0[n, 0]*(1/_N.sqrt(2*_N.pi*Sgs[n,0, 0])) * _N.exp(-0.5*(fld - us[n, 0])*(fld - us[n, 0])*iSgs[n,0, 0]))[:, 0]
         ll += (l0[n, 0]*(1/_N.sqrt(2*_N.pi*Sgs[n,0, 0])) * _N.exp(-0.5*(fld - x)*(fld - x)*iSgs[n,0, 0]) * (1/_N.sqrt(2*_N.pi)**mdim)*(1./_N.sqrt(_N.linalg.det(Sgs[n,1:, 1:]))) * _N.exp(-0.5*_N.dot((atMk - m), _N.dot(iSgs[n, 1:, 1:], (atMk - m)))))[:, 0] 
+    """
 
     return ll

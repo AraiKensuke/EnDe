@@ -7,6 +7,7 @@ from distutils.extension import Extension
 #from Cython.Build import cythonize      # cythonize compiles a pyx
 from Cython.Distutils import build_ext   # Extension for a c-file, build_ext for cython file
 
+module = "fastnum"
 
 ###  import LogitWrapper 
 ###  LogitWrapper
@@ -47,14 +48,14 @@ if "--use_openmp" in sys.argv:
 
 cmdclass = {'build_ext' : build_ext}
 #  Output to be named _LogitWrapper.so
-ext_modules = Extension('fastnum',
-                    ["fastnum.pyx"],
+ext_modules = Extension(module,
+                        ["%s.pyx" % module],
                     #libraries = ['gsl', 'gslcblas'],
                     include_dirs=incdir1,   #  include_dirs for Mac
                     extra_compile_args=extra_compile_args,
                     extra_link_args=extra_link_args)  #  linker args
 setup(
-    name='fastnum',
+    name=module,
     cmdclass = cmdclass,
     #ext_modules = 
     ext_modules=[ext_modules],

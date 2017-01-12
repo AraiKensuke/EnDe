@@ -350,7 +350,7 @@ class MarkAndRF:
                 ###############     u
                 ###############
                 for m in xrange(M):
-                    if clstsz[m] > 0:
+                    if clstsz[m] >= K:
                         u_Sg_[m] = _N.linalg.inv(_iu_Sg[m] + clstsz[m]*iSg[m])
                         clstx    = mks[l_sts[m]]
 
@@ -375,7 +375,11 @@ class MarkAndRF:
                         u_u_[m] = _N.array(_u_u[m])
 
                 ucmvnrms= _N.random.randn(M, K)
-                C       = _N.linalg.cholesky(u_Sg_)
+                try:
+                    C       = _N.linalg.cholesky(u_Sg_)
+                except _N.linalg.linalg.LinAlgError:
+                    _N.savetxt("nonPD_u_Sg_", u_Sg_)
+                    raise
                 u[0:M]       = _N.einsum("njk,nk->nj", C, ucmvnrms) + u_u_
 
                 smp_mk_prms[oo.ky_p_u][:, iter] = u[0:M].T  # dim of u wrong
@@ -593,3 +597,5 @@ class MarkAndRF:
             dmp = open(resFN("posteriors_%d.dmp" % epc, dir=oo.outdir), "wb")
             pickle.dump(pcklme, dmp, -1)
             dmp.close()
+
+######  Hi Eric
