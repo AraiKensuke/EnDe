@@ -94,6 +94,9 @@ def mltpl_ig_prmsUV(sg2s, sLLkPr, s, d_sg2s, sg2s_m1, clstsz, it, mks, t0, xt0t1
     """
     xt0t1    relative coordinates
     mks      absolute coordinates
+
+    sLLkPr   spiking part
+    s        silence part
     """
     sat = sLLkPr + s
     sat -= _N.max(sat, axis=0)
@@ -101,11 +104,22 @@ def mltpl_ig_prmsUV(sg2s, sLLkPr, s, d_sg2s, sg2s_m1, clstsz, it, mks, t0, xt0t1
 
     # ###  does well when a is large
 
-    p     = _N.array(y[0:-1]*d_sg2s)   #  p weighted by bin size
+    p     = _N.array(0.5*(y[0:-1]+y[1:])*d_sg2s)   #  p weighted by bin size
     p     /= _N.sum(p, axis=0)
+
 
     u = _N.sum(sg2s_m1 * p, axis=0)
     vr= _N.sum((sg2s_m1-u)*(sg2s_m1-u) * p, axis=0)
+
+    """
+    if it % 50 == 0:
+        xpx = _N.empty((sg2s_m1.shape[0], 4))
+        xpx[:, 0] = sg2s_m1[:, 0]
+        xpx[:, 1] = p[:, 0]
+        xpx[:, 2] = 0.5*(sLLkPr[0:-1, 0] + sLLkPr[1:, 0])
+        xpx[:, 3] = 0.5*(s[0:-1, 0] + s[1:, 0])
+        _U.savetxtWCom("xpx%d" % it, xpx, fmt="%.6e %.6e %.6e %.6e", com="# u=%(u).5e  vr=%(vr).5e" % {"u" : u, "vr" : vr})
+    """
 
     a_ = u*u /vr + 2
     B_ = (a_ - 1)*u

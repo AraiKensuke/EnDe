@@ -176,14 +176,39 @@ def declare_params(_M, K, nzclstr=False, uAll=None, SgAll=None):
     Sg      = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*0.1
     return l0, f, q2, u, Sg
 
-def declare_prior_hyp_params(M, MF, K, x, mks, Asts, t0):
+def declare_prior_hyp_params(M, MF, K, x, mks, Asts, t0, priors, labS, labH):
     #  PRIORS.  These get updated after each EPOCH
     #  priors  prefixed w/ _
     _f_u    = _N.zeros(M);    _f_q2  = _N.ones(M)*16 #  wide
-    #  inverse gamma
     _q2_a   = _N.ones(M)*0.01;    _q2_B  = _N.ones(M)*1e-3
-    _l0_a   = _N.ones(M)*0.05;     _l0_B  = _N.ones(M)*(1/30.)
-    #_l0_a   = _N.ones(M)*0.5;     _l0_B  = _N.ones(M)
+    _l0_a   = _N.ones(M)*0.5;     _l0_B  = _N.ones(M)
+
+    iclstr  = -1
+    for clstr_id in xrange(M):
+        _f_u[clstr_id]    = priors._f_u[0]
+        _f_q2[clstr_id]   = priors._f_q2[0]
+        #  inverse gamma
+        _q2_a[clstr_id]   = priors._q2_a[0]
+        _q2_B[clstr_id]   = priors._q2_B[0]
+        _l0_a[clstr_id]   = priors._l0_a[0]
+        _l0_B[clstr_id]   = priors._l0_B[0]
+        
+    for lab in [labS, labH]:
+        iclstr  += 1
+        uniq_ids = _N.unique(lab)
+
+        print "--------------------------------"
+        print uniq_ids
+        print "--------------------------------"
+        for clstr_id in lab:
+            _f_u[clstr_id]    = priors._f_u[iclstr]
+            _f_q2[clstr_id]   = priors._f_q2[iclstr]
+            #  inverse gamma
+            _q2_a[clstr_id]   = priors._q2_a[iclstr]
+            _q2_B[clstr_id]   = priors._q2_B[iclstr]
+            _l0_a[clstr_id]   = priors._l0_a[iclstr]
+            _l0_B[clstr_id]   = priors._l0_B[iclstr]
+
     #mkmn    = _N.mean(mks[Asts+t0], axis=0)   #  let's use
     #mkcv    = _N.cov(mks[Asts+t0], rowvar=0)
     ############

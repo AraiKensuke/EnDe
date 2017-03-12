@@ -200,20 +200,49 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, l_l0_chpts, l_ctr_
     #  change place field location
     Lam   = f*dt*_N.exp(-0.5*(pths-ctr)**2 / sx)
 
+    _N.savetxt("lam", Lam.T)
+    _N.savetxt("pths", pths)
+
     rnds = _N.random.rand(M, NT)
 
     #dat = _N.zeros((NT, 2 + K))
     dat = _N.zeros((NT, 2 + K))
     dat[:, 0] = pths
+    datNghbr = _N.zeros((NT, 2 + K))  ##  if spk in bin already exists, nxt door
+    datNghbr[:, 0] = pths
 
     for m in xrange(M):
-        sts  = _N.where(rnds[m] < Lam[m])[0]
+        sts  = _N.where(rnds[m] < Lam[m])[0]      #  spikes from this neuron
+        alrdyXst = _N.where(dat[:, 1] == 1)[0]  #  places where synchronous
+        ndToMove = _N.intersect1d(alrdyXst, sts)
+        dntMove  = _N.setdiff1d(sts, ndToMove)    #  empty slots
+        nonsynch = _N.empty(len(sts))          
+        datNghbr[dntMove, 1] = 1
+        nonsynch[0:len(dntMove)]    = dntMove
+        print len(ndToMove)
+
+        iStart   = len(dntMove)                   #  in nonsynch
+
+        for iOcpd in ndToMove:  # occupied
+            bDone = False
+            while not bDone:
+                iOcpd += 1
+                if datNghbr[iOcpd, 1] == 0:
+                    datNghbr[iOcpd, 1] = 1
+                    nonsynch[iStart]   = iOcpd
+                    iStart += 1
+                    bDone = True
+
+        snonsynch = _N.sort(nonsynch)
         dat[sts, 1] = 1
 
         nrn = nrnNum[m]
+
         if K > 0:
             for t in xrange(len(sts)):
-                dat[sts[t], 2:] = _N.random.multivariate_normal(mk_MU[nrn, sts[t]], Covs[nrn], size=1)
+                obsMrk = _N.random.multivariate_normal(mk_MU[nrn, sts[t]], Covs[nrn], size=1)
+                dat[sts[t], 2:] = obsMrk
+                datNghbr[nonsynch[t], 2:] = obsMrk
 
         #  now noise spikes
         if bckgrdLam is not None:
@@ -266,6 +295,7 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, l_l0_chpts, l_ctr_
 
     smk = " %.4f" * K
     _U.savetxtWCom("%s" % fn, dat, fmt=("%.4f %d" + smk), delimiter=" ", com="#  script=%s.py" % script)
+    _U.savetxtWCom("%s_NS.dat" % fn[:-4], datNghbr, fmt=("%.4f %d" + smk), delimiter=" ", com="#  script=%s.py" % script)
 
     pcklme = {}
 

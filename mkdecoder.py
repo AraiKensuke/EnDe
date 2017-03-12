@@ -56,7 +56,7 @@ class mkdecoder:
     svMkIntnsty = None   #  save just the mark intensities
 
     ##  X_   and _X
-    def __init__(self, kde=False, bx=None, Bx=None, Bm=None, mkfns=None, encfns=None, K=None, nTets=None, xLo=0, xHi=3, maze=mz_CRCL, spdMult=1, ignorespks=False):
+    def __init__(self, kde=False, bx=None, Bx=None, Bm=None, mkfns=None, encfns=None, K=None, nTets=None, xLo=0, xHi=3, maze=mz_CRCL, spdMult=0.1, ignorespks=False):
         """
         """
         oo = self

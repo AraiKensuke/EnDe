@@ -12,10 +12,10 @@ import EnDedirs as _edd
 
 #  for bond day4, ex = 2, 4, 6
 #  for day3, ex 
-day    = 4
+day    = 6
 sdy    = ("0%d" % day) if (day < 10) else "%d" % day
-ep=4-1;
-
+ep=6-1;
+"""
 anim1 = "bon"
 anim2 = "bond"
 anim3 = "Bon"
@@ -23,13 +23,13 @@ anim3 = "Bon"
 anim1 = "fra"
 anim2 = "frank"
 anim3 = "Fra"
-"""
 
+basedir = "/Users/arai"
 #  experimental data mark, position container
 
-frip = "/home/karai/Dropbox (EastWestSideHippos)/BostonData/%(s3)s/%(s1)sripplescons%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3}
-flnp = "/home/karai/Dropbox (EastWestSideHippos)/BostonData/%(s3)s/%(s1)slinpos%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3}
-frwp = "/home/karai/Dropbox (EastWestSideHippos)/BostonData/%(s3)s/%(s1)srawpos%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3}
+frip = "%(bd)s/Dropbox (EastWestSideHippos)/BostonData/%(s3)s/%(s1)sripplescons%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3, "bd" : basedir}
+flnp = "%(bd)s/Dropbox (EastWestSideHippos)/BostonData/%(s3)s/%(s1)slinpos%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3, "bd" : basedir}
+frwp = "%(bd)s/Dropbox (EastWestSideHippos)/BostonData/%(s3)s/%(s1)srawpos%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3, "bd" : basedir}
 
 rip = _sio.loadmat(frip)    #  load matlab .mat files
 mLp = _sio.loadmat(flnp)
@@ -435,7 +435,7 @@ pos     =  _N.empty(t1-t0)
 svecT_ms = _N.linspace(t0, t1, t1-t0, endpoint=False)    #  
 svecL0_ms = _N.interp(svecT_ms, svecT*1000, svecL0)
 
-prmfilepath = "/home/karai/Dropbox (EastWestSideHippos)/BostonData/%(s2)s%(dy)s" %  {"s1" : anim1, "dy" : sdy, "s2" : anim2}
+prmfilepath = "%(bd)s/Dropbox (EastWestSideHippos)/BostonData/%(s2)s%(dy)s" %  {"s1" : anim1, "dy" : sdy, "s2" : anim2, "bd" : basedir}
 onlydirs = [f for f in listdir(prmfilepath) if isdir(join(prmfilepath, f))]
 srtdirs  = _N.sort(onlydirs)
 
@@ -456,6 +456,7 @@ it      = -1
 
 for dir in srtdirs:
     tet = dir.split("-")[0]
+    print "dir   is %s" % dir
     prmfn = "%(d)s/%(td)s/%(an)s%(sd)s-%(st)s_params.mat" % {"d" : prmfilepath, "an" : anim2, "sd" : sdy, "st" : tet, "td" : dir}
     if os.access(prmfn, os.F_OK):
         it += 1
@@ -494,7 +495,11 @@ for dir in srtdirs:
                 y.append(t_champs[imk, 1])
                 rngT.append(now_s)
                 rngX.append(svecL0[fd[0]])
-                marks[ind, it] = [t_champs[imk, 1:]]
+                if marks[ind, it] is None:
+                    marks[ind, it] = [t_champs[imk, 1:]]
+                else:
+                    print "here"
+                    marks[ind, it].append(t_champs[imk, 1:])
 
 x  = []
 xt = []
