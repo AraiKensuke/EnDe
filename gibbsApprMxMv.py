@@ -69,6 +69,8 @@ class MarkAndRF:
 
     q2_min = 5e-5
     q2_max = 1e5
+
+    q2_dec_wgts = None   #  weights to place on bin size for q2 numerical  [wgtL, wgtH].  Equally sized bins in logscale by default.
     
     oneCluster = False
     
@@ -119,13 +121,25 @@ class MarkAndRF:
         ####  NSexp, Nupx, fss, q2ss
 
 
-        CCC = 1
         #  numerical grid
         ux = _N.linspace(oo.xLo, oo.xHi, oo.Nupx, endpoint=False)   # uniform x position   #  grid over 
         uxr = ux.reshape((1, oo.Nupx))
         uxrr= ux.reshape((1, 1, oo.Nupx))
         #q2x    = _N.exp(_N.linspace(_N.log(1e-7), _N.log(100), oo.q2ss))  #  5 orders of
         q2x    = _N.exp(_N.linspace(_N.log(oo.q2x_L), _N.log(oo.q2x_H), oo.q2ss))  #  5 orders of
+
+        if oo.q2_dec_wgts is not None:
+            q2x_m    = _N.log(q2x)
+            d_c_log= _N.diff(q2x_m)   #  <=  constant
+            d_c_log *= _N.linspace(oo.q2_dec_wgts[0], oo.q2_dec_wgts[1], oo.q2ss-1)
+
+            for ii in xrange(oo.q2ss - 1):
+                q2x_m[ii+1] = q2x_m[ii] + d_c_log[ii]
+
+            #print q2x
+            #print q2x_m
+            q2x = _N.exp(q2x_m)   # re-weighted bin sizes
+            
         d_q2x  = _N.diff(q2x)
         q2x_m1 = _N.array(q2x[0:-1])
         lq2x    = _N.log(q2x)
@@ -311,7 +325,7 @@ class MarkAndRF:
 
                 sLLkPr      = _N.empty((M, oo.q2ss))
                 l0_exp_px   = _N.sum(l0_intgrd*pxr, axis=1) * dSilenceX
-                BL  = ((CCC*oo.dt)/_N.sqrt(twpi*q2[0:M]))*l0_exp_px    #  dim M
+                BL  = ((oo.dt)/_N.sqrt(twpi*q2[0:M]))*l0_exp_px    #  dim M
 
                 if (epc > 0) and oo.adapt:
                     _md_nd= _l0_a / _l0_B
@@ -327,8 +341,7 @@ class MarkAndRF:
                 
                 try:
                     #  mean is (l0_a_ / l0_B_)
-                    #print l0_a_
-                    #print l0_B_
+                    #these = _N.where(l0_a_ > 0)[0]
                     l0[0:M] = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_))  #  check
                 except ValueError:
                     """
@@ -439,7 +452,7 @@ class MarkAndRF:
                     l0r = l0[0:M].reshape((M, 1))
                     q2r = q2[0:M].reshape((M, 1))
                      #  s   is (M x fss)
-                    s = -CCC*(l0r*oo.dt/_N.sqrt(twpi*q2r)) * f_exp_px  #  a function of x
+                    s = -(l0r*oo.dt/_N.sqrt(twpi*q2r)) * f_exp_px  #  a function of x
                     #if (iter > ITERS - 40) and (iter % 5 == 0):
                     #    print f_exp_px
                     #    _plt.plot(fxs[0], _N.s)
@@ -512,7 +525,7 @@ class MarkAndRF:
 
                     # function of q2
 
-                    s = -CCC*((l0r*oo.dt)/sqrt_2pi_q2x)*q2_exp_px
+                    s = -((l0r*oo.dt)/sqrt_2pi_q2x)*q2_exp_px
                 else:
                     s = _N.zeros((oo.q2ss, M))
                 #  B' / (a' - 1) = MODE   #keep mode the same after discount
