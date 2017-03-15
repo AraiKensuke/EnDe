@@ -396,7 +396,7 @@ def findsmallclusters(nhmks, slabs, pmdim):
     #_plt.scatter(mks[_N.array(s_smallClstrs), 0], mks[_N.array(s_smallClstrs), 1])
     return smallClstrs, s_smallClstrs
 
-def emMKPOS_sep1A(nhmks, hmks, TR=5, wfNClstrs=[[2, 8], [1, 4]], spNClstrs=[[1, 7], [1, 3]]):
+def emMKPOS_sep1A(nhmks, hmks, TR=5, wfNClstrs=[[2, 8], [1, 4]], spNClstrs=[[1, 7], [1, 2]]):
     #  wfNClstrs   [ non-hash(min, max), hash(min, max)  by waveform clustering
     TR = 2
 
@@ -431,7 +431,6 @@ def emMKPOS_sep1A(nhmks, hmks, TR=5, wfNClstrs=[[2, 8], [1, 4]], spNClstrs=[[1, 
                 inThisClstr = _N.where(bestLab == nc)[0]
                 LiTC        = len(inThisClstr)
 
-                print LiTC
                 if LiTC > 2:   #  at least 2 spikes from this neuron
 
                     pbestLab = _N.ones(LiTC, dtype=_N.int) * -1   #  poslabs
@@ -461,7 +460,7 @@ def emMKPOS_sep1A(nhmks, hmks, TR=5, wfNClstrs=[[2, 8], [1, 4]], spNClstrs=[[1, 
 
     return bestLabs[0], bestLabs[1], startClstrs
 
-def emMKPOS_sep1B(nhmks, hmks, TR=5, wfNClstrs=[[2, 8], [1, 4]], spNClstrs=[[1, 7], [1, 3]]):
+def emMKPOS_sep1B(nhmks, hmks, TR=5, wfNClstrs=[[2, 8], [1, 4]], spNClstrs=[[1, 7], [1, 2]]):
     #  wfNClstrs   [ non-hash(min, max), hash(min, max)  by waveform clustering
     TR = 2
 

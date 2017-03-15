@@ -67,11 +67,11 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
         # len(hashsp)==len(labH)
         # len(unonhash)==len(labS)
         if (len(unonhash) > 0) and (len(hashsp) > 0): 
-            labS, labH, clstrs = emMKPOS_sep1B(_x[unonhash], _x[hashsp])
+            labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], _x[hashsp])
         elif len(unonhash) == 0:
-            labS, labH, clstrs = emMKPOS_sep1B(None, _x[hashsp], TR=5)
+            labS, labH, clstrs = emMKPOS_sep1A(None, _x[hashsp], TR=5)
         else:
-            labS, labH, clstrs = emMKPOS_sep1B(_x[unonhash], None, TR=5)
+            labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], None, TR=5)
         if doSepHash:
             splitclstrs(_x[unonhash], labS)
             posMkCov0(_x[unonhash], labS)
@@ -93,9 +93,9 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
             clstrs[0] = len(_N.unique(labS)) 
             clstrs[1] = len(_N.unique(labH))
 
-            print "----------"
-            print clstrs
-            print "----------"
+            # print "----------"
+            # print clstrs
+            # print "----------"
             # labS [0...#S]   labH [#S...#S+#H]
             
             nzspks = _N.where(labS == -1)[0]
@@ -138,12 +138,17 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
             #_plt.scatter(_x[hashsp[these], 0], _x[hashsp[these], 1], color=cls[i+clstrs[0]])
 
         MF     = clstrs[0] + clstrs[1]   #  includes noise
+
+        print "------------"
+        print clstrs[0]
+        print clstrs[1]
+        print "666&&&&&&&&&"
         if nzclstr:
             ths = _N.where(flatlabels == -1)[0]
             flatlabels[ths] = MF - 1
-            M = int((clstrs[0]-1) * 1.3 + clstrs[1]) + 2   #  20% more clusters
+            M = int((clstrs[0]-1) + clstrs[1]) + 1   #  20% more clusters
         else:
-            M = int(clstrs[0] * 1.3 + clstrs[1]) + 2   #  20% more clusters
+            M = int(clstrs[0] + clstrs[1]) + 1   #  20% more clusters
         print "cluters:  %d" % M
 
     Mwonz     = M if (nzclstr is False) else M-1
@@ -762,11 +767,12 @@ def finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a
                                   (f[m] > oo.xHi+sq25[m]):
                 print "resetting  cluster %(m)d   %(l0).3f  %(f).3f" % {"m" : m, "l0" : (l0[m] / _N.sqrt(twpi*q2[m])), "f" : f[m]}
 
-                _q2_a[m] = 1e-4
-                _q2_B[m] = 1e-3
+                _q2_a[m] = -1
+                _q2_B[m] = 0
                 _f_q2[m] = 4
                 _u_Sg[m] = _N.identity(K)*9
-                _l0_a[m] = 1e-4
+                _l0_a[m] = 0
+                _l0_a[m] = 0
                 freeClstr[m] = True
             else:
                 freeClstr[m] = False

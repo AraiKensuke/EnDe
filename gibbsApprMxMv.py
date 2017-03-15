@@ -341,8 +341,8 @@ class MarkAndRF:
                 
                 try:
                     #  mean is (l0_a_ / l0_B_)
-                    #these = _N.where(l0_a_ > 0)[0]
-                    l0[0:M] = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_))  #  check
+                    atleast1 = _N.where(l0_a_ > 0)[0]
+                    l0[atleast1] = _ss.gamma.rvs(l0_a_[atleast1], scale=(1/l0_B_[atleast1]))  #  check
                 except ValueError:
                     """
                     print l0_B_
@@ -556,6 +556,8 @@ class MarkAndRF:
                         sLLkPr[m] = -(_q2_a[m] + 1)*lq2x - iq2x*_q2_B[m]
 
                 q2_a_, q2_B_ = mltpl_ig_prmsUV(q2xr, sLLkPr.T, s.T, d_q2xr, q2x_m1r, clstsz, iter, mks, t0, xt0t1, gz, l_sts, SL_as, SL_Bs, _q2_a, _q2_B, oo.q2_min, oo.q2_max)
+
+                l0[atleast1] = _ss.gamma.rvs(l0_a_[atleast1], scale=(1/l0_B_[atleast1]))  #  check
                     
                 q2[0:M] = _ss.invgamma.rvs(q2_a_ + 1, scale=q2_B_)  #  check
 
