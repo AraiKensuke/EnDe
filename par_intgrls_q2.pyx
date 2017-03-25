@@ -10,9 +10,12 @@ cdef Py_ssize_t idx, i, n = 100
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cdef double q2_intgrl(double p_fm, double *p_ux, double *p_px, int Nupx, double dSilenceX, double IIQ2) nogil:
+    """
+    integral is a Gaussian (at cluster center, width being sampled) weighted with occupation
+    """
     cdef double dd, tot, hlfIIQ2
 
-    hlfIIQ2 = -0.5*IIQ2
+    hlfIIQ2 = -0.5*IIQ2   #  half inverse q2
     tot = 0.0
 
     for 0 <= n < Nupx:
@@ -59,6 +62,8 @@ def M_times_N_q2_intgrls_raw(double[::1] f, double[::1] ux, double[::1] iiq2xs, 
     cdef double *p_ux  = &ux[0]
     cdef double *p_q2_exp_px = &q2_exp_px[0, 0]
 
+    ##  maybe go several ierations - sample q2_exp_px roughly first.
+    ##                             then 
     with nogil, parallel(num_threads=nthrds):
         for m in prange(M):
             mq2ss = m*q2ss
