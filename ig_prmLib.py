@@ -90,7 +90,7 @@ def ig_prmsUV(sg2s, sLLkPr, s, d_sg2s, sg2s_m1, ITER=1, nSpksM=0, clstr=-1, l0=N
 #  sg2s is the x-axis over which posterior is numerically evaluated
 #  sLLkPr  spiking likelihood + prior
 #  s is the spatial modulation due to silence
-def mltpl_ig_prmsUV(sg2s, sLLkPr, s, d_sg2s, sg2s_m1, clstsz, it, mks, t0, xt0t1, gz, l_sts, SL_as, SL_Bs, _q2_a, _q2_B, q2_min, q2_max, l0=None):
+def mltpl_ig_prmsUV(sg2s, sLLkPr, s, d_sg2s, sg2s_m1, clstsz, it, mks, t0, xt0t1, gz, SL_as, SL_Bs, _q2_a, _q2_B, q2_min, q2_max, l0=None):
     """
     xt0t1    relative coordinates
     mks      absolute coordinates
@@ -106,7 +106,7 @@ def mltpl_ig_prmsUV(sg2s, sLLkPr, s, d_sg2s, sg2s_m1, clstsz, it, mks, t0, xt0t1
 
     p     = _N.array(0.5*(y[0:-1]+y[1:])*d_sg2s)   #  p weighted by bin size
     p     /= _N.sum(p, axis=0)
-
+    
 
     u = _N.sum(sg2s_m1 * p, axis=0)
     vr= _N.sum((sg2s_m1-u)*(sg2s_m1-u) * p, axis=0)
@@ -131,9 +131,17 @@ def mltpl_ig_prmsUV(sg2s, sLLkPr, s, d_sg2s, sg2s_m1, clstsz, it, mks, t0, xt0t1
     modes = B_ / (a_ + 1)
     agt  = _N.where((modes < q2_min) | (modes > q2_max))[0]
     for im in agt:
-        print "iter %(it)d    hit min or max  cluster %(cl)d  %(md).3e   replace with %(lmd).3e" % {"cl" : im, "md" : modes[im], "lmd" : (SL_Bs[im] / (SL_as[im] + 1)), "it" : it}
+        print "iter %(it)d sz %(sz)d   hit min or max  cluster %(cl)d  %(md).3e   replace with %(lmd).3e" % {"cl" : im, "md" : modes[im], "lmd" : (SL_Bs[im] / (SL_as[im] + 1)), "it" : it, "sz" : clstsz[im]}
         a_[im]  = SL_as[im]
         B_[im]  = SL_Bs[im]
+
+        d  = _N.empty((sg2s.shape[0], 4))
+        d[:, 0] = sg2s[:, 0]
+        d[:, 1] = sLLkPr[:, im]
+        d[:, 2] = s[:, im]
+        d[:, 3] = y[:, im]
+        _U.savetxtWCom("y%(m)d" % {"m" : im}, d, com="#  %(a).3e  %(B).3e" % {"a" : a_[im], "B" : B_[im]})
+        
 
     """
     for im in agt:

@@ -313,6 +313,7 @@ class MarkAndRF:
             iiq2r= iiq2.reshape((M, 1))
             iiq2rr= iiq2.reshape((M, 1, 1))
             sLLkPr      = _N.empty((M, oo.q2ss))
+            sLLk_f_Pr      = _N.empty((M, oo.q2ss))
 
             for iter in xrange(ITERS):
                 #tt1 = _tm.time()
@@ -422,14 +423,14 @@ class MarkAndRF:
                 """
 
                 FQ    = _N.sqrt(FQ2)
-                Ur    = U.reshape((M, 1))
+                Ur    = U.reshape((M, 1))  # mean of spikes assigned to clstr
                 FQr   = FQ.reshape((M, 1))
                 FQ2r  = FQ2.reshape((M, 1))
 
                 if use_spc:
                     fxs  = _N.copy(_fxs0)
-                    fxs *= (FQr*120)
-                    fxs -= (FQr*60)
+                    fxs *= (FQr*60)   #  60 
+                    fxs -= (FQr*30)
                     fxs += Ur
 
                     if use_omp:
@@ -607,42 +608,12 @@ class MarkAndRF:
                 l0_a_ = aL + _Dl0_a
                 l0_B_ = BL + _Dl0_B
                 
-                try:   #  if there is no prior, if a cluster 
-                    #  mean is (l0_a_ / l0_B_)
-                    atleast1 = _N.where(l0_a_ > 0)[0]
-                    # if epc > 0:
-                    #     print atleast1
-                    #     print l0_a_[atleast1]
-                    #     print l0_B_[atleast1]   
-                    #     print BL[atleast1]
-                    #     print _Dl0_B[atleast1]
-                    #     print _l0_a  #  many
-                    #     print _l0_B
-
-                    l0[atleast1] = _ss.gamma.rvs(l0_a_[atleast1], scale=(1/l0_B_[atleast1]))  #  check
-                except ValueError:
-                    """
-                    print l0_B_
-                    print _Dl0_B
-                    print BL
-                    print l0_exp_px
-                    print 1/_N.sqrt(twpi*q2[0:M])
-
-                    print pxr
-                    print l0_intgrd
-                    """
-                    _N.savetxt("fxux", (fr - ux)*(fr-ux))
-                    _N.savetxt("fr", fr)
-                    _N.savetxt("iiq2", iiq2)
-                    _N.savetxt("l0_intgrd", l0_intgrd)
-                    raise
-
+                atleast1 = _N.where(l0_a_ > 0)[0]
+                l0 = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_))  #  check
 
                 smp_sp_prms[oo.ky_p_l0, iter] = l0[0:M]
                 smp_sp_hyps[oo.ky_h_l0_a, iter] = l0_a_
                 smp_sp_hyps[oo.ky_h_l0_B, iter] = l0_B_
-
-
                     
                 #  nz clstr.  fixed width
                 if oo.nzclstr:
