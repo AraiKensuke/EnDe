@@ -1,7 +1,11 @@
 import numpy as _N
 from filter import gauKer
 import matplotlib.pyplot as _plt
+import scipy.special as _ssp
 #from scipy.spatial.distance import cdist, euclidean
+
+_GAMMA         = 0
+_INV_GAMMA     = 1
 
 def MAPvalues(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, gk, l_trlsNearMAP):
 
@@ -55,14 +59,47 @@ def MAPvalues2(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, gk, l_trlsNea
                 #fig.add_subplot(1, nprms, ip+1)
 
                 smps  = smp_prms[ip, frm:, m]
-                postMode[epc, col] = _N.mean(smps)
-                #postMode[epc, col] = _N.median(smps)
+                #postMode[epc, col] = _N.mean(smps)
+                postMode[epc, col] = _N.median(smps)
             if l_trlsNearMAP is not None:
                 # trlsNearMAP for each params added to list
                 l_trlsNearMAP.append(trlsNearMAP)  
 
 
+def gam_inv_gam_dist_ML(smps, dist=_GAMMA):
+    """
+    The a, B hyperparameters for gamma or inverse gamma distributions
+    """
+    N = len(smps)
 
+    s_x_ix = _N.sum(smps) if dist == _GAMMA else _N.sum(1./smps)
+    pm_s_logx = _N.sum(_N.log(smps)) 
+    pm_s_logx *= 1 if dist == _GAMMA else -1
+
+    mn  = _N.mean(smps)
+    vr  = _N.std(smps)**2
+    BBP = (mn / vr) if dist == _GAMMA else mn*(1 + (mn*mn)/vr)
+
+    Bx  = _N.linspace(BBP/50, BBP*50, 1000)
+    yx  = _N.empty(1000)
+    iB  = -1
+    for B in Bx:
+        iB += 1
+        P0 = _ssp.digamma(B/N * s_x_ix)
+        yx[iB] = N*(_N.log(B) - P0) + pm_s_logx
+
+    lst = _N.where((yx[:-1] >= 0) & (yx[1:] <= 0))[0]
+    if len(lst) > 0:
+        ib4 = lst[0]
+        #  decreasing
+        mslp  = (yx[ib4+1] - yx[ib4]) 
+        rd    = (0-yx[ib4])  / mslp
+
+        Bml = Bx[ib4] + rd*(Bx[ib4+1]-Bx[ib4])
+        aml = (Bml/N)*s_x_ix   #  sum xi / N  = B/a
+        return aml, Bml
+    else:
+        return None, None
 
 """
 smps  = _ss.invgamma.rvs(a, scale=B, size=N)

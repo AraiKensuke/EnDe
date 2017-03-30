@@ -1,6 +1,6 @@
 import numpy as _N
 from fitutil import  emMKPOS_sep1A, emMKPOS_sep1B, sepHash, colorclusters, findsmallclusters, splitclstrs, posMkCov0, contiguous_pack2
-from posteriorUtil import MAPvalues2
+from posteriorUtil import MAPvalues2, gam_inv_gam_dist_ML
 import clrs 
 from filter import gauKer
 import time as _tm
@@ -562,12 +562,34 @@ def finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a
     f[0:M]          = oo.sp_prmPstMd[epc, oo.ky_p_f::3]
     q2[0:M]         = oo.sp_prmPstMd[epc, oo.ky_p_q2::3]
     MAPvalues2(epc, smp_sp_hyps, oo.sp_hypPstMd, frm, ITERS, M, 6, occ, gkMAP, None)
-    _f_u[:]       = oo.sp_hypPstMd[epc, oo.ky_h_f_u::6]
-    _f_q2[:]      = oo.sp_hypPstMd[epc, oo.ky_h_f_q2::6]
-    _q2_a[:]      = oo.sp_hypPstMd[epc, oo.ky_h_q2_a::6]
-    _q2_B[:]      = oo.sp_hypPstMd[epc, oo.ky_h_q2_B::6]
-    _l0_a[:]      = oo.sp_hypPstMd[epc, oo.ky_h_l0_a::6]
-    _l0_B[:]      = oo.sp_hypPstMd[epc, oo.ky_h_l0_B::6]
+
+    _f_u[:]      = _N.mean(smp_sp_prms[1, frm:], axis=0)
+    _f_q2[:]     = _N.std(smp_sp_prms[1, frm:], axis=0)**2
+
+    mn_l0   = _N.mean(smp_sp_prms[0, frm:], axis=0)
+    vr_l0   = _N.std(smp_sp_prms[0, frm:], axis=0)**2
+    _l0_a[:]   = (mn_l0*mn_l0)/vr_l0
+    _l0_B[:]   = mn_l0/vr_l0
+
+    mn_q2   = _N.mean(smp_sp_prms[2, frm:], axis=0)
+    vr_q2   = _N.std(smp_sp_prms[2, frm:], axis=0)**2
+    _q2_a[:]   = 2 + (mn_q2*mn_q2)/vr_q2
+    _q2_B[:]   = mn_q2*(1 + (mn_q2*mn_q2)/vr_q2)
+
+    for m in xrange(M):
+        print "cls %d hyperparams" % m
+        print "f   %(mn).3f  %(sd).3f" % {"mn" : _f_u[m], "sd" : _f_q2[m]}
+        print "q2  %(a).3f  %(b).3f" % {"a" : _q2_a[m], "b" : _q2_B[m]}
+        print "l0  %(a).3f  %(b).3f" % {"a" : _l0_a[m], "b" : _l0_B[m]}
+
+        
+    # _f_u[:]       = oo.sp_hypPstMd[epc, oo.ky_h_f_u::6]
+    # _f_q2[:]      = oo.sp_hypPstMd[epc, oo.ky_h_f_q2::6]
+    # _q2_a[:]      = oo.sp_hypPstMd[epc, oo.ky_h_q2_a::6]
+    # _q2_B[:]      = oo.sp_hypPstMd[epc, oo.ky_h_q2_B::6]
+    # _l0_a[:]      = oo.sp_hypPstMd[epc, oo.ky_h_l0_a::6]
+    # _l0_B[:]      = oo.sp_hypPstMd[epc, oo.ky_h_l0_B::6]
+
 
     #pcklme["cp%d" % epc] = _N.array(smp_sp_prms)
     #trlsNearMAP = _N.array(list(set(trlsNearMAP_D)))+frm   #  use these trials to pick out posterior params for MARK part
@@ -590,9 +612,9 @@ def finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a
     ##  params and hyper parms for mark
 
     for m in xrange(M):
-        MAPtrls = l_trlsNearMAP[m]
-        if len(MAPtrls) == 0:  #  none of them.  causes nan in mean
-            MAPtrls = _N.arange(frm, ITERS, 10)
+        #MAPtrls = l_trlsNearMAP[m]
+        #if len(MAPtrls) == 0:  #  none of them.  causes nan in mean
+        MAPtrls = _N.arange(frm, ITERS, 10)
         #print MAPtrls
         u[m] = _N.median(smp_mk_prms[0][:, frm:, m], axis=1)
 
@@ -639,20 +661,10 @@ def finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a
             #  nothing about the mark distribution.  That is why f, q2
             #  are updated when there are no spikes, but u and Sg are not.
 
-            if q2[m] < 0:
-                print "????????????????"
-                print q2
-                print "q2[%(m)d] = %(q2).3f" % {"m" : m, "q2" : q2[m]}
-                print smp_sp_prms[0, :, m]
-                print smp_sp_prms[1, :, m]
-                print smp_sp_prms[2, :, m]
-                print smp_sp_hyps[4, :, m]
-                print smp_sp_hyps[5, :, m]
             if ((occ[m] < minAss) and (l0[m] / _N.sqrt(twpi*q2[m]) < 1)) or \
                                   (f[m] < oo.xLo-sq25[m]) or \
                                   (f[m] > oo.xHi+sq25[m]):
                 print "resetting  cluster %(m)d   %(l0).3f  %(f).3f" % {"m" : m, "l0" : (l0[m] / _N.sqrt(twpi*q2[m])), "f" : f[m]}
-
                 _q2_a[m] = 0.1
                 _q2_B[m] = 1e-4
                 _f_q2[m] = 16.
@@ -675,9 +687,9 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
     #  finish epoch doesn't deal with noise cluster
     tt2 = _tm.time()
 
-    gkMAP    = gauKer(2)
-    frm   = int(0.7*ITERS)  #  have to test for stationarity
+    frm   = 1000  #  have to test for stationarity
 
+    ##  
     if nSpks > 0:
         #  ITERS x nSpks x M   
         occ   = _N.mean(_N.mean(gz[frm:ITERS-1], axis=0), axis=0)
@@ -688,19 +700,33 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
     oo.smp_mk_prms = smp_mk_prms
 
     l_trlsNearMAP = []
-    MAPvalues2(epc, smp_sp_prms, oo.sp_prmPstMd, frm, ITERS, M, 3, occ, gkMAP, l_trlsNearMAP)
-    l0[0:M]         = oo.sp_prmPstMd[epc, oo.ky_p_l0::3]
-    f[0:M]          = oo.sp_prmPstMd[epc, oo.ky_p_f::3]
-    q2[0:M]         = oo.sp_prmPstMd[epc, oo.ky_p_q2::3]
-
-    for m in xrange(M):
+    
+    skp = 2
+    #  marginal posteriors of the spatial and cluster params
+    for m in xrange(oo.M):
+        f_smps    = smp_sp_prms[1, frm::evry, skp]
+        f_u_[m]      = _N.mean(f_smps)
+        f_s_[m]     = _N.std(f_smps)**2
+        #  hyper params to be copied to _f_u, _f_s
+        oo.sp_prmPstMd[epc, oo.ky_p_f, m] = f_u_
         
-        _f_u[:]       = oo.sp_hypPstMd[epc, oo.ky_h_f_u::6]
-        _f_q2[:]      = oo.sp_hypPstMd[epc, oo.ky_h_f_q2::6]
-        _q2_a[:]      = oo.sp_hypPstMd[epc, oo.ky_h_q2_a::6]
-        _q2_B[:]      = oo.sp_hypPstMd[epc, oo.ky_h_q2_B::6]
-        _l0_a[:]      = oo.sp_hypPstMd[epc, oo.ky_h_l0_a::6]
-        _l0_B[:]      = oo.sp_hypPstMd[epc, oo.ky_h_l0_B::6]
+        ##########################
+        l0_a_[m], l0_B_[m] = _pu.gam_inv_gam_dist_ML(smp_sp_prms[0, frm::evry, skp], dist=_pU.GAMMA)
+        oo.sp_prmPstMd[epc, oo.ky_p_l0, m] = (l0_a_[m] - 1) / l0_B_[m]
+
+        ##########################
+        q2_a_[m], q2_B_[m] = _pu.gam_inv_gam_dist_ML(smp_sp_prms[2, frm::evry, skp], dist=_pU.INV_GAMMA)
+        oo.sp_prmPstMd[epc, oo.ky_p_q2, m] = q2_B_[m] / (q2_a_[m] + 1) 
+
+    _f_u[:]       = f_u_[:];     _f_q2[:]      = f_q2_[:]
+    _q2_a[:]      = q2_a_[:];    _q2_B[:]      = q2_B_[:]
+    _l0_a[:]      = l0_a_[:];    _l0_B[:]      = l0_B_[:]
+
+    #  go through each cluster, find the iters that are 
+
+    #for
+    MAPvalues2(epc, smp_sp_hyps, oo.sp_hypPstMd, frm, ITERS, M, 6, occ, gkMAP, None)
+
 
     #pcklme["cp%d" % epc] = _N.array(smp_sp_prms)
     #trlsNearMAP = _N.array(list(set(trlsNearMAP_D)))+frm   #  use these trials to pick out posterior params for MARK part
@@ -722,12 +748,9 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
 
     ##  params and hyper parms for mark
 
+    MAPtrls = _N.arange(frm, ITERS, 10)
     for m in xrange(M):
-        MAPtrls = l_trlsNearMAP[m]
-        if len(MAPtrls) == 0:  #  none of them.  causes nan in mean
-            MAPtrls = _N.arange(frm, ITERS, 10)
-        #print MAPtrls
-        u[m] = _N.median(smp_mk_prms[0][:, frm:, m], axis=1)
+        u[m] = _N.mean(smp_mk_prms[0][:, frm:, m], axis=1)
 
         Sg[m] = _N.mean(smp_mk_prms[1][:, :, frm:, m], axis=2)
         oo.mk_prmPstMd[oo.ky_p_u][epc, m] = u[m]
@@ -741,7 +764,6 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
         oo.mk_hypPstMd[oo.ky_h_u_Sg][epc, m]  = _u_Sg[m]
         oo.mk_hypPstMd[oo.ky_h_Sg_nu][epc, m] = _Sg_nu[m]
         oo.mk_hypPstMd[oo.ky_h_Sg_PSI][epc, m]= _Sg_PSI[m]
-        #print _u_Sg[m]
 
     u[0:M]         = oo.mk_prmPstMd[oo.ky_p_u][epc]
     Sg[0:M]        = oo.mk_prmPstMd[oo.ky_p_Sg][epc]
@@ -770,28 +792,16 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
             #  nothing about the mark distribution.  That is why f, q2
             #  are updated when there are no spikes, but u and Sg are not.
 
-            if q2[m] < 0:
-                print "????????????????"
-                print q2
-                print "q2[%(m)d] = %(q2).3f" % {"m" : m, "q2" : q2[m]}
-                print smp_sp_prms[0, :, m]
-                print smp_sp_prms[1, :, m]
-                print smp_sp_prms[2, :, m]
-                print smp_sp_hyps[4, :, m]
-                print smp_sp_hyps[5, :, m]
             if ((occ[m] < minAss) and (l0[m] / _N.sqrt(twpi*q2[m]) < 1)) or \
                                   (f[m] < oo.xLo-sq25[m]) or \
                                   (f[m] > oo.xHi+sq25[m]):
                 print "resetting  cluster %(m)d   %(l0).3f  %(f).3f" % {"m" : m, "l0" : (l0[m] / _N.sqrt(twpi*q2[m])), "f" : f[m]}
-
-                """
                 _q2_a[m] = -1
                 _q2_B[m] = 0
                 _f_q2[m] = 4
                 _u_Sg[m] = _N.identity(K)*9
                 _l0_a[m] = 0
                 _l0_a[m] = 0
-                """
                 freeClstr[m] = True
             else:
                 freeClstr[m] = False

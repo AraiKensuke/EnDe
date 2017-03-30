@@ -38,7 +38,7 @@ class MarkAndRF:
 
     #  sizes of arrays
     Nupx = 200      #   # points to sample position with  (uniform lam(x)p(x))
-    fss = 60       #  sampling at various values of f
+    fss = 200       #  sampling at various values of f
     q2ss = 150      #  sampling at various values of q2
 
     intvs = None    #  
@@ -313,7 +313,7 @@ class MarkAndRF:
             iiq2r= iiq2.reshape((M, 1))
             iiq2rr= iiq2.reshape((M, 1, 1))
             sLLkPr      = _N.empty((M, oo.q2ss))
-            sLLk_f_Pr      = _N.empty((M, oo.q2ss))
+            sLLk_f_Pr      = _N.empty((M, oo.fss))
 
             for iter in xrange(ITERS):
                 #tt1 = _tm.time()
@@ -429,9 +429,11 @@ class MarkAndRF:
 
                 if use_spc:
                     fxs  = _N.copy(_fxs0)
-                    fxs *= (FQr*60)   #  60 
-                    fxs -= (FQr*30)
+                    fxs *= (FQr*80)   #  40   0.1  
+                    fxs -= (FQr*40)
                     fxs += Ur
+                    d_fxsr = _N.diff(fxs, axis=1)
+                    fxsr     = fxs.reshape((M, oo.fss, 1))
 
                     if use_omp:
                         M_times_N_f_intgrls_raw(fxs, ux, iiq2, dSilenceX, px, f_exp_px, M, oo.fss, oo.Nupx, oo.nThrds)
@@ -454,24 +456,28 @@ class MarkAndRF:
 
                 #  U, FQ2 is   dim(M)   
                 #  fxs is M x fss
-                funcf   = -0.5*((fxs-Ur)*(fxs-Ur))/FQ2r + s
-                maxes   = _N.max(funcf, axis=1)   
-                maxesr  = maxes.reshape((M, 1))
-                funcf   -= maxesr
-                condPosF= _N.exp(funcf)   #  condPosF is M x fss
-                ttB = _tm.time()
+                sLLk_f_pr = -0.5*((fxs-Ur)*(fxs-Ur))/FQ2r
+                # funcf   =  + s
+                # maxes   = _N.max(funcf, axis=1)   
+                # maxesr  = maxes.reshape((M, 1))
+                # funcf   -= maxesr
+                # condPosF= _N.exp(funcf)   #  condPosF is M x fss
+                # ttB = _tm.time()
 
                 #  fxs   M x fss
                 #  fxs            M x fss
                 #  condPosF       M x fss
-                norm    = 1./_N.sum(condPosF, axis=1)  #  sz M
-                f_u_    = norm*_N.sum(fxs*condPosF, axis=1)  #  sz M
-                f_u_r   = f_u_.reshape((M, 1))
-                f_q2_   = norm*_N.sum(condPosF*(fxs-f_u_r)*(fxs-f_u_r), axis=1)
-                f[0:M]       = _N.sqrt(f_q2_)*_N.random.randn() + f_u_
+                # norm    = 1./_N.sum(condPosF, axis=1)  #  sz M
+                # f_u_    = norm*_N.sum(fxs*condPosF, axis=1)  #  sz M
+                # f_u_r   = f_u_.reshape((M, 1))
+                # f_q2_   = norm*_N.sum(condPosF*(fxs-f_u_r)*(fxs-f_u_r), axis=1)
+                # f[0:M]       = _N.sqrt(f_q2_)*_N.random.randn() + f_u_
+
+                f[0:M] = _pcs.smp_from_cdf_interp_ind_x(fxsr, sLLk_f_pr.T, s.T, d_fxsr, None)
+
                 smp_sp_prms[oo.ky_p_f, iter] = f[0:M]
-                smp_sp_hyps[oo.ky_h_f_u, iter] = f_u_
-                smp_sp_hyps[oo.ky_h_f_q2, iter] = f_q2_
+                #smp_sp_hyps[oo.ky_h_f_u, iter] = f_u_
+                #smp_sp_hyps[oo.ky_h_f_q2, iter] = f_q2_
 
                 #tt5 = _tm.time()
                 ##############
@@ -550,7 +556,8 @@ class MarkAndRF:
                         SL_as[m] = SL_a
                         #  spiking prior x prior
                         #sLLkPr[m] = -(SL_a + 1)*lq2x - iq2x*SL_B
-                        sLLkPr[m] = -(_q2_a[m] + SL_a + 2)*lq2x - iq2x*(_q2_B[m] + SL_B)
+                        #sLLkPr[m] = -(_q2_a[m] + SL_a + 2)*lq2x - iq2x*(_q2_B[m] + SL_B)
+                        sLLkPr[m] = -(_q2_a[m] + SL_a - 1)*lq2x - iq2x*(_q2_B[m] + SL_B)
                     else:
                         sLLkPr[m] = -(_q2_a[m] + 1)*lq2x - iq2x*_q2_B[m]
 
@@ -604,11 +611,10 @@ class MarkAndRF:
                     _Dl0_a = _l0_a
                     _Dl0_B = _l0_B
 
-                aL  = clstsz
-                l0_a_ = aL + _Dl0_a
+                aL  = clstsz + 1
+                l0_a_ = aL + _Dl0_a - 1   #  if no prior, l0_a_ = aL
                 l0_B_ = BL + _Dl0_B
                 
-                atleast1 = _N.where(l0_a_ > 0)[0]
                 l0 = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_))  #  check
 
                 smp_sp_prms[oo.ky_p_l0, iter] = l0[0:M]
@@ -621,7 +627,7 @@ class MarkAndRF:
                     BL  = (oo.dt/_N.sqrt(twpi*q2[Mwowonz-1]))*nz_l0_exp_px
 
                     minds = len(_N.where(gz[iter, :, Mwowonz-1] == 1)[0])
-                    l0_a_ = minds + _nz_l0_a
+                    l0_a_ = minds + 1 + _nz_l0_a - 1
                     l0_B_ = BL    + _nz_l0_B
 
                     l0[Mwowonz-1]  = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_)) 
@@ -632,18 +638,21 @@ class MarkAndRF:
             ttB = _tm.time()
             print (ttB-ttA)
 
-            gAMxMu.finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_hyps, smp_sp_prms, smp_mk_hyps, smp_mk_prms, freeClstr, M, K)
+            gAMxMu.finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_hyps, smp_sp_prms, smp_mk_hyps, smp_mk_prms, freeClstr, M, K)
             #  MAP of nzclstr
             if oo.nzclstr:
-                frm = int(0.7*ITERS)
+                frm = 1000
                 _nz_l0_a              = _N.median(smp_nz_hyps[0, frm:])
                 _nz_l0_B              = _N.median(smp_nz_hyps[1, frm:])
-            pcklme["smp_sp_hyps"] = smp_sp_hyps
+            #  SAMPLED parameters and hyps
+            pcklme["smp_sp_hyps"] = smp_sp_hyps  # 
             pcklme["smp_mk_hyps"] = smp_mk_hyps
             pcklme["smp_sp_prms"] = smp_sp_prms
             pcklme["smp_mk_prms"] = smp_mk_prms
+            #  MODE values - point estimates for params for decode
             pcklme["sp_prmPstMd"] = oo.sp_prmPstMd
             pcklme["mk_prmPstMd"] = oo.mk_prmPstMd
+            #  _u_u etc etc.  are passed directly to finish_epoch()
             pcklme["intvs"]       = oo.intvs
             pcklme["occ"]         = gz
             pcklme["nz_pth"]         = nz_pth
