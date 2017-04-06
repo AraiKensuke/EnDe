@@ -169,7 +169,7 @@ def declare_params(M, K, uAll=None, SgAll=None):
     Sg      = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*0.1
     return l0, f, q2, u, Sg
 
-def declare_prior_hyp_params(M, MF, K, x, mks, Asts, t0):
+def declare_prior_hyp_params(M, MF, K, x, mks, Asts, t0, priors, labS, labH):
     #  PRIORS.  These get updated after each EPOCH
     #  priors  prefixed w/ _
     _f_u    = _N.zeros(M);    _f_q2  = _N.ones(M)*16 #  wide
@@ -245,7 +245,7 @@ def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, 
     oo.mk_prmPstMd[oo.ky_p_u][0] = u[0:M]
     oo.mk_prmPstMd[oo.ky_p_Sg][0] = Sg[0:M]
 
-def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, cmp2Existing, nthrds=1):
+def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, cmp2Existing, nthrds=1):
     #  Msc   Msc signal clusters
     #  M     all clusters, including nz clstr.  M == Msc when not using nzclstr
     #  Gibbs sampling
@@ -318,10 +318,10 @@ def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _
 
         #print "spikes not hash"
          #print abvthrInds
-        abvthrEachCh = u[0:Msc] > hashthresh  #  M x K  (M includes noise)
+        abvthrEachCh = u > hashthresh  #  M x K  (M includes noise)
         abvthrAtLeast1Ch = _N.sum(abvthrEachCh, axis=1) > 0
         
-        knownNonHclstrs  = _N.where(abvthrAtLeast1Ch & (freeClstr == False) & (q2[0:Msc] < wdSpc))[0]
+        knownNonHclstrs  = _N.where(abvthrAtLeast1Ch & (freeClstr == False) & (q2 < wdSpc))[0]
         
 
         #print "clusters not hash"
