@@ -15,7 +15,7 @@ import utilities as _U
 twpi = 2*_N.pi
 wdSpc = 1
 
-def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneCluster=False, nzclstr=False):
+def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneCluster=False):
     n0 = 0
     n1 = len(Asts)
 
@@ -138,25 +138,19 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
             #_plt.scatter(_x[hashsp[these], 0], _x[hashsp[these], 1], color=cls[i+clstrs[0]])
 
         MF     = clstrs[0] + clstrs[1]   #  includes noise
-        if nzclstr:
-            ths = _N.where(flatlabels == -1)[0]
-            flatlabels[ths] = MF - 1
-            M = int((clstrs[0]-1) * 1.3 + clstrs[1]) + 2   #  20% more clusters
-        else:
-            M = int(clstrs[0] * 1.3 + clstrs[1]) + 2   #  20% more clusters
+        M = int(clstrs[0] * 1.3 + clstrs[1]) + 2   #  20% more clusters
         print "cluters:  %d" % M
 
-    Mwonz     = M if (nzclstr is False) else M-1
     #####  MODES  - find from the sampling
-    oo.sp_prmPstMd = _N.zeros((oo.epochs, 3*Mwonz))   # mode of params
-    oo.sp_hypPstMd  = _N.zeros((oo.epochs, (2+2+2)*Mwonz)) # hyperparam
-    oo.mk_prmPstMd = [_N.zeros((oo.epochs, Mwonz, K)),
-                      _N.zeros((oo.epochs, Mwonz, K, K))]
+    oo.sp_prmPstMd = _N.zeros((oo.epochs, 3*M))   # mode of params
+    oo.sp_hypPstMd  = _N.zeros((oo.epochs, (2+2+2)*M)) # hyperparam
+    oo.mk_prmPstMd = [_N.zeros((oo.epochs, M, K)),
+                      _N.zeros((oo.epochs, M, K, K))]
                       # mode of params
-    oo.mk_hypPstMd  = [_N.zeros((oo.epochs, Mwonz, K)),
-                       _N.zeros((oo.epochs, Mwonz, K, K)), # hyperparam
-                       _N.zeros((oo.epochs, Mwonz, 1)), # hyperparam
-                       _N.zeros((oo.epochs, Mwonz, K, K))]
+    oo.mk_hypPstMd  = [_N.zeros((oo.epochs, M, K)),
+                       _N.zeros((oo.epochs, M, K, K)), # hyperparam
+                       _N.zeros((oo.epochs, M, 1)), # hyperparam
+                       _N.zeros((oo.epochs, M, K, K))]
 
     print labS
     print labH
@@ -164,11 +158,10 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
     ##################
 
     # flatlabels + lab = same content, but flatlabels are temporally correct
-    return labS, labH, flatlabels, Mwonz, MF, hashthresh, clstrs
+    return labS, labH, flatlabels, M, MF, hashthresh, clstrs
 
-def declare_params(_M, K, nzclstr=False, uAll=None, SgAll=None):
+def declare_params(M, K, uAll=None, SgAll=None):
     ######################################  INITIAL VALUE OF PARAMS
-    M        = _M if not nzclstr else _M + 1   #  l0, q2, f, u, Sg include nzcl
     l0       = _N.array([11.,]*M)
     q2       = _N.array([0.04]*M)
     f        = _N.empty(M)
@@ -217,7 +210,7 @@ def declare_prior_hyp_params(M, MF, K, x, mks, Asts, t0):
 
     return _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI
 
-def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, Asts, t0, x, mks, flatlabels, nHSclusters, nzclstr=False, signalClusters=None):
+def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, Asts, t0, x, mks, flatlabels, nHSclusters, signalClusters=None):
     """
     M is # of clusters excluding noize
     """
@@ -245,29 +238,6 @@ def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, 
         q2[im] = 100
         Sg[im] = _N.identity(K)*20
         l0[im] = 100
-
-    if nzclstr:   # the nzclstr has no hyperparams
-        print "using the noise cluster"
-        #  l0 / sqrt(2*pi*50**2)
-        print "M   ''''''''''''    %d" % M
-        l0[M] = 1000000.   #  ~ 0.1Hz    #  1000/sqrt(2*pi*300**2)  #  seems better to start high here
-        q2[M] = 500**2
-        if signalClusters is not None:
-            Sg[M] = _N.cov(mks[Asts[signalClusters]], rowvar=0) * 20
-            u[M]  = _N.mean(mks[Asts[signalClusters]], axis=0)
-        else:
-            sd  = _N.sort(mks[Asts], axis=0)    #  first index is tetrode
-            mins= _N.min(sd, axis=0);     maxs= _N.max(sd, axis=0)
-            Wdth= sd[-1] - sd[0]
-            ctr = sd[0] + 0.5*(sd[-1] - sd[0])
-            u[M]    = ctr
-
-            _N.fill_diagonal(Sg[M], (5*Wdth)**2)
-            #Sg[M] = _N.cov(mks[Asts], rowvar=0)*10000
-            #u[M]  = _N.mean(mks[Asts], axis=0)
-
-            print Sg[M]
-        f[M]  = 0
 
     oo.sp_prmPstMd[0, oo.ky_p_l0::3] = l0[0:M]
     oo.sp_prmPstMd[0, oo.ky_p_f::3] = f[0:M]
@@ -619,7 +589,7 @@ def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _
     gz[it] = (M1&M2).T
 
     if cmp2Existing:
-        #  gz   is ITERS x N x Mwowonz   (N # of spikes in epoch)
+        #  gz   is ITERS x N x M   (N # of spikes in epoch)
         gz[it, newNonHashSpks] = False   #  not a member of any of them
         gz[it, newNonHashSpks, newNonHashSpksMemClstr] = True
 
