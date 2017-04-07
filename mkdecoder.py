@@ -261,7 +261,7 @@ class mkdecoder:
                     fig = _plt.figure()
                     _plt.plot(oo.Lklhd[tet, t])
 
-            assert A > 0, "die"
+            assert A > 0, "A   %.4f" % A
 
             oo.pX_Nm[t] /= A
             #tt4 = _tm.time()

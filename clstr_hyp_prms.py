@@ -17,3 +17,7 @@ class priors:
 
     _u_Sg   = None
     _u_u    = None
+
+    _Sg_nu   = None
+    _Sg_PSI    = None
+

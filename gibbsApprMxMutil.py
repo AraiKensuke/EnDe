@@ -11,11 +11,12 @@ import hc_bcast as _hcb
 import scipy.stats as _ss
 import openTets as _oT
 import utilities as _U
+import posteriorUtil as _pU
 
 twpi = 2*_N.pi
 wdSpc = 1
 
-def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneCluster=False, nzclstr=False):
+def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneCluster=False):
     n0 = 0
     n1 = len(Asts)
 
@@ -81,14 +82,14 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
 
             print smallClstrID
             _N.savetxt("labSb4", labS, fmt="%d")
-            for nid in smallClstrID:
-                ths = _N.where(labS == nid)[0]
-                labS[ths] = -1#clstrs[0]+clstrs[1]-1  # -1 first for easy cpack2
+            # for nid in smallClstrID:
+            #     ths = _N.where(labS == nid)[0]
+            #     labS[ths] = -1#clstrs[0]+clstrs[1]-1  # -1 first for easy cpack2
             _N.savetxt("labS", labS, fmt="%d")
 
             # 0...clstrs[0]-1     clstrs[0]...clstrs[0]+clstrs[1]-1  (no nz)
             # 0...clstrs[0]-2     clstrs[0]-1...clstrs[0]+clstrs[1]-2  (no nz)
-            contiguous_pack2(labS, startAt=-1)
+            contiguous_pack2(labS, startAt=0)
 
             clstrs[0] = len(_N.unique(labS)) 
             clstrs[1] = len(_N.unique(labH))
@@ -98,20 +99,20 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
             # print "----------"
             # labS [0...#S]   labH [#S...#S+#H]
             
-            nzspks = _N.where(labS == -1)[0]
-            labS[nzspks] = clstrs[0]+clstrs[1]-1   #  highest ID
+            #nzspks = _N.where(labS == -1)[0]
+            #labS[nzspks] = clstrs[0]+clstrs[1]-1   #  highest ID
 
-            contiguous_pack2(labH, startAt=(clstrs[0]-1))
+            contiguous_pack2(labH, startAt=(clstrs[0]))
             _N.savetxt("labH", labH, fmt="%d")
             _N.savetxt("labS", labS, fmt="%d")
 
             #contiguous_pack2(labH, startAt=(_N.max(labS)+1))
 
-            nonnz = _N.where(labS < clstrs[0]-1)[0]
-            nz    = _N.where(labS == clstrs[0]+clstrs[1]-1)[0]
-            _plt.scatter(_x[hashsp, 0], _x[hashsp, 1], color="black")
-            _plt.scatter(_x[unonhash[nonnz], 0], _x[unonhash[nonnz], 1], color="blue")
-            _plt.scatter(_x[unonhash[nz], 0], _x[unonhash[nz], 1], color="red")
+            #nonnz = _N.where(labS < clstrs[0]-1)[0]
+            #nz    = _N.where(labS == clstrs[0]+clstrs[1]-1)[0]
+            # _plt.scatter(_x[hashsp, 0], _x[hashsp, 1], color="black")
+            # _plt.scatter(_x[unonhash[nonnz], 0], _x[unonhash[nonnz], 1], color="blue")
+            # _plt.scatter(_x[unonhash[nz], 0], _x[unonhash[nz], 1], color="red")
 
             #colorclusters(_x[hashsp], labH, clstrs[1], name="hash", xLo=xLo, xHi=xHi)
             #colorclusters(_x[unonhash], labS, clstrs[0], name="nhash", xLo=xLo, xHi=xHi)
@@ -139,29 +140,29 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
 
         MF     = clstrs[0] + clstrs[1]   #  includes noise
 
+
+        MS = int(clstrs[0] * 1.2)
+        MS = clstrs[0] + 2 if (MS == clstrs[0]) else MS
+        M = int(MS + clstrs[1])   #  20% more clusters
+
         print "------------"
         print clstrs[0]
         print clstrs[1]
         print "666&&&&&&&&&"
-        if nzclstr:
-            ths = _N.where(flatlabels == -1)[0]
-            flatlabels[ths] = MF - 1
-            M = int((clstrs[0]-1) + clstrs[1]) + 1   #  20% more clusters
-        else:
-            M = int(clstrs[0] + clstrs[1]) + 1   #  20% more clusters
+
+        #M = int(clstrs[0] + clstrs[1]) + 1   #  20% more clusters
         print "cluters:  %d" % M
 
-    Mwonz     = M if (nzclstr is False) else M-1
     #####  MODES  - find from the sampling
-    oo.sp_prmPstMd = _N.zeros((oo.epochs, 3*Mwonz))   # mode of params
-    oo.sp_hypPstMd  = _N.zeros((oo.epochs, (2+2+2)*Mwonz)) # hyperparam
-    oo.mk_prmPstMd = [_N.zeros((oo.epochs, Mwonz, K)),
-                      _N.zeros((oo.epochs, Mwonz, K, K))]
+    oo.sp_prmPstMd = _N.zeros((oo.epochs, 3*M))   # mode of params
+    oo.sp_hypPstMd  = _N.zeros((oo.epochs, (2+2+2)*M)) # hyperparam
+    oo.mk_prmPstMd = [_N.zeros((oo.epochs, M, K)),
+                      _N.zeros((oo.epochs, M, K, K))]
                       # mode of params
-    oo.mk_hypPstMd  = [_N.zeros((oo.epochs, Mwonz, K)),
-                       _N.zeros((oo.epochs, Mwonz, K, K)), # hyperparam
-                       _N.zeros((oo.epochs, Mwonz, 1)), # hyperparam
-                       _N.zeros((oo.epochs, Mwonz, K, K))]
+    oo.mk_hypPstMd  = [_N.zeros((oo.epochs, M, K)),
+                       _N.zeros((oo.epochs, M, K, K)), # hyperparam
+                       _N.zeros((oo.epochs, M, 1)), # hyperparam
+                       _N.zeros((oo.epochs, M, K, K))]
 
     print labS
     print labH
@@ -169,11 +170,10 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
     ##################
 
     # flatlabels + lab = same content, but flatlabels are temporally correct
-    return labS, labH, flatlabels, Mwonz, MF, hashthresh, clstrs
+    return labS, labH, flatlabels, M, MF, hashthresh, clstrs
 
-def declare_params(_M, K, nzclstr=False, uAll=None, SgAll=None):
+def declare_params(M, K, uAll=None, SgAll=None):
     ######################################  INITIAL VALUE OF PARAMS
-    M        = _M if not nzclstr else _M + 1   #  l0, q2, f, u, Sg include nzcl
     l0       = _N.array([11.,]*M)
     q2       = _N.array([0.04]*M)
     f        = _N.empty(M)
@@ -240,14 +240,18 @@ def declare_prior_hyp_params(M, MF, K, x, mks, Asts, t0, priors, labS, labH):
 
     #_u_Sg   = _N.tile(_N.identity(K), M).T.reshape((M, K, K))  #  this 
     _u_Sg   = _N.tile(allSg, M).T.reshape((M, K, K))  #  this 
+    priors._u_u = _N.array(_u_u[0])
+    priors._u_Sg = _N.array(_u_Sg[0])
     _u_iSg  = _N.linalg.inv(_u_Sg)
     ############
     _Sg_nu  = _N.ones((M, 1))*(K*1.01)
     _Sg_PSI = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*0.05
+    priors._Sg_nu = _Sg_nu[0]
+    priors._Sg_PSI = _N.array(_Sg_PSI[0])
 
     return _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI
 
-def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, Asts, t0, x, mks, flatlabels, nHSclusters, nzclstr=False, signalClusters=None):
+def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, Asts, t0, x, mks, flatlabels, nHSclusters, signalClusters=None):
     """
     M is # of clusters excluding noize
     """
@@ -276,36 +280,13 @@ def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, 
         Sg[im] = _N.identity(K)*20
         l0[im] = 100
 
-    if nzclstr:   # the nzclstr has no hyperparams
-        print "using the noise cluster"
-        #  l0 / sqrt(2*pi*50**2)
-        print "M   ''''''''''''    %d" % M
-        l0[M] = 1000000.   #  ~ 0.1Hz    #  1000/sqrt(2*pi*300**2)  #  seems better to start high here
-        q2[M] = 500**2
-        if signalClusters is not None:
-            Sg[M] = _N.cov(mks[Asts[signalClusters]], rowvar=0) * 20
-            u[M]  = _N.mean(mks[Asts[signalClusters]], axis=0)
-        else:
-            sd  = _N.sort(mks[Asts], axis=0)    #  first index is tetrode
-            mins= _N.min(sd, axis=0);     maxs= _N.max(sd, axis=0)
-            Wdth= sd[-1] - sd[0]
-            ctr = sd[0] + 0.5*(sd[-1] - sd[0])
-            u[M]    = ctr
+    oo.sp_prmPstMd[0, oo.ky_p_l0::3] = l0
+    oo.sp_prmPstMd[0, oo.ky_p_f::3] = f
+    oo.sp_prmPstMd[0, oo.ky_p_q2::3] = q2
+    oo.mk_prmPstMd[oo.ky_p_u][0] = u
+    oo.mk_prmPstMd[oo.ky_p_Sg][0] = Sg
 
-            _N.fill_diagonal(Sg[M], (5*Wdth)**2)
-            #Sg[M] = _N.cov(mks[Asts], rowvar=0)*10000
-            #u[M]  = _N.mean(mks[Asts], axis=0)
-
-            print Sg[M]
-        f[M]  = 0
-
-    oo.sp_prmPstMd[0, oo.ky_p_l0::3] = l0[0:M]
-    oo.sp_prmPstMd[0, oo.ky_p_f::3] = f[0:M]
-    oo.sp_prmPstMd[0, oo.ky_p_q2::3] = q2[0:M]
-    oo.mk_prmPstMd[oo.ky_p_u][0] = u[0:M]
-    oo.mk_prmPstMd[oo.ky_p_Sg][0] = Sg[0:M]
-
-def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, cmp2Existing, nthrds=1):
+def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, cmp2Existing, nthrds=1):
     #  Msc   Msc signal clusters
     #  M     all clusters, including nz clstr.  M == Msc when not using nzclstr
     #  Gibbs sampling
@@ -378,10 +359,10 @@ def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _
 
         #print "spikes not hash"
          #print abvthrInds
-        abvthrEachCh = u[0:Msc] > hashthresh  #  M x K  (M includes noise)
+        abvthrEachCh = u > hashthresh  #  M x K  (M includes noise)
         abvthrAtLeast1Ch = _N.sum(abvthrEachCh, axis=1) > 0
         
-        knownNonHclstrs  = _N.where(abvthrAtLeast1Ch & (freeClstr == False) & (q2[0:Msc] < wdSpc))[0]
+        knownNonHclstrs  = _N.where(abvthrAtLeast1Ch & (freeClstr == False) & (q2 < wdSpc))[0]
         
 
         #print "clusters not hash"
@@ -475,15 +456,15 @@ def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _
                     im = freeClstrs[ii]   # Asts + t0 gives absolute time
                     newNonHashSpksMemClstr[iths] = im
 
-                    _u_u[im]  = _N.mean(mASr[0, ths], axis=0)
-                    u[im]     = _u_u[im]
-                    _f_u[im]  = _N.mean(xASr[0, ths], axis=0)
-                    f[im]     = _f_u[im]
+                    #_u_u[im]  = _N.mean(mASr[0, ths], axis=0)
+                    u[im]     = _N.mean(mASr[0, ths], axis=0)
+                    #_f_u[im]  = _N.mean(xASr[0, ths], axis=0)
+                    f[im]     = _N.mean(xASr[0, ths], axis=0)
                     q2[im]    = _N.std(xASr[0, ths], axis=0)**2 * 9
                     #  l0 = Hz * sqrt(2*_N.pi*q2)
                     l0[im]    =   10*_N.sqrt(q2[im])
                     _f_q2[im] = 1
-                    _u_Sg[im] = _N.cov(mASr[0, ths], rowvar=0)*25
+                    #_u_Sg[im] = _N.cov(mASr[0, ths], rowvar=0)*25
                     print "ep %(ep)d  new   cluster #  %(m)d" % {"ep" : epc, "m" : im}
                     print _u_u[im]
                     print _f_u[im]
@@ -499,10 +480,11 @@ def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _
         else:  #  just one cluster
             im = freeClstrs[0]   # Asts + t0 gives absolute time
 
-            _u_u[im]  = _N.mean(mASr[0, newNonHashSpks[farMKSPinds]], axis=0)
-            _f_u[im]  = _N.mean(xASr[0, newNonHashSpks[farMKSPinds]], axis=0)
-            _u_Sg[im] = _N.cov(mASr[0, newNonHashSpks[farMKSPinds]], rowvar=0)*16
-            _f_q2[im] = _N.std(xASr[0, newNonHashSpks[farMKSPinds]], axis=0)**2 * 16
+
+            #_u_u[im]  = _N.mean(mASr[0, newNonHashSpks[farMKSPinds]], axis=0)
+            #_f_u[im]  = _N.mean(xASr[0, newNonHashSpks[farMKSPinds]], axis=0)
+            #_u_Sg[im] = _N.cov(mASr[0, newNonHashSpks[farMKSPinds]], rowvar=0)*16
+            #_f_q2[im] = _N.std(xASr[0, newNonHashSpks[farMKSPinds]], axis=0)**2 * 16
 
 
     ####  outside cmp2Existing here
@@ -535,7 +517,7 @@ def stochasticAssignment(oo, epc, it, Msc, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _
     gz[it] = (M1&M2).T
 
     if cmp2Existing:
-        #  gz   is ITERS x N x Mwowonz   (N # of spikes in epoch)
+        #  gz   is ITERS x N x M   (N # of spikes in epoch)
         gz[it, newNonHashSpks] = False   #  not a member of any of them
         gz[it, newNonHashSpks, newNonHashSpksMemClstr] = True
 
@@ -544,7 +526,6 @@ def finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a
     #  finish epoch doesn't deal with noise cluster
     tt2 = _tm.time()
 
-    gkMAP    = gauKer(2)
     frm   = int(0.7*ITERS)  #  have to test for stationarity
 
     if nSpks > 0:
@@ -557,11 +538,12 @@ def finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a
     oo.smp_mk_prms = smp_mk_prms
 
     l_trlsNearMAP = []
-    MAPvalues2(epc, smp_sp_prms, oo.sp_prmPstMd, frm, ITERS, M, 3, occ, gkMAP, l_trlsNearMAP)
-    l0[0:M]         = oo.sp_prmPstMd[epc, oo.ky_p_l0::3]
-    f[0:M]          = oo.sp_prmPstMd[epc, oo.ky_p_f::3]
-    q2[0:M]         = oo.sp_prmPstMd[epc, oo.ky_p_q2::3]
-    MAPvalues2(epc, smp_sp_hyps, oo.sp_hypPstMd, frm, ITERS, M, 6, occ, gkMAP, None)
+
+    MAPvalues2(epc, smp_sp_prms, oo.sp_prmPstMd, frm, ITERS, M, 3, occ, l_trlsNearMAP)
+    l0         = oo.sp_prmPstMd[epc, oo.ky_p_l0::3]
+    f          = oo.sp_prmPstMd[epc, oo.ky_p_f::3]
+    q2         = oo.sp_prmPstMd[epc, oo.ky_p_q2::3]
+    MAPvalues2(epc, smp_sp_hyps, oo.sp_hypPstMd, frm, ITERS, M, 6, occ, None)
 
     _f_u[:]      = _N.mean(smp_sp_prms[1, frm:], axis=0)
     _f_q2[:]     = _N.std(smp_sp_prms[1, frm:], axis=0)**2
@@ -632,8 +614,8 @@ def finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a
         oo.mk_hypPstMd[oo.ky_h_Sg_PSI][epc, m]= _Sg_PSI[m]
         #print _u_Sg[m]
 
-    u[0:M]         = oo.mk_prmPstMd[oo.ky_p_u][epc]
-    Sg[0:M]        = oo.mk_prmPstMd[oo.ky_p_Sg][epc]
+    u         = oo.mk_prmPstMd[oo.ky_p_u][epc]
+    Sg        = oo.mk_prmPstMd[oo.ky_p_Sg][epc]
 
     ###  hack here.  If we don't reset the prior for 
     ###  what happens when a cluster is unused?
@@ -668,6 +650,7 @@ def finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a
                 _q2_a[m] = 0.1
                 _q2_B[m] = 1e-4
                 _f_q2[m] = 16.
+
                 _u_Sg[m] = _N.identity(K)*9
                 _l0_a[m] = 0.1
                 _l0_a[m] = 1./2
@@ -683,7 +666,7 @@ def finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a
 
 
 
-def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_hyps, smp_sp_prms, smp_mk_hyps, smp_mk_prms, freeClstr, M, K):
+def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_hyps, smp_sp_prms, smp_mk_hyps, smp_mk_prms, freeClstr, M, K, priors, m1stHashClstr):
     #  finish epoch doesn't deal with noise cluster
     tt2 = _tm.time()
 
@@ -702,30 +685,37 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
     l_trlsNearMAP = []
     
     skp = 2
+    print "-------------"
     #  marginal posteriors of the spatial and cluster params
-    for m in xrange(oo.M):
-        f_smps    = smp_sp_prms[1, frm::evry, skp]
-        f_u_[m]      = _N.mean(f_smps)
-        f_s_[m]     = _N.std(f_smps)**2
+    for m in xrange(M):
+        f_smps    = smp_sp_prms[1, frm::skp, m]
+        _f_u[m]      = _N.mean(f_smps)
+        _f_q2[m]     = _N.std(f_smps)**2
         #  hyper params to be copied to _f_u, _f_s
-        oo.sp_prmPstMd[epc, oo.ky_p_f, m] = f_u_
         
         ##########################
-        l0_a_[m], l0_B_[m] = _pu.gam_inv_gam_dist_ML(smp_sp_prms[0, frm::evry, skp], dist=_pU.GAMMA)
-        oo.sp_prmPstMd[epc, oo.ky_p_l0, m] = (l0_a_[m] - 1) / l0_B_[m]
+        print _N.mean(smp_sp_prms[0, frm::skp, m])
+        print _N.mean(smp_sp_prms[2, frm::skp, m])
+        _l0_a[m], _l0_B[m] = _pU.gam_inv_gam_dist_ML(smp_sp_prms[0, frm::skp, m], dist=_pU._GAMMA, clstr=m)
 
         ##########################
-        q2_a_[m], q2_B_[m] = _pu.gam_inv_gam_dist_ML(smp_sp_prms[2, frm::evry, skp], dist=_pU.INV_GAMMA)
-        oo.sp_prmPstMd[epc, oo.ky_p_q2, m] = q2_B_[m] / (q2_a_[m] + 1) 
+        _q2_a[m], _q2_B[m] = _pU.gam_inv_gam_dist_ML(smp_sp_prms[2, frm::skp, m], dist=_pU._INV_GAMMA, clstr=m)
+    print "---------"
+    print _q2_a
+    print _q2_B
 
-    _f_u[:]       = f_u_[:];     _f_q2[:]      = f_q2_[:]
-    _q2_a[:]      = q2_a_[:];    _q2_B[:]      = q2_B_[:]
-    _l0_a[:]      = l0_a_[:];    _l0_B[:]      = l0_B_[:]
+    print _l0_a
+    print _l0_B
+    print "---------"
 
+
+    oo.sp_prmPstMd[epc, oo.ky_p_f::3] = _f_u
+    oo.sp_prmPstMd[epc, oo.ky_p_l0::3] = (_l0_a - 1) / _l0_B
+    oo.sp_prmPstMd[epc, oo.ky_p_q2::3] = _q2_B / (_q2_a + 1) 
     #  go through each cluster, find the iters that are 
 
     #for
-    MAPvalues2(epc, smp_sp_hyps, oo.sp_hypPstMd, frm, ITERS, M, 6, occ, gkMAP, None)
+    MAPvalues2(epc, smp_sp_hyps, oo.sp_hypPstMd, frm, ITERS, M, 6, occ, None)
 
 
     #pcklme["cp%d" % epc] = _N.array(smp_sp_prms)
@@ -765,8 +755,8 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
         oo.mk_hypPstMd[oo.ky_h_Sg_nu][epc, m] = _Sg_nu[m]
         oo.mk_hypPstMd[oo.ky_h_Sg_PSI][epc, m]= _Sg_PSI[m]
 
-    u[0:M]         = oo.mk_prmPstMd[oo.ky_p_u][epc]
-    Sg[0:M]        = oo.mk_prmPstMd[oo.ky_p_Sg][epc]
+    u         = oo.mk_prmPstMd[oo.ky_p_u][epc]
+    Sg        = oo.mk_prmPstMd[oo.ky_p_Sg][epc]
 
     ###  hack here.  If we don't reset the prior for 
     ###  what happens when a cluster is unused?
@@ -776,6 +766,8 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
     ###  values once that cluster becomes used again.  So
     ###  we would like unused clusters to have l0->0, but keep the
     ###  variance small.  That's why we will reset a cluster
+
+    sq25  = 5*_N.sqrt(q2)
 
     if M > 1:
         occ = _N.mean(_N.sum(gz[frm:], axis=1), axis=0)  # avg. # of marks assigned to this cluster
@@ -792,16 +784,31 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
             #  nothing about the mark distribution.  That is why f, q2
             #  are updated when there are no spikes, but u and Sg are not.
 
-            if ((occ[m] < minAss) and (l0[m] / _N.sqrt(twpi*q2[m]) < 1)) or \
-                                  (f[m] < oo.xLo-sq25[m]) or \
-                                  (f[m] > oo.xHi+sq25[m]):
+            bBad = (_l0_a[m] is None) or (_l0_B[m] is None) or _N.isnan(_l0_a[m]) or _N.isnan(_l0_B[m]) or (_q2_a[m] is None) or (_q2_B[m] is None) or _N.isnan(_q2_a[m]) or _N.isnan(_q2_B[m])
+            if bBad:
+                print "cluster who's posterior difficult to estimate found.   occupancy %d" % occ[m]
+            if bBad or (occ[m] == 0) or ((occ[m] < minAss) and (l0[m] / _N.sqrt(twpi*q2[m]) < 1)) or \
+               (f[m] < oo.xLo-sq25[m]) or (f[m] > oo.xHi+sq25[m]):
                 print "resetting  cluster %(m)d   %(l0).3f  %(f).3f" % {"m" : m, "l0" : (l0[m] / _N.sqrt(twpi*q2[m])), "f" : f[m]}
-                _q2_a[m] = -1
-                _q2_B[m] = 0
-                _f_q2[m] = 4
-                _u_Sg[m] = _N.identity(K)*9
-                _l0_a[m] = 0
-                _l0_a[m] = 0
+                iclstr = 1 if m >= m1stHashClstr else 0
+                _q2_a[m] = priors._q2_a[iclstr]
+                _q2_B[m] = priors._q2_B[iclstr]
+                _f_u[m]  = priors._f_u[iclstr]
+                _f_q2[m] = priors._f_q2[iclstr]
+                _l0_a[m] = priors._l0_a[iclstr]
+                _l0_B[m] = priors._l0_B[iclstr]
+                _u_u[m]  = priors._u_u
+                _u_Sg[m]  = priors._u_Sg
+                print "_u_Sg is"
+                print _u_Sg[m]
+                _Sg_nu[m]  = priors._Sg_nu
+                _Sg_PSI[m]  = priors._Sg_PSI
+
+                oo.sp_prmPstMd[epc, oo.ky_p_l0+3*m] = 0
+                oo.sp_prmPstMd[epc, oo.ky_p_q2+3*m] = 10000.
+
+                #_u_Sg   = _N.tile(allSg, M).T.reshape((M, K, K))  #  this 
+
                 freeClstr[m] = True
             else:
                 freeClstr[m] = False

@@ -45,7 +45,7 @@ def MAPvalues(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, gk, l_trlsNear
             trlsNearMAP += frm
             l_trlsNearMAP.append(trlsNearMAP)
 
-def MAPvalues2(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, gk, l_trlsNearMAP, alltrials=False):
+def MAPvalues2(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, l_trlsNearMAP, alltrials=False):
     print "IN MAPvalues2 - not mean"
     N   = smp_prms.shape[1] - frm
     for m in xrange(M):
@@ -66,13 +66,22 @@ def MAPvalues2(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, gk, l_trlsNea
                 l_trlsNearMAP.append(trlsNearMAP)  
 
 
-def gam_inv_gam_dist_ML(smps, dist=_GAMMA):
+
+def gam_inv_gam_dist_ML(smps, dist=_GAMMA, clstr=None):
+
     """
     The a, B hyperparameters for gamma or inverse gamma distributions
     """
     N = len(smps)
 
     s_x_ix = _N.sum(smps) if dist == _GAMMA else _N.sum(1./smps)
+
+    if len(_N.where(smps == 0)[0]) > 0:
+        print "0 found for cluster %(c)d   for dist %(d)s" % {"c" : clstr, "d" : ("gamma" if dist == _GAMMA else "inv gamma")}
+        return None, None
+                                                              
+                                                              
+    
     pm_s_logx = _N.sum(_N.log(smps)) 
     pm_s_logx *= 1 if dist == _GAMMA else -1
 
