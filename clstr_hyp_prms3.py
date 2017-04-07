@@ -17,4 +17,3 @@ class priors:
 
     _u_Sg   = None
     _u_u    = None
-

@@ -140,6 +140,7 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
 
         MF     = clstrs[0] + clstrs[1]   #  includes noise
 
+
         MS = int(clstrs[0] * 1.2)
         MS = clstrs[0] + 2 if (MS == clstrs[0]) else MS
         M = int(MS + clstrs[1])   #  20% more clusters
@@ -148,6 +149,7 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
         print clstrs[0]
         print clstrs[1]
         print "666&&&&&&&&&"
+
         #M = int(clstrs[0] + clstrs[1]) + 1   #  20% more clusters
         print "cluters:  %d" % M
 
@@ -478,6 +480,7 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _f_q2,
         else:  #  just one cluster
             im = freeClstrs[0]   # Asts + t0 gives absolute time
 
+
             #_u_u[im]  = _N.mean(mASr[0, newNonHashSpks[farMKSPinds]], axis=0)
             #_f_u[im]  = _N.mean(xASr[0, newNonHashSpks[farMKSPinds]], axis=0)
             #_u_Sg[im] = _N.cov(mASr[0, newNonHashSpks[farMKSPinds]], rowvar=0)*16
@@ -535,6 +538,7 @@ def finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a
     oo.smp_mk_prms = smp_mk_prms
 
     l_trlsNearMAP = []
+
     MAPvalues2(epc, smp_sp_prms, oo.sp_prmPstMd, frm, ITERS, M, 3, occ, l_trlsNearMAP)
     l0         = oo.sp_prmPstMd[epc, oo.ky_p_l0::3]
     f          = oo.sp_prmPstMd[epc, oo.ky_p_f::3]
@@ -646,6 +650,7 @@ def finish_epoch(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a
                 _q2_a[m] = 0.1
                 _q2_B[m] = 1e-4
                 _f_q2[m] = 16.
+
                 _u_Sg[m] = _N.identity(K)*9
                 _l0_a[m] = 0.1
                 _l0_a[m] = 1./2
