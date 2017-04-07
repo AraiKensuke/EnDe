@@ -16,7 +16,7 @@ def kerFr(atMark, sptl, tr_mks, mdim, Bx, cBm, bx, dxp, occ):
     """
     iB2    = 1/(cBm*cBm)
 
-    nSpks  = tr_mks.shape[0]
+    nTrSpks  = tr_mks.shape[0]
 
     #  q4mk  shape (nSpks, )   treat as (1, nSpks) when q4mk + sptl
     #  sptl  shape (Nx, nSpks)
@@ -31,10 +31,15 @@ def kerFr(atMark, sptl, tr_mks, mdim, Bx, cBm, bx, dxp, occ):
     #  if H diagonal with diagonal cB**2
     #  det(H) == (cB^2)^mdim), so |det(H)|^(1/2) == cB^(2*mdim*0.5) == cB^mdim
 
-    print q4mk.shape
-    print sptl.shape
-    fr1 = (isqrt2pi * isqrt2pi**mdim)*(1./Bx)*(1./nSpks)*(1./cBm**mdim)*_N.sum(_N.exp(sptl + q4mk), axis=1)*dxp / (occ * 0.001)  #  return me # of positions to evaluate
-    #fr1 = (isqrt2pi**mdim)*(1./nSpks)*(1./cBm**mdim)*_N.sum(_N.exp(q4mk))
+    fr1= (isqrt2pi * isqrt2pi**mdim)*(1./Bx)*(1./nTrSpks)*(1./cBm**mdim)*_N.sum(_N.exp(sptl + q4mk), axis=1) / (occ * 0.001)  #  return me # of positions to evaluate
+
+    # fr1 = _N.zeros(sptl.shape[0])
+
+    # for n in xrange(nTrSpks):
+    #     fr1 += _N.exp(q4mk[n])*_N.exp(sptl[:, n])
+    # fr1 *= (isqrt2pi * isqrt2pi**mdim)*(1./Bx)*(1./nTrSpks)*(1./cBm**mdim)*dxp / (occ * 0.001)*2000
+    #  sptl
+
 
     """   EQUIVALENT TO
     fr2     = _N.zeros(fld_x.shape[0])
@@ -71,10 +76,25 @@ def evalAtFxdMks_new(fxdMks, l0, us, Sgs, iSgs, i2pidcovsr):
     Nx, pmdim     = fxdMks.shape
 
     fxdMksr= fxdMks.reshape(Nx, 1, pmdim)
-    
+
     cmps = i2pidcovsr*_N.exp(-0.5*_N.einsum("xmj,xmj->mx", fxdMksr-us, _N.einsum("mjk,xmk->xmj", iSgs, fxdMksr - us)))
-    #cmps = i2pidcovsr*_N.exp(-0.5*_N.dot(fxdMks-us[0], _N.dot(iSgs[0], fxdMks - us[0])))
 
     zs = _N.sum(l0*cmps, axis=0)
 
     return zs
+    """
+
+    fld = fxdMks[:, 0].reshape(Nx, 1)    #  fld is (Nx, 1)
+
+    ll  = _N.zeros(Nx)
+    mdim= pmdim - 1
+
+    for n in xrange(us.shape[0]):
+        atMk= fxdMks[n, 1:]
+        x = us[n, 0]
+        m = us[n, 1:]
+        #ll += (l0[n, 0]*(1/_N.sqrt(2*_N.pi*Sgs[n,0, 0])) * _N.exp(-0.5*(fld - us[n, 0])*(fld - us[n, 0])*iSgs[n,0, 0]))[:, 0]
+        ll += (l0[n, 0]*(1/_N.sqrt(2*_N.pi*Sgs[n,0, 0])) * _N.exp(-0.5*(fld - x)*(fld - x)*iSgs[n,0, 0]) * (1/_N.sqrt(2*_N.pi)**mdim)*(1./_N.sqrt(_N.linalg.det(Sgs[n,1:, 1:]))) * _N.exp(-0.5*_N.dot((atMk - m), _N.dot(iSgs[n, 1:, 1:], (atMk - m)))))[:, 0] 
+    """
+
+    return ll

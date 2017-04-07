@@ -4,6 +4,9 @@ import kdeutil as _ku
 import time as _tm
 import matplotlib.pyplot as _plt
 
+mz_CRCL = 0
+mz_W    = 1
+
 class mkdecoder:
     nTets   = 1
     pX_Nm = None   #  p(X | Nm)
@@ -48,18 +51,26 @@ class mkdecoder:
     mLo      = -2
     mHi      = 8
 
+    sts_per_tet = None
+    _sts_per_tet = None
+    svMkIntnsty = None   #  save just the mark intensities
+
     ##  X_   and _X
-    def __init__(self, kde=False, bx=None, Bx=None, Bm=None, mkfns=None, encfns=None, K=None, nTets=None, xLo=0, xHi=3):
+    def __init__(self, kde=False, bx=None, Bx=None, Bm=None, mkfns=None, encfns=None, K=None, nTets=None, xLo=0, xHi=3, maze=mz_CRCL, spdMult=0.1, ignorespks=False):
         """
         """
         oo = self
         oo.kde = kde
 
+        oo.spdMult = spdMult
+        oo.ignorespks = ignorespks
         oo.bx = bx;   oo.Bx = Bx;   oo.Bm = Bm
         oo.mkpos = []
         #  read mkfns
         _sts   = []#  a mark on one of the several tetrodes
-        for fn in mkfns:
+        oo._sts_per_tet = []
+        for fn in mkfns:   #  for each tetrode filename
+
             _dat = _N.loadtxt(datFN("%s.dat" % fn))
             if K is None:
                 K   = _dat.shape[1] - 2
@@ -67,7 +78,9 @@ class mkdecoder:
             else:
                 dat = _dat[:, 0:2+K]
             oo.mkpos.append(dat)
-            _sts.extend(_N.where(dat[:, 1] == 1)[0])
+            spkts = _N.where(dat[:, 1] == 1)[0]
+            oo._sts_per_tet.append(spkts)
+            _sts.extend(spkts)
         oo.sts = _N.unique(_sts)
 
         oo.nTets = len(oo.mkpos)
@@ -95,6 +108,7 @@ class mkdecoder:
 
         oo.pX_Nm = _N.zeros((oo.pos.shape[0], oo.Nx))
         oo.Lklhd = _N.zeros((oo.nTets, oo.pos.shape[0], oo.Nx))
+        oo.intnstyAtMrk= None    # instead of saving everything
 
         oo.decmth = "kde"
         #################################################################
@@ -120,53 +134,52 @@ class mkdecoder:
         k2 = 0.1
         k3 = 0.1
 
-        """
-        for i in xrange(0, oo.Nx):  #  indexing of xTrs  [to, from]
-            oo.xTrs[i, i] = 1-p1   
-            if i == 0:
-                #oo.xTrs[0, oo.Nx-1] = p1*0.5
-                oo.xTrs[0, oo.Nx-1] = p1*0.9  #  backwards
-            if i >= 0:
-                oo.xTrs[i-1, i] = p1*0.1
-                oo.xTrs[i, i-1] = p1*0.9
-            if i == oo.Nx-1:
-                oo.xTrs[oo.Nx-1, 0] = p1*0.1
+        if maze == mz_CRCL:
+            ##  circular maze
+            for i in xrange(0, oo.Nx):  #  indexing of xTrs  [to, from]
+                oo.xTrs[i, i] = 1-p1   
+                if i == 0:
+                    #oo.xTrs[0, oo.Nx-1] = p1*0.5
+                    oo.xTrs[0, oo.Nx-1] = p1*0.9  #  backwards
+                if i >= 0:
+                    oo.xTrs[i-1, i] = p1*0.1
+                    oo.xTrs[i, i-1] = p1*0.9
+                if i == oo.Nx-1:
+                    oo.xTrs[oo.Nx-1, 0] = p1*0.1
+        elif maze == mz_W:
+            ##  W-maze
+            for i in xrange(0, oo.Nx/2):
+                oo.xTrs[i, i] = 1-p1
+                if i > 0:
+                    oo.xTrs[i-1, i] = p1
+                if i > 1:        ##  next nearest neighbor
+                    oo.xTrs[i-2, i] = p1*k2
+                    oo.xTrs[i+1, i] = p1*k2*k3
+                elif i == 1:
+                    oo.xTrs[oo.Nx/2-1, 1] = p1*k2/2
+                    oo.xTrs[oo.Nx/2, 1]   = p1*k2/2
+                    oo.xTrs[i+1, i] = p1*k2*k3
 
-        """
-        ##  W-maze
-        for i in xrange(0, oo.Nx/2):
-            oo.xTrs[i, i] = 1-p1
-            if i > 0:
-                oo.xTrs[i-1, i] = p1
-            if i > 1:        ##  next nearest neighbor
-                oo.xTrs[i-2, i] = p1*k2
-                oo.xTrs[i+1, i] = p1*k2*k3
-            elif i == 1:
-                oo.xTrs[oo.Nx/2-1, 1] = p1*k2/2
-                oo.xTrs[oo.Nx/2, 1]   = p1*k2/2
-                oo.xTrs[i+1, i] = p1*k2*k3
-
-        oo.xTrs[oo.Nx/2-1, 0] = p1/2
-        oo.xTrs[oo.Nx/2, 0]   = p1/2
-        for i in xrange(oo.Nx/2, oo.Nx):
-            oo.xTrs[i, i] = 1-p1
-            if i < oo.Nx - 1:
-                oo.xTrs[i+1, i] = p1
-            if i < oo.Nx - 2:
-                oo.xTrs[i-1, i] = p1*k2*k3
-                oo.xTrs[i+2, i] = p1*k2
-            elif i == oo.Nx-2:
-                oo.xTrs[i-1, i] = p1*k2*k3
-                oo.xTrs[oo.Nx/2-1, oo.Nx-2] = p1*k2/2
-                oo.xTrs[oo.Nx/2, oo.Nx-2]   = p1*k2/2
-        oo.xTrs[oo.Nx/2-1, oo.Nx-1] = p1/2
-        oo.xTrs[oo.Nx/2, oo.Nx-1]   = p1/2
+            oo.xTrs[oo.Nx/2-1, 0] = p1/2
+            oo.xTrs[oo.Nx/2, 0]   = p1/2
+            for i in xrange(oo.Nx/2, oo.Nx):
+                oo.xTrs[i, i] = 1-p1
+                if i < oo.Nx - 1:
+                    oo.xTrs[i+1, i] = p1
+                if i < oo.Nx - 2:
+                    oo.xTrs[i-1, i] = p1*k2*k3
+                    oo.xTrs[i+2, i] = p1*k2
+                elif i == oo.Nx-2:
+                    oo.xTrs[i-1, i] = p1*k2*k3
+                    oo.xTrs[oo.Nx/2-1, oo.Nx-2] = p1*k2/2
+                    oo.xTrs[oo.Nx/2, oo.Nx-2]   = p1*k2/2
+            oo.xTrs[oo.Nx/2-1, oo.Nx-1] = p1/2
+            oo.xTrs[oo.Nx/2, oo.Nx-1]   = p1/2
 
             #oo.xTrs[:, j] += _N.mean(oo.xTrs[:, j])*0.01
-        for i in xrange(oo.Nx):
-            A = _N.trapz(oo.xTrs[:, i])*((oo.xHi-oo.xLo)/float(oo.Nx))
-            oo.xTrs[:, i] /= A
-
+            for i in xrange(oo.Nx):
+                A = _N.trapz(oo.xTrs[:, i])*((oo.xHi-oo.xLo)/float(oo.Nx))
+                oo.xTrs[:, i] /= A
 
     def init_pX_Nm(self, t):
         oo = self
@@ -185,6 +198,8 @@ class mkdecoder:
         oo = self
         ##  each 
 
+        oo.svMkIntnsty = []
+
         for nt in xrange(oo.nTets):
             l0s   = prms[nt][0][uFE]
             us    = prms[nt][1][uFE]
@@ -194,6 +209,7 @@ class mkdecoder:
             iSgs  = _N.linalg.inv(covs)
             i2pidcovs = (1/_N.sqrt(2*_N.pi))**(oo.mdim+1)*(1./_N.sqrt(_N.linalg.det(covs)))
             i2pidcovsr= i2pidcovs.reshape((M, 1))
+            oo.svMkIntnsty.append([])
 
         oo.init_pX_Nm(t0)   #  flat pX_Nm  init cond at start of decode
         oo.LmdMargOvrMrks(0, t0, prms=prms, uFE=uFE)
@@ -204,6 +220,8 @@ class mkdecoder:
         fxdMks[:, 0] = oo.xp
 
         dens = []
+
+        ones = _N.ones(oo.Nx)
         for t in xrange(t0+1,t1): # start at 1 because initial condition
             #tt1 = _tm.time()
             for nt in xrange(oo.nTets):
@@ -211,8 +229,10 @@ class mkdecoder:
 
                 if (oo.mkpos[nt][t, 1] == 1):
                     fxdMks[:, 1:] = oo.mkpos[nt][t, 2:]
-                    oo.Lklhd[nt, t] *= _ku.evalAtFxdMks_new(fxdMks, l0s, us, covs, iSgs, i2pidcovsr)*oo.dt
-                    #dens.append(_ku.evalAtFxdMks_new(fxdMks, l0s, us, covs, iSgs, i2pidcovsr))
+                    if not oo.ignorespks:
+                        mkint = _ku.evalAtFxdMks_new(fxdMks, l0s, us, covs, iSgs, i2pidcovsr)*oo.dt
+                        oo.Lklhd[nt, t] *= mkint
+                        oo.svMkIntnsty[nt].append(mkint)
 
             ttt1 =0
             ttt2 =0
@@ -241,7 +261,7 @@ class mkdecoder:
                     fig = _plt.figure()
                     _plt.plot(oo.Lklhd[tet, t])
 
-            assert A > 0, "die"
+            assert A > 0, "A   %.4f" % A
 
             oo.pX_Nm[t] /= A
             #tt4 = _tm.time()
@@ -315,10 +335,17 @@ class mkdecoder:
 
         ibx2   = 1. / (oo.bx * oo.bx)
         sptl   =  []
-
         dens   = []
+
+        oo.svMkIntnsty = []
+
         for nt in xrange(oo.nTets):
+            lst = []
+
             sptl.append(-0.5*ibx2*(oo.xpr - oo.tr_pos[nt])**2)  #  this piece doesn't need to be evalu
+            oo.svMkIntnsty.append([])
+
+        ###############################
         for t in xrange(t0+1,t1): # start at 1 because initial condition
             #tt1 = _tm.time()
             for nt in xrange(oo.nTets):
@@ -327,8 +354,10 @@ class mkdecoder:
                 if (oo.mkpos[nt][t, 1] == 1):
                     fxdMks[:, 1:] = oo.mkpos[nt][t, 2:]
                         #(atMark, fld_x, tr_pos, tr_mks, all_pos, mdim, Bx, cBm, bx)
+                    mkint = _ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx, oo.dxp, oo.occ)
+                    oo.svMkIntnsty[nt].append(mkint)
                     #dens.append(_ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx, oo.dxp, oo.occ))
-                    oo.Lklhd[nt, t] *= _ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx, oo.dxp, oo.occ)
+                    oo.Lklhd[nt, t] *= mkint
 
             ttt1 =0
             ttt2 =0
@@ -369,3 +398,4 @@ class mkdecoder:
 
     def spkts(self, nt, t0, t1):
         return _N.where(self.mkpos[nt][t0:t1, 1] == 1)[0] + t0
+

@@ -1,13 +1,14 @@
+import EnDedirs as _edd
 #  in terms of relative length
 firstT   = 3.6
 minT     = 0.5
 maxT     = 1.5
 
-epochs   = 40
+epochs   = 32
 
 intvs = _N.empty(epochs+1)
 
-eqI   = False
+eqI   = True
 t     = 0
 intvs[0] = 0
 for epc in xrange(epochs):
@@ -22,7 +23,7 @@ iInd = 0
 bFnd = False
 while not bFnd:
     iInd += 1
-    fn = "../DATA/itv%(e)d_%(iI)d.dat" % {"e" : epochs, "iI" : iInd}
+    fn = _edd.datFN("itv%(e)d_%(iI)d.dat" % {"e" : epochs, "iI" : iInd})
 
     if not os.access(fn, os.F_OK):  # file exists
         bFnd = True

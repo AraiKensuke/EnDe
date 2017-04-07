@@ -1,7 +1,11 @@
 import numpy as _N
 from filter import gauKer
 import matplotlib.pyplot as _plt
+import scipy.special as _ssp
 #from scipy.spatial.distance import cdist, euclidean
+
+_GAMMA         = 0
+_INV_GAMMA     = 1
 
 def MAPvalues(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, gk, l_trlsNearMAP):
 
@@ -41,7 +45,7 @@ def MAPvalues(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, gk, l_trlsNear
             trlsNearMAP += frm
             l_trlsNearMAP.append(trlsNearMAP)
 
-def MAPvalues2(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, gk, l_trlsNearMAP, alltrials=False):
+def MAPvalues2(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, l_trlsNearMAP, alltrials=False):
     print "IN MAPvalues2 - not mean"
     N   = smp_prms.shape[1] - frm
     for m in xrange(M):
@@ -57,47 +61,52 @@ def MAPvalues2(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, gk, l_trlsNea
                 smps  = smp_prms[ip, frm:, m]
                 #postMode[epc, col] = _N.mean(smps)
                 postMode[epc, col] = _N.median(smps)
-                # ismps = smps.argsort()
-                # spcng = _N.diff(smps[ismps])
-                # ispcng= spcng.argsort()
-
-                # if int(0.1*N) > 1:
-                #     hstSpc= _N.mean(spcng[ispcng[0:int(0.1*N)]])
-                # else:
-                #     hstSpc= 1
-
-                # thr_ispc = _N.where(spcng[ispcng] < 100*hstSpc)[0]
-
-                # if len(thr_ispc) > 0:   #  this param not all the same
-                #     L     = _N.min(smps);  H     = _N.max(smps[ismps[thr_ispc]])
-                #     A     = H-L
-                #     cnts, bns = _N.histogram(smps, bins=_N.linspace(L-0.0001*A, H + 0.0001*A, 60))
-
-                #     xfit    = 0.5*(bns[1:] + bns[0:-1])
-
-                #     fcnts = _N.convolve(cnts, gk, mode="same")
-                #     ib  = int(_N.mean(_N.where(fcnts == _N.max(fcnts))[0]))
-                #     xMAP = bns[ib]
-                #     #_plt.plot(xfit, fcnts)
-                #     #_plt.axvline(x=xMAP)
-
-                #     xLo  = xfit[_N.where(fcnts > fcnts[ib]*0.6)[0][0]]
-                #     xHi  = xfit[_N.where(fcnts > fcnts[ib]*0.6)[0][-1]]
-
-                #     if occ[m] > 0:
-                #         these=_N.where((smps > xLo) & (smps < xHi))[0]
-                #         trlsNearMAP = _N.intersect1d(these, trlsNearMAP)
-                #     postMode[epc, col] = xMAP
-                # else:
-                #     postMode[epc, col] = smps[0]
-                #     trlsNearMAP = _N.arange(N)+frm    
-
             if l_trlsNearMAP is not None:
                 # trlsNearMAP for each params added to list
                 l_trlsNearMAP.append(trlsNearMAP)  
 
 
+def gam_inv_gam_dist_ML(smps, dist=_GAMMA, clstr=None):
+    """
+    The a, B hyperparameters for gamma or inverse gamma distributions
+    """
+    N = len(smps)
 
+    s_x_ix = _N.sum(smps) if dist == _GAMMA else _N.sum(1./smps)
+    if len(_N.where(smps == 0)[0]) > 0:
+        print "0 found for cluster %(c)d   for dist %(d)s" % {"c" : clstr, "d" : ("gamma" if dist == _GAMMA else "inv gamma")}
+        return None, None
+                                                              
+                                                              
+    
+    pm_s_logx = _N.sum(_N.log(smps)) 
+
+    pm_s_logx *= 1 if dist == _GAMMA else -1
+
+    mn  = _N.mean(smps)
+    vr  = _N.std(smps)**2
+    BBP = (mn / vr) if dist == _GAMMA else mn*(1 + (mn*mn)/vr)
+
+    Bx  = _N.linspace(BBP/50, BBP*50, 1000)
+    yx  = _N.empty(1000)
+    iB  = -1
+    for B in Bx:
+        iB += 1
+        P0 = _ssp.digamma(B/N * s_x_ix)
+        yx[iB] = N*(_N.log(B) - P0) + pm_s_logx
+
+    lst = _N.where((yx[:-1] >= 0) & (yx[1:] <= 0))[0]
+    if len(lst) > 0:
+        ib4 = lst[0]
+        #  decreasing
+        mslp  = (yx[ib4+1] - yx[ib4]) 
+        rd    = (0-yx[ib4])  / mslp
+
+        Bml = Bx[ib4] + rd*(Bx[ib4+1]-Bx[ib4])
+        aml = (Bml/N)*s_x_ix   #  sum xi / N  = B/a
+        return aml, Bml
+    else:
+        return None, None
 
 """
 smps  = _ss.invgamma.rvs(a, scale=B, size=N)
