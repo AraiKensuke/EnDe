@@ -638,7 +638,9 @@ class MarkAndRF:
             ttB = _tm.time()
             print (ttB-ttA)
 
+
             gAMxMu.finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_hyps, smp_sp_prms, smp_mk_hyps, smp_mk_prms, freeClstr, M, K, priors)
+
             #  MAP of nzclstr
             if oo.nzclstr:
                 frm = 1000
