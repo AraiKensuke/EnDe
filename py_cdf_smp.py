@@ -74,10 +74,7 @@ def smp_from_cdf_interp(sg2s, sLLkPr, s, d_sg2s, sg2s_m1):
             print "q2 retRnd[m] < 0:  %(1).3e  %(2).3e   %(3).3e  %(4).3e     rat %(5).3e" % {"1" : sg2s[isg2], "2" : rnds[m], "3" : cdf[isg2,m], "4" : cdf[isg2+1,m], "5" : ((rnds[m] - cdf[isg2,m]) / (cdf[isg2+1,m] - cdf[isg2,m]))}
     return retRnd
 
-    #_plt.plot(sg2s[1:, 0], cdf[:, 0])
-
-
-def smp_from_cdf_interp_ind_x(sg2s, sLLkPr, s, d_sg2s, sg2s_m1):
+def smp_from_cdf_interp_ind_x(sg2s, sLLkPr, s, d_sg2s):
     """
     each cluster has independent x over which conditional likelihood defined
     xt0t1    relative coordinates
@@ -94,11 +91,10 @@ def smp_from_cdf_interp_ind_x(sg2s, sLLkPr, s, d_sg2s, sg2s_m1):
     N, M = pnn.shape
     cdf   = _N.zeros((N, M))
 
-    for m in xrange(M):
-        for i in xrange(1, N):  #  over 
-        #print cdf[i].shape
-        #print pnn[:, i].shape
-            cdf[i, m] = cdf[i-1, m] + pnn[i, m]*d_sg2s[m, i-1]
+    #for m in xrange(M):
+    for i in xrange(1, N):  #  over 
+        #cdf[i, m] = cdf[i-1, m] + pnn[i, m]*d_sg2s[m, i-1]
+        cdf[i] = cdf[i-1] + pnn[i]*d_sg2s[:, i-1]
     cdf /= cdf[-2]     #  even if U[0,1] rand is 1, we still have some room at the end to add a bit of noise.
 
     rnds = _N.random.rand(M)
