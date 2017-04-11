@@ -14,6 +14,7 @@ import pickle
 from posteriorUtil import MAPvalues2
 from filter import gauKer
 import gibbsApprMxMutil as gAMxMu
+import stochasticAssignment as _sA
 from par_intgrls_f  import M_times_N_f_intgrls_raw
 from par_intgrls_q2 import M_times_N_q2_intgrls_raw
 import raw_random_access as _rra
@@ -199,6 +200,7 @@ class MarkAndRF:
 
             if epc == ep1:   ###  initialize
                 labS, labH, flatlabels, M, MF, hashthresh, nHSclusters = gAMxMu.initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=doSepHash, xLo=oo.xLo, xHi=oo.xHi, oneCluster=oo.oneCluster)
+                m1stHashClstr = _N.min(_N.unique(labH))
 
                 #nHSclusters.append(M - nHSclusters[0]-nHSclusters[1])   #  last are free clusters that are not the noise cluster
 
@@ -296,7 +298,7 @@ class MarkAndRF:
                 if (iter % 100) == 0:    
                     print "-------iter  %(i)d" % {"i" : iter}
 
-                gAMxMu.stochasticAssignment(oo, epc, iter, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, ((epc > 0) and (iter == 0)), nthrds=oo.nThrds)
+                _sA.stochasticAssignment(oo, epc, iter, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stHashClstr, ((epc > 0) and (iter == 0)), nthrds=oo.nThrds)
 
                 ###############  FOR EACH CLUSTER
 
@@ -549,8 +551,7 @@ class MarkAndRF:
 
             ttB = _tm.time()
             print (ttB-ttA)
-
-            m1stHashClstr = _N.min(_N.unique(labH))
+            
             gAMxMu.finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_hyps, smp_sp_prms, smp_mk_hyps, smp_mk_prms, freeClstr, M, K, priors, m1stHashClstr)
             #  MAP of nzclstr
             pcklme["smp_sp_hyps"] = smp_sp_hyps

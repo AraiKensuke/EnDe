@@ -115,7 +115,9 @@ def sepHash(_x, BINS=50, blksz=20, xlo=-6, xhi=6):
             blk += 1
             cnts, bns = _N.histogram(_x[inds[blk*blksz:(blk+1)*blksz], 0], bins=bins)
             cumcnts += cnts
-            if len(_N.where(cumcnts[minBins] < mincnt[minBins])[0]) == 0:
+            nearEmptyBins = len(_N.where(cumcnts[minBins] < mincnt[minBins])[0])
+            print nearEmptyBins
+            if nearEmptyBins < int(BINS*0.5):
                 done = True
                 nonhash.extend(inds[0:(blk+1)*blksz])
 
