@@ -322,7 +322,7 @@ class MarkAndRF:
                 ###############     u
                 ###############
                 for m in xrange(M):
-                    if clstsz[m] > K:   # >= K causes Cholesky to fail at times.
+                    if clstsz[m] > 1:   # >= K causes Cholesky to fail at times.
                         u_Sg_[m] = _N.linalg.inv(_iu_Sg[m] + clstsz[m]*iSg[m])
                         clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
 
@@ -421,19 +421,20 @@ class MarkAndRF:
                 ##############  VARIANCE, COVARIANCE
                 ##############
                 for m in xrange(M):
-                    if clstsz[m] > K:
-                        ##  dof of posterior distribution of cluster covariance
-                        Sg_nu_ = _Sg_nu[m, 0] + clstsz[m]
-                        ##  dof of posterior distribution of cluster covariance
-                        ur = u[m].reshape((1, K))
-                        clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
-                        #clstx    = l_sts[m]]
-                        Sg_PSI_ = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
-                    else:
-                        Sg_nu_ = _Sg_nu[m, 0] 
-                        ##  dof of posterior distribution of cluster covariance
-                        ur = u[m].reshape((1, K))
-                        Sg_PSI_ = _Sg_PSI[m]
+                    #if clstsz[m] > K:
+                    ##  dof of posterior distribution of cluster covariance
+                    Sg_nu_ = _Sg_nu[m, 0] + clstsz[m]
+                    ##  dof of posterior distribution of cluster covariance
+                    ur = u[m].reshape((1, K))
+                    clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
+                    #clstx    = l_sts[m]]
+                    #  dot((clstx-ur).T, (clstx-ur))==ZERO(K) when clstsz ==0
+                    Sg_PSI_ = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
+                    # else:
+                    #     Sg_nu_ = _Sg_nu[m, 0] 
+                    #     ##  dof of posterior distribution of cluster covariance
+                    #     ur = u[m].reshape((1, K))
+                    #     Sg_PSI_ = _Sg_PSI[m]
                     Sg[m] = s_u.sample_invwishart(Sg_PSI_, Sg_nu_)
                     smp_mk_hyps[oo.ky_h_Sg_nu][0, iter, m] = Sg_nu_
                     smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, iter, m] = Sg_PSI_
@@ -464,6 +465,7 @@ class MarkAndRF:
                 else:
                     s = _N.zeros((oo.q2ss, M))
                 #  B' / (a' - 1) = MODE   #keep mode the same after discount
+
                 #  B' = MODE * (a' - 1)
                 if (epc > 0) and oo.adapt:
                     _md_nd= _q2_B[q2_a_Init] / (_q2_a[q2_a_Init] + 1)
@@ -479,7 +481,7 @@ class MarkAndRF:
 
                 SL_Bs = _N.empty(M)
                 SL_as = _N.empty(M)
-                #tt7 = _tm.time()
+                tt7 = _tm.time()
                 for m in xrange(M):
                     if clstsz[m] > 0:
                         sts = v_sts[cls_str_ind[m]:cls_str_ind[m+1]]
@@ -490,7 +492,8 @@ class MarkAndRF:
                     else:
                         sLLkPr[m] = -(_q2_a[m] + 1)*lq2x - iq2x*_q2_B[m]
 
-                #tt8 = _tm.time()
+                tt8 = _tm.time()
+
                 q2 = _pcs.smp_from_cdf_interp(q2xr, sLLkPr.T, s.T, d_q2xr, q2x_m1r)
                 #tt9 = _tm.time()
 

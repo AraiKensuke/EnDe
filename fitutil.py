@@ -117,7 +117,7 @@ def sepHash(_x, BINS=50, blksz=20, xlo=-6, xhi=6):
             cumcnts += cnts
             nearEmptyBins = len(_N.where(cumcnts[minBins] < mincnt[minBins])[0])
             print nearEmptyBins
-            if nearEmptyBins < int(BINS*0.5):
+            if nearEmptyBins < int(BINS*0.2):
                 done = True
                 nonhash.extend(inds[0:(blk+1)*blksz])
 

@@ -85,10 +85,12 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
         abvthrAtLeast1Ch = _N.sum(abvthrEachCh, axis=1) > 0
         belowthrAllCh    = _N.sum(abvthrEachCh, axis=1) == 0   # N x K
         
-        knownNonHclstrs  = _N.where(abvthrAtLeast1Ch & (freeClstr == False) & (q2 < wdSpc))[0]   
+        #knownNonHclstrs  = _N.where(abvthrAtLeast1Ch & (freeClstr == False) & (q2 < wdSpc))[0]   
+        allClstrs = _N.arange(M)
+        knownNonHclstrs  = _N.where((freeClstr == False) & (allClstrs < m1stHashClstr))[0]
         print "non-H clstrs"
         print knownNonHclstrs
-        knownHclstrs     = _N.where(belowthrAllCh & (freeClstr == False))[0]
+        knownHclstrs     = _N.where((freeClstr == False) & (allClstrs >= m1stHashClstr))[0]
         print "H clstrs"
         print knownHclstrs
 
@@ -184,7 +186,7 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
         print "----------------------------------------------"
         reassign_l8r = []  
         farClusts = []
-        while ii < len(freeClstrs):
+        while ii < (len(freeClstrs)-1):  #  keep one fat
             farClusts.append([])
             im = freeClstrs[ii]   # Asts + t0 gives absolute time
             ii += 1
@@ -224,12 +226,13 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
                 xmk[:, 1:] = mASr[0, ths]
                 farClusts[ii-1].append(xmk)
 
-                #_f_u[im]  = _N.mean(xASr[0, ths])
+                _f_u[im]  = _N.mean(xASr[0, ths])
                 f[im]     = _N.mean(xASr[0, ths])
                 fp.write("setting f to %s\n" % str(f[im]))
-                q2[im]     = _N.std(xASr[0, ths])**2
+                #q2[im]     = _N.std(xASr[0, ths])**2/10  #  bound to contain noise
+                q2[im]     = _N.std(xASr[0, ths])**2/50.  #  bound to contain noise
                 l0[im]     = 200*_N.sqrt(q2[im])
-                #_f_q2[im] = 2**2
+                _f_q2[im] = 2**2
                 imap = _N.empty((len(ths), 2), dtype=_N.int)
                 imap[:, 0] = ths
                 imap[:, 1] = im
@@ -251,7 +254,6 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
         dmp = open(resFN("farClusts_%d.dmp" % epc, dir=oo.outdir), "wb")
         pickle.dump(farClusts, dmp, -1)
         dmp.close()
-
 
         """
         ##  points in newNonHashSpks but not in farMKinds
