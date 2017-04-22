@@ -139,7 +139,7 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
         MF     = clstrs[0] + clstrs[1]   #  includes noise
 
 
-        MS = int(clstrs[0] * 1.2)
+        MS = int(clstrs[0] * 1.3) 
         MS = clstrs[0] + 2 if (MS == clstrs[0]) else MS
         M = int(MS + clstrs[1])   #  20% more clusters
 

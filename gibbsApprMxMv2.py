@@ -37,7 +37,9 @@ class MarkAndRF:
     twpi = 2*_N.pi
 
     #  sizes of arrays
-    Nupx = 200      #   # points to sample position with  (uniform lam(x)p(x))
+    NposHistBins = 200      #   # points to sample position with  (uniform lam(x)p(x))
+    Nupx      = 200
+    
     fss = 60       #  sampling at various values of f
     q2ss = 150      #  sampling at various values of q2
 
@@ -64,6 +66,8 @@ class MarkAndRF:
 
     nz_q2               = 500
     nz_f                = 0
+
+    Bx                  = 0    #  noise in xpos
 
     q2x_L = 1e-7
     q2x_H = 1e2
@@ -159,17 +163,17 @@ class MarkAndRF:
         l_sqrt_2pi_q2x = _N.log(sqrt_2pi_q2x)
 
         freeClstr = None
-        if smth_pth_ker > 0:
-            gk     = gauKer(smth_pth_ker) # 0.1s  smoothing of motion
-            gk     /= _N.sum(gk)
-            xf     = _N.convolve(oo.dat[:, 0], gk, mode="same")
-            oo.dat[:, 0] = xf + nz_pth*_N.random.randn(len(oo.dat[:, 0]))
-        else:
-            oo.dat[:, 0] += nz_pth*_N.random.randn(len(oo.dat[:, 0]))
+        # if smth_pth_ker > 0:
+        #     gk     = gauKer(smth_pth_ker) # 0.1s  smoothing of motion
+        #     gk     /= _N.sum(gk)
+        #     xf     = _N.convolve(oo.dat[:, 0], gk, mode="same")
+        #     oo.dat[:, 0] = xf + nz_pth*_N.random.randn(len(oo.dat[:, 0]))
+        # else:
+        #     oo.dat[:, 0] += nz_pth*_N.random.randn(len(oo.dat[:, 0]))
         x      = oo.dat[:, 0]
         mks    = oo.dat[:, 2:]
-        if nz_pth > 0:
-            _N.savetxt(resFN("nzyx.txt", dir=oo.outdir), x, fmt="%.4f")
+        # if nz_pth > 0:
+        #     _N.savetxt(resFN("nzyx.txt", dir=oo.outdir), x, fmt="%.4f")
 
         f_q2_rate = (oo.diffusePerMin**2)/60000.  #  unit of minutes  
         
@@ -189,10 +193,23 @@ class MarkAndRF:
                 dt = 0.5*((t1+t0) - (t0+tm1))
 
             dt = (t1-t0)*0.5
-            xt0t1 = _N.array(x[t0:t1])
+
             posbins  = _N.linspace(oo.xLo, oo.xHi, oo.Nupx+1)
             #  _N.sum(px)*(xbns[1]-xbns[0]) = 1
+
+            ##  smooth the positions
+            smthd_pos = x[t0:t1] + oo.Bx*_N.random.randn(t1-t0)
+            ltL = _N.where(smthd_pos < oo.xLo)[0]
+            smthd_pos[ltL] += 2*(oo.xLo - smthd_pos[ltL])
+            gtR = _N.where(smthd_pos > oo.xHi)[0]
+            smthd_pos[gtR] += 2*(oo.xHi - smthd_pos[gtR])
+            
+            xt0t1 = smthd_pos
+            
             px, xbns = _N.histogram(xt0t1, bins=posbins, normed=True)
+            _plt.plot(px)
+            
+                
             pxr      = px.reshape((1, oo.Nupx))
             pxrr     = px.reshape((1, 1, oo.Nupx))
 
@@ -200,7 +217,7 @@ class MarkAndRF:
 
             if epc == ep1:   ###  initialize
                 labS, labH, flatlabels, M, MF, hashthresh, nHSclusters = gAMxMu.initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=doSepHash, xLo=oo.xLo, xHi=oo.xHi, oneCluster=oo.oneCluster)
-                m1stHashClstr = _N.min(_N.unique(labH))
+                m1stHashClstr = 1 if oo.oneCluster else _N.min(_N.unique(labH)) 
 
                 #nHSclusters.append(M - nHSclusters[0]-nHSclusters[1])   #  last are free clusters that are not the noise cluster
 
@@ -322,7 +339,7 @@ class MarkAndRF:
                 ###############     u
                 ###############
                 for m in xrange(M):
-                    if clstsz[m] > 1:   # >= K causes Cholesky to fail at times.
+                    if clstsz[m] > 0:   # >= K causes Cholesky to fail at times.
                         u_Sg_[m] = _N.linalg.inv(_iu_Sg[m] + clstsz[m]*iSg[m])
                         clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
 
@@ -375,8 +392,8 @@ class MarkAndRF:
 
                 if use_spc:
                     fxs  = _N.copy(_fxs0)
-                    fxs *= (FQr*120)
-                    fxs -= (FQr*60)
+                    fxs *= (FQr*30)
+                    fxs -= (FQr*15)
                     fxs += Ur
 
                     if use_omp:
@@ -402,7 +419,7 @@ class MarkAndRF:
                 maxesr  = maxes.reshape((M, 1))
                 funcf   -= maxesr
                 condPosF= _N.exp(funcf)   #  condPosF is M x fss
-                ttB = _tm.time()
+                #ttB = _tm.time()
 
                 #  fxs   M x fss
                 #  fxs            M x fss
@@ -481,7 +498,10 @@ class MarkAndRF:
 
                 SL_Bs = _N.empty(M)
                 SL_as = _N.empty(M)
-                tt7 = _tm.time()
+                #tt7 = _tm.time()
+
+                #SL_B = calc_SL_B(xt0t1, f, cls_str_ind)
+                #sLLkPr = -(0.5*clstsz + _q2_a + 1)*lq2xr - iq2xr*_q2_B
                 for m in xrange(M):
                     if clstsz[m] > 0:
                         sts = v_sts[cls_str_ind[m]:cls_str_ind[m+1]]
@@ -492,7 +512,7 @@ class MarkAndRF:
                     else:
                         sLLkPr[m] = -(_q2_a[m] + 1)*lq2x - iq2x*_q2_B[m]
 
-                tt8 = _tm.time()
+                #tt8 = _tm.time()
 
                 q2 = _pcs.smp_from_cdf_interp(q2xr, sLLkPr.T, s.T, d_q2xr, q2x_m1r)
                 #tt9 = _tm.time()

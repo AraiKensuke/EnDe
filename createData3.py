@@ -164,7 +164,15 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, l_l0_chpts, l_ctr_
 
             r   = _N.interp(x, xp, rp)       #  creates a velocity vector
             #  create movement without regard for place field
-            r += Amx*(1.1+_N.sin(2*_N.pi*_N.linspace(0, 1, N, endpoint=False)*frqmx))
+            frqmxR = frqmx*(1+0.15*_N.random.randn())
+            offs = 1 + 0.015*_N.random.randn(N)
+            _N.linspace(0, 1, N, endpoint=False)
+            rscld_t = _N.random.rand(N)   #  rscld_t
+            rscld_t /= (_N.max(rscld_t)*1.01)
+            rscld_t.sort()
+            phi0 = _N.random.rand()*2*_N.pi
+            #r += Amx*(offs+_N.sin(2*_N.pi*_N.linspace(0, 1, N, endpoint=False)*frqmxR)**2)
+            r += _N.exp(Amx*_N.sin(2*_N.pi*rscld_t*frqmxR + phi0))
             pth = _N.zeros(N+1)
             for n in xrange(1, N+1):
                 pth[n] = pth[n-1] + r[n-1]

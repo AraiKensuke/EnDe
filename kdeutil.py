@@ -74,9 +74,10 @@ def Lambda(fld_x, tr_pos, all_pos, Bx, bx, dxp, occ):
 
 def evalAtFxdMks_new(fxdMks, l0, us, Sgs, iSgs, i2pidcovsr):
     Nx, pmdim     = fxdMks.shape
-
+    #  fxdMks is a 
     fxdMksr= fxdMks.reshape(Nx, 1, pmdim)
 
+    #  cmps is spatial contribution 
     cmps = i2pidcovsr*_N.exp(-0.5*_N.einsum("xmj,xmj->mx", fxdMksr-us, _N.einsum("mjk,xmk->xmj", iSgs, fxdMksr - us)))
 
     zs = _N.sum(l0*cmps, axis=0)
