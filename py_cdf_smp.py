@@ -1,4 +1,4 @@
-import numpy as _N
+ import numpy as _N
 import matplotlib.pyplot as _plt
 
 def smp_from_cdf(sg2s, sLLkPr, s, d_sg2s, sg2s_m1):

@@ -14,6 +14,7 @@ import pickle
 from posteriorUtil import MAPvalues2
 from filter import gauKer
 import gibbsApprMxMutil as gAMxMu
+import stochasticAssignment as _sA
 from par_intgrls_f  import M_times_N_f_intgrls_raw
 from par_intgrls_q2 import M_times_N_q2_intgrls_raw
 import raw_random_access as _rra
@@ -36,7 +37,9 @@ class MarkAndRF:
     twpi = 2*_N.pi
 
     #  sizes of arrays
-    Nupx = 200      #   # points to sample position with  (uniform lam(x)p(x))
+    NposHistBins = 200      #   # points to sample position with  (uniform lam(x)p(x))
+    Nupx      = 200
+    
     fss = 60       #  sampling at various values of f
     q2ss = 150      #  sampling at various values of q2
 
@@ -63,6 +66,8 @@ class MarkAndRF:
 
     nz_q2               = 500
     nz_f                = 0
+
+    Bx                  = 0    #  noise in xpos
 
     q2x_L = 1e-7
     q2x_H = 1e2
@@ -158,17 +163,17 @@ class MarkAndRF:
         l_sqrt_2pi_q2x = _N.log(sqrt_2pi_q2x)
 
         freeClstr = None
-        if smth_pth_ker > 0:
-            gk     = gauKer(smth_pth_ker) # 0.1s  smoothing of motion
-            gk     /= _N.sum(gk)
-            xf     = _N.convolve(oo.dat[:, 0], gk, mode="same")
-            oo.dat[:, 0] = xf + nz_pth*_N.random.randn(len(oo.dat[:, 0]))
-        else:
-            oo.dat[:, 0] += nz_pth*_N.random.randn(len(oo.dat[:, 0]))
+        # if smth_pth_ker > 0:
+        #     gk     = gauKer(smth_pth_ker) # 0.1s  smoothing of motion
+        #     gk     /= _N.sum(gk)
+        #     xf     = _N.convolve(oo.dat[:, 0], gk, mode="same")
+        #     oo.dat[:, 0] = xf + nz_pth*_N.random.randn(len(oo.dat[:, 0]))
+        # else:
+        #     oo.dat[:, 0] += nz_pth*_N.random.randn(len(oo.dat[:, 0]))
         x      = oo.dat[:, 0]
         mks    = oo.dat[:, 2:]
-        if nz_pth > 0:
-            _N.savetxt(resFN("nzyx.txt", dir=oo.outdir), x, fmt="%.4f")
+        # if nz_pth > 0:
+        #     _N.savetxt(resFN("nzyx.txt", dir=oo.outdir), x, fmt="%.4f")
 
         f_q2_rate = (oo.diffusePerMin**2)/60000.  #  unit of minutes  
         
@@ -188,10 +193,23 @@ class MarkAndRF:
                 dt = 0.5*((t1+t0) - (t0+tm1))
 
             dt = (t1-t0)*0.5
-            xt0t1 = _N.array(x[t0:t1])
+
             posbins  = _N.linspace(oo.xLo, oo.xHi, oo.Nupx+1)
             #  _N.sum(px)*(xbns[1]-xbns[0]) = 1
+
+            ##  smooth the positions
+            smthd_pos = x[t0:t1] + oo.Bx*_N.random.randn(t1-t0)
+            ltL = _N.where(smthd_pos < oo.xLo)[0]
+            smthd_pos[ltL] += 2*(oo.xLo - smthd_pos[ltL])
+            gtR = _N.where(smthd_pos > oo.xHi)[0]
+            smthd_pos[gtR] += 2*(oo.xHi - smthd_pos[gtR])
+            
+            xt0t1 = smthd_pos
+            
             px, xbns = _N.histogram(xt0t1, bins=posbins, normed=True)
+            _plt.plot(px)
+            
+                
             pxr      = px.reshape((1, oo.Nupx))
             pxrr     = px.reshape((1, 1, oo.Nupx))
 
@@ -199,6 +217,7 @@ class MarkAndRF:
 
             if epc == ep1:   ###  initialize
                 labS, labH, flatlabels, M, MF, hashthresh, nHSclusters = gAMxMu.initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=doSepHash, xLo=oo.xLo, xHi=oo.xHi, oneCluster=oo.oneCluster)
+                m1stHashClstr = 1 if oo.oneCluster else _N.min(_N.unique(labH)) 
 
                 #nHSclusters.append(M - nHSclusters[0]-nHSclusters[1])   #  last are free clusters that are not the noise cluster
 
@@ -296,7 +315,7 @@ class MarkAndRF:
                 if (iter % 100) == 0:    
                     print "-------iter  %(i)d" % {"i" : iter}
 
-                gAMxMu.stochasticAssignment(oo, epc, iter, M, K, l0, f, q2, u, Sg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, ((epc > 0) and (iter == 0)), nthrds=oo.nThrds)
+                _sA.stochasticAssignment(oo, epc, iter, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stHashClstr, ((epc > 0) and (iter == 0)), nthrds=oo.nThrds)
 
                 ###############  FOR EACH CLUSTER
 
@@ -320,7 +339,7 @@ class MarkAndRF:
                 ###############     u
                 ###############
                 for m in xrange(M):
-                    if clstsz[m] > K:   # >= K causes Cholesky to fail at times.
+                    if clstsz[m] > 0:   # >= K causes Cholesky to fail at times.
                         u_Sg_[m] = _N.linalg.inv(_iu_Sg[m] + clstsz[m]*iSg[m])
                         clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
 
@@ -373,8 +392,8 @@ class MarkAndRF:
 
                 if use_spc:
                     fxs  = _N.copy(_fxs0)
-                    fxs *= (FQr*120)
-                    fxs -= (FQr*60)
+                    fxs *= (FQr*30)
+                    fxs -= (FQr*15)
                     fxs += Ur
 
                     if use_omp:
@@ -400,7 +419,7 @@ class MarkAndRF:
                 maxesr  = maxes.reshape((M, 1))
                 funcf   -= maxesr
                 condPosF= _N.exp(funcf)   #  condPosF is M x fss
-                ttB = _tm.time()
+                #ttB = _tm.time()
 
                 #  fxs   M x fss
                 #  fxs            M x fss
@@ -419,19 +438,20 @@ class MarkAndRF:
                 ##############  VARIANCE, COVARIANCE
                 ##############
                 for m in xrange(M):
-                    if clstsz[m] > K:
-                        ##  dof of posterior distribution of cluster covariance
-                        Sg_nu_ = _Sg_nu[m, 0] + clstsz[m]
-                        ##  dof of posterior distribution of cluster covariance
-                        ur = u[m].reshape((1, K))
-                        clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
-                        #clstx    = l_sts[m]]
-                        Sg_PSI_ = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
-                    else:
-                        Sg_nu_ = _Sg_nu[m, 0] 
-                        ##  dof of posterior distribution of cluster covariance
-                        ur = u[m].reshape((1, K))
-                        Sg_PSI_ = _Sg_PSI[m]
+                    #if clstsz[m] > K:
+                    ##  dof of posterior distribution of cluster covariance
+                    Sg_nu_ = _Sg_nu[m, 0] + clstsz[m]
+                    ##  dof of posterior distribution of cluster covariance
+                    ur = u[m].reshape((1, K))
+                    clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
+                    #clstx    = l_sts[m]]
+                    #  dot((clstx-ur).T, (clstx-ur))==ZERO(K) when clstsz ==0
+                    Sg_PSI_ = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
+                    # else:
+                    #     Sg_nu_ = _Sg_nu[m, 0] 
+                    #     ##  dof of posterior distribution of cluster covariance
+                    #     ur = u[m].reshape((1, K))
+                    #     Sg_PSI_ = _Sg_PSI[m]
                     Sg[m] = s_u.sample_invwishart(Sg_PSI_, Sg_nu_)
                     smp_mk_hyps[oo.ky_h_Sg_nu][0, iter, m] = Sg_nu_
                     smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, iter, m] = Sg_PSI_
@@ -462,6 +482,7 @@ class MarkAndRF:
                 else:
                     s = _N.zeros((oo.q2ss, M))
                 #  B' / (a' - 1) = MODE   #keep mode the same after discount
+
                 #  B' = MODE * (a' - 1)
                 if (epc > 0) and oo.adapt:
                     _md_nd= _q2_B[q2_a_Init] / (_q2_a[q2_a_Init] + 1)
@@ -478,6 +499,9 @@ class MarkAndRF:
                 SL_Bs = _N.empty(M)
                 SL_as = _N.empty(M)
                 #tt7 = _tm.time()
+
+                #SL_B = calc_SL_B(xt0t1, f, cls_str_ind)
+                #sLLkPr = -(0.5*clstsz + _q2_a + 1)*lq2xr - iq2xr*_q2_B
                 for m in xrange(M):
                     if clstsz[m] > 0:
                         sts = v_sts[cls_str_ind[m]:cls_str_ind[m+1]]
@@ -489,6 +513,7 @@ class MarkAndRF:
                         sLLkPr[m] = -(_q2_a[m] + 1)*lq2x - iq2x*_q2_B[m]
 
                 #tt8 = _tm.time()
+
                 q2 = _pcs.smp_from_cdf_interp(q2xr, sLLkPr.T, s.T, d_q2xr, q2x_m1r)
                 #tt9 = _tm.time()
 
@@ -549,8 +574,7 @@ class MarkAndRF:
 
             ttB = _tm.time()
             print (ttB-ttA)
-
-            m1stHashClstr = _N.min(_N.unique(labH))
+            
             gAMxMu.finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_hyps, smp_sp_prms, smp_mk_hyps, smp_mk_prms, freeClstr, M, K, priors, m1stHashClstr)
             #  MAP of nzclstr
             pcklme["smp_sp_hyps"] = smp_sp_hyps

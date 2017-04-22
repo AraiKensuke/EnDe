@@ -3,6 +3,7 @@ from EnDedirs import resFN, datFN
 import kdeutil as _ku
 import time as _tm
 import matplotlib.pyplot as _plt
+import hc_bcast as _hb
 
 mz_CRCL = 0
 mz_W    = 1
@@ -195,6 +196,7 @@ class mkdecoder:
         prms posterior params
         use params to decode marks from t0 to t1
         """
+        print "epoch used for encoding: %d" % uFE
         oo = self
         ##  each 
 
@@ -231,6 +233,26 @@ class mkdecoder:
                     fxdMks[:, 1:] = oo.mkpos[nt][t, 2:]
                     if not oo.ignorespks:
                         mkint = _ku.evalAtFxdMks_new(fxdMks, l0s, us, covs, iSgs, i2pidcovsr)*oo.dt
+                        # print fxdMks.shape
+                        # print l0s.shape
+                        # print us.shape
+                        # print iSgs.shape
+                        # print i2pidcovs.shape
+                        #l0sr = _N.array(l0s[:, 0])
+                        #mkint2 = _hb.evalAtFxdMks_new(fxdMks, l0sr, us, iSgs, i2pidcovs, M, oo.Nx, oo.mdim + 1)*oo.dt
+                        #mkint = _hb.evalAtFxdMks_new(fxdMks, l0sr, us, iSgs, i2pidcovs, M, oo.Nx, oo.mdim + 1)*oo.dt
+                        #print mkint1
+                        #print mkint2
+                        if t >= 276590:
+                            print "-------   uFE %d" % uFE
+                            print t
+                            print mkint
+                            "^^^^^^^^^^^^^"
+                            print prms[nt][0][uFE]
+                            print l0s
+                            # print us
+                            # print covs
+                            print iSgs
                         oo.Lklhd[nt, t] *= mkint
                         oo.svMkIntnsty[nt].append(mkint)
 
@@ -251,7 +273,7 @@ class mkdecoder:
             oo.pX_Nm[t] = oo.intgrl * _N.product(oo.Lklhd[:, t], axis=0)
             A = _N.trapz(oo.pX_Nm[t], dx=oo.dxp)
             if A == 0:
-                print "A is %.5f" % A
+                print "A is %(A).5f at time %(t)d" % {"A": A, "t" : t}
                 fig = _plt.figure()
 
                 #_plt.plot(_N.product(oo.Lklhd[:, t], axis=0))
@@ -331,8 +353,6 @@ class mkdecoder:
 
         pNkmk = _N.empty((oo.Nx, oo.nTets))
 
-        tStart = _tm.time()
-
         ibx2   = 1. / (oo.bx * oo.bx)
         sptl   =  []
         dens   = []
@@ -380,7 +400,7 @@ class mkdecoder:
             #print "%(1).3e   %(2).3e   %(3).3e" % {"1" : (tt2-tt1), "2" : (tt3-tt2), "3" : (tt4-tt3)}
             #print "%(1).3e   %(2).3e" % {"1" : ttt1, "2" : ttt2}
         tEnd = _tm.time()
-        print "decode   %(1).3e" % {"1" : (tEnd-tStart)}
+
         #_N.savetxt("densKDE", _N.array(dens))
 
     def prepareDecKDE(self, t0, t1, telapse=0):
@@ -398,4 +418,5 @@ class mkdecoder:
 
     def spkts(self, nt, t0, t1):
         return _N.where(self.mkpos[nt][t0:t1, 1] == 1)[0] + t0
+
 

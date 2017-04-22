@@ -25,6 +25,7 @@ def createSmoothedPath(cps, N):
     pth[int(N*t1):] = cps[NC-1, 1]
     return pth
 
+
 def createSmoothedPathK(cps, N, K, LoHis):
     """
     cps = [[x1, y1], [x2, y2], [x3, y3], ...], yi in [0, 1]
