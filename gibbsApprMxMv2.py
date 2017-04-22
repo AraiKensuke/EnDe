@@ -392,7 +392,7 @@ class MarkAndRF:
 
                 if use_spc:
                     fxs  = _N.copy(_fxs0)
-                    fxs *= (FQr*30)
+                    fxs *= (FQr*30)       #  integral sampled at these f vals
                     fxs -= (FQr*15)
                     fxs += Ur
 
