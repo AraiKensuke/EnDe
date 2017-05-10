@@ -1,3 +1,6 @@
+cimport cython
+
+@cython.cdivision(True)
 def f_spiking_portion(double[::1] xt0t1, long t0, long[::1] v_sts, long[::1] strt_inds, long[::1] clstsz, double[::1] q2, double[::1] _f_u, double[::1] q2pr, long M, double[::1] U, double[::1] FQ2):
     """
     Contribution of Spiking to conditional posterior of f

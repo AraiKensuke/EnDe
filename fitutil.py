@@ -83,7 +83,7 @@ def colorclusters(smkpos, labs, MS, name="", xLo=0, xHi=3):
     print L
 
 
-def sepHash(_x, BINS=50, blksz=20, xlo=-6, xhi=6):
+def sepHash(_x, BINS=50, blksz=20, xlo=-6, xhi=6, K=4):
     ##########################
     bins    = _N.linspace(xlo, xhi, BINS+1)
     
@@ -94,8 +94,7 @@ def sepHash(_x, BINS=50, blksz=20, xlo=-6, xhi=6):
     totalMks = _x.shape[0]
 
     # only look in bins where at least minInBin marks observed.
-    for ch in xrange(1, 5):
-    #for ch in xrange(1, 3):
+    for ch in xrange(1, K+1):
         cnts0, bns0 = _N.histogram(_x[:, 0], bins=bins)
         mncnt       = _N.mean(cnts0)
         minBins       = _N.where(cnts0 > 0.5*mncnt)[0]   # only compare these
@@ -398,7 +397,7 @@ def findsmallclusters(nhmks, slabs, pmdim):
     #_plt.scatter(mks[_N.array(s_smallClstrs), 0], mks[_N.array(s_smallClstrs), 1])
     return smallClstrs, s_smallClstrs
 
-def emMKPOS_sep1A(nhmks, hmks, TR=5, wfNClstrs=[[2, 8], [1, 4]], spNClstrs=[[1, 7], [1, 2]]):
+def emMKPOS_sep1A(nhmks, hmks, TR=5, wfNClstrs=[[2, 8], [1, 4]], spNClstrs=[[1, 7], [1, 2]], K=4):
     #  wfNClstrs   [ non-hash(min, max), hash(min, max)  by waveform clustering
     TR = 2
 
@@ -437,7 +436,7 @@ def emMKPOS_sep1A(nhmks, hmks, TR=5, wfNClstrs=[[2, 8], [1, 4]], spNClstrs=[[1, 
 
                     pbestLab = _N.ones(LiTC, dtype=_N.int) * -1   #  poslabs
                     pos = mks[inThisClstr, 0]
-                    _N.savetxt("clstr%(nh)d_%(iRM)d" % {"nh" : iNH, "iRM" : iRMv_ME}, mks[inThisClstr], fmt="%.4f %4f %.4f %4f %.4f")
+                    #_N.savetxt("clstr%(nh)d_%(iRM)d" % {"nh" : iNH, "iRM" : iRMv_ME}, mks[inThisClstr], fmt="%.4f %4f %.4f %4f %.4f")
                     iRMv_ME += 1
                     pos = pos.reshape(LiTC, 1)
 
@@ -563,7 +562,7 @@ def splitclstrs(posmk, labS):
                 labS[lrgr] += 1
                 labS[these] = pbestLab + uID
 
-def posMkCov0(posmk, labS):
+def posMkCov0(posmk, labS, K=4):
     #  for each cluster, see if its better as 1 or 2 cluster
     unIDs = _N.unique(labS)
     nClstrs = len(unIDs)
@@ -576,9 +575,10 @@ def posMkCov0(posmk, labS):
         if len(these) > 8:
             pc1, pv1 = _ss.pearsonr(posmk[these, 0], posmk[these, 1])
             pc2, pv2 = _ss.pearsonr(posmk[these, 0], posmk[these, 2])
-            pc3, pv3 = _ss.pearsonr(posmk[these, 0], posmk[these, 3])
-            pc4, pv4 = _ss.pearsonr(posmk[these, 0], posmk[these, 4])
+            if K >= 2:
+                pc3, pv3 = _ss.pearsonr(posmk[these, 0], posmk[these, 3])
+                pc4, pv4 = _ss.pearsonr(posmk[these, 0], posmk[these, 4])
 
-            if (pv1 < 0.01) or (pv2 < 0.01) or (pv3 < 0.01) or (pv4 < 0.01):
-                print "uID %(id)d is significant:  %(pc1).3f  %(pc2).3f  %(pc3).3f  %(pc4).3f" % {"id" : uID, "pc1" : pc1, "pc2" : pc2, "pc3" : pc3, "pc4" : pc4}
+            #if (pv1 < 0.01) or (pv2 < 0.01) or (pv3 < 0.01) or (pv4 < 0.01):
+            #    print "uID %(id)d is significant:  %(pc1).3f  %(pc2).3f  %(pc3).3f  %(pc4).3f" % {"id" : uID, "pc1" : pc1, "pc2" : pc2, "pc3" : pc3, "pc4" : pc4}
 

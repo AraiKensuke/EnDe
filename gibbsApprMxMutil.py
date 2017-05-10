@@ -66,14 +66,14 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
         # len(hashsp)==len(labH)
         # len(unonhash)==len(labS)
         if (len(unonhash) > 0) and (len(hashsp) > 0): 
-            labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], _x[hashsp])
+            labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], _x[hashsp], K=K)
         elif len(unonhash) == 0:
-            labS, labH, clstrs = emMKPOS_sep1A(None, _x[hashsp], TR=5)
+            labS, labH, clstrs = emMKPOS_sep1A(None, _x[hashsp], TR=5, K=K)
         else:
-            labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], None, TR=5)
+            labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], None, TR=5, K=K)
         if doSepHash:
             splitclstrs(_x[unonhash], labS)
-            posMkCov0(_x[unonhash], labS)
+            posMkCov0(_x[unonhash], labS, K=K)
 
             #mergesmallclusters(_x[unonhash], _x[hashsp], labS, labH, K+1, clstrs)
             smallClstrID, spksInSmallClstrs = findsmallclusters(_x[unonhash], labS, K+1)
@@ -139,8 +139,8 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
         MF     = clstrs[0] + clstrs[1]   #  includes noise
 
 
-        MS = int(clstrs[0] * 1.3) 
-        MS = clstrs[0] + 2 if (MS == clstrs[0]) else MS
+        MS = int(clstrs[0] * 1.01) 
+        MS = clstrs[0] if (MS == clstrs[0]) else MS
         M = int(MS + clstrs[1])   #  20% more clusters
 
         print "------------"
@@ -455,12 +455,12 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
         #  hyper params to be copied to _f_u, _f_s
         
         ##########################
-        print _N.mean(smp_sp_prms[0, frm::skp, m])
-        print _N.mean(smp_sp_prms[2, frm::skp, m])
         _l0_a[m], _l0_B[m] = _pU.gam_inv_gam_dist_ML(smp_sp_prms[0, frm::skp, m], dist=_pU._GAMMA, clstr=m)
+        print "ML fit of smps  _l0_a[%(m)d] %(a).3f  _l0_B[%(m)d] %(B).3f" % {"m" : m, "a" : _l0_a[m], "B" : _l0_B[m]}
 
         ##########################
         _q2_a[m], _q2_B[m] = _pU.gam_inv_gam_dist_ML(smp_sp_prms[2, frm::skp, m], dist=_pU._INV_GAMMA, clstr=m)
+        print "ML fit of smps  _q2_a[%(m)d] %(a).3f  _q2_B[%(m)d] %(B).3f" % {"m" : m, "a" : _q2_a[m], "B" : _q2_B[m]}
     print "---------"
     print _q2_a
     print _q2_B
@@ -548,7 +548,7 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
             bBad = (_l0_a[m] is None) or (_l0_B[m] is None) or _N.isnan(_l0_a[m]) or _N.isnan(_l0_B[m]) or (_q2_a[m] is None) or (_q2_B[m] is None) or _N.isnan(_q2_a[m]) or _N.isnan(_q2_B[m])
             if bBad:
                 print "cluster who's posterior difficult to estimate found.   occupancy %d" % occ[m]
-            if bBad or (occ[m] == 0) or ((occ[m] < minAss) and (l0[m] / _N.sqrt(twpi*q2[m]) < 1)) or \
+            if bBad or ((occ[m] < minAss) and (l0[m] / _N.sqrt(twpi*q2[m]) < 0.1)) or \
                (f[m] < oo.xLo-sq25[m]) or (f[m] > oo.xHi+sq25[m]):
                 print "resetting  cluster %(m)d   %(l0).3f  %(f).3f" % {"m" : m, "l0" : (l0[m] / _N.sqrt(twpi*q2[m])), "f" : f[m]}
                 iclstr = 1 if m >= m1stHashClstr else 0

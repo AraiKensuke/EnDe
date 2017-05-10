@@ -61,7 +61,7 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     #  mAS = mks[Asts+t0] 
     #  xAS = x[Asts + t0]   #  position @ spikes
 
-    if cmp2Existing:   #  compare only non-hash spikes and non-hash clusters
+    if cmp2Existing and (M > 1):   #  compare only non-hash spikes and non-hash clusters
         # realCl = _N.where(freeClstr == False)[0]
         # print freeClstr.shape
         # print realCl.shape
@@ -368,8 +368,8 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
 
     gz[it] = (M1&M2).T
 
-    if cmp2Existing:
-        for ii in xrange(3):
+    if cmp2Existing and (M > 1):
+        for ii in xrange(2):
             gz[it, reassign_l8r[ii][:, 0]] = False
             gz[it, reassign_l8r[ii][:, 0], reassign_l8r[ii][:, 1]] = True
     #     #  gz   is ITERS x N x M   (N # of spikes in epoch)
