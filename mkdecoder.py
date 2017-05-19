@@ -225,6 +225,7 @@ class mkdecoder:
 
         ones = _N.ones(oo.Nx)
         for t in xrange(t0+1,t1): # start at 1 because initial condition
+            #print "t %d" % t
             #tt1 = _tm.time()
             for nt in xrange(oo.nTets):
                 oo.Lklhd[nt, t] = pNkmk0[:, nt]
@@ -243,16 +244,6 @@ class mkdecoder:
                         #mkint = _hb.evalAtFxdMks_new(fxdMks, l0sr, us, iSgs, i2pidcovs, M, oo.Nx, oo.mdim + 1)*oo.dt
                         #print mkint1
                         #print mkint2
-                        if t >= 276590:
-                            print "-------   uFE %d" % uFE
-                            print t
-                            print mkint
-                            "^^^^^^^^^^^^^"
-                            print prms[nt][0][uFE]
-                            print l0s
-                            # print us
-                            # print covs
-                            print iSgs
                         oo.Lklhd[nt, t] *= mkint
                         oo.svMkIntnsty[nt].append(mkint)
 
@@ -277,13 +268,16 @@ class mkdecoder:
                 fig = _plt.figure()
 
                 #_plt.plot(_N.product(oo.Lklhd[:, t], axis=0))
-                print "t=%d" % t
+                #print "t=%d" % t
                 for tet in xrange(4):
-                    print oo.Lklhd[tet, t]
+                    #print oo.Lklhd[tet, t]
                     fig = _plt.figure()
                     _plt.plot(oo.Lklhd[tet, t])
 
-            assert A > 0, "A   %.4f" % A
+            if _N.isnan(A):
+                print "nan" 
+                print mkint
+            assert A > 0, "A   %(A).4f,  t is %(t)d" % {"A" : A, "t" : t}
 
             oo.pX_Nm[t] /= A
             #tt4 = _tm.time()

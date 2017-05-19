@@ -71,6 +71,9 @@ class MarkAndRF:
     q2_L = 1e-6;    q2_H = 1e4
 
     oneCluster = False
+
+    q2_lvls    = _N.array([0.02**2, 0.05**2, 0.1**2, 0.2**2, 0.5**2, 1**2, 6**2, 100000**2])
+    Nupx_lvls  = _N.array([1000, 600, 200, 100, 60, 20, 12, 8])
     
     def __init__(self, outdir, fn, intvfn, xLo=0, xHi=3, seed=1041, adapt=True, t_hlf_l0_mins=None, t_hlf_q2_mins=None, oneCluster=False):
         oo     = self
@@ -97,7 +100,7 @@ class MarkAndRF:
         oo.xLo = xLo
         oo.xHi = xHi
 
-    def gibbs(self, ITERS, K, priors, ep1=0, ep2=None, savePosterior=True, gtdiffusion=False, doSepHash=True, use_spc=True, nz_pth=0., smth_pth_ker=100, ignoresilence=False, use_omp=False, nThrds=2):
+    def gibbs(self, ITERS, K, priors, ep1=0, ep2=None, savePosterior=True, gtdiffusion=False, doSepHash=True, use_spc=True, nz_pth=0., smth_pth_ker=100, ignoresilence=False, use_omp=False, nThrds=2, f_STEPS=13, q2_STEPS=13, f_SMALL=10, q2_SMALL=10, f_cldz=10, q2_cldz=10, minSmps=20):
         """
         gtdiffusion:  use ground truth center of place field in calculating variance of center.  Meaning of diffPerMin different
         """
@@ -118,8 +121,8 @@ class MarkAndRF:
         ####  NSexp, Nupx, fss, q2ss
 
         #  numerical grid
-        ux = _N.linspace(oo.xLo, oo.xHi, oo.Nupx, endpoint=False)   # grid over which spatial integrals are calculated
-        uxr = ux.reshape((1, oo.Nupx))
+        #ux = _N.linspace(oo.xLo, oo.xHi, oo.Nupx, endpoint=False)   # grid over which spatial integrals are calculated
+        #uxr = ux.reshape((1, oo.Nupx))
 
         #  grid over which conditional probability of q2 adaptively sampled
         #  grid over which conditional probability of q2 adaptively sampled
@@ -144,7 +147,9 @@ class MarkAndRF:
         tau_l0 = oo.t_hlf_l0/_N.log(2)
         tau_q2 = oo.t_hlf_q2/_N.log(2)
 
-        _cdfs.init(oo.dt, oo.f_L, oo.f_H, oo.q2_L, oo.q2_H, 13, 13, 10, 10, 10, 10)
+        _cdfs.init(oo.dt, oo.f_L, oo.f_H, oo.q2_L, oo.q2_H, f_STEPS, q2_STEPS, f_SMALL, q2_SMALL, f_cldz, q2_cldz, minSmps)
+        _cdfs.init_occ_resolutions(oo.xLo, oo.xHi, oo.q2_lvls, oo.Nupx_lvls)
+
         for epc in xrange(ep1, ep2):
             print "^^^^^^^^^^^^^^^^^^^^^^^^    epoch %d" % epc
 
@@ -168,11 +173,11 @@ class MarkAndRF:
             smthd_pos[gtR] += 2*(oo.xHi - smthd_pos[gtR])
             
             xt0t1 = smthd_pos
+
+            _cdfs.change_occ_px(xt0t1, oo.xLo, oo.xHi)
+            #px, xbns = _N.histogram(xt0t1, bins=posbins, normed=True)
             
-            px, xbns = _N.histogram(xt0t1, bins=posbins, normed=True)
-            _plt.plot(px)
-            
-            pxr      = px.reshape((1, oo.Nupx))
+            #pxr      = px.reshape((1, oo.Nupx))
 
             Asts    = _N.where(oo.dat[t0:t1, 1] == 1)[0]   #  based at 0
 
@@ -203,6 +208,7 @@ class MarkAndRF:
                 freeClstr[:] = False
 
                 l0, f, q2, u, Sg = gAMxMu.declare_params(M, K)   #  nzclstr not inited  # sized to include noise cluster if needed
+                l0_exp_px = _N.empty(M)
                 _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, \
                     _Sg_PSI = gAMxMu.declare_prior_hyp_params(M, MF, K, x, mks, Asts, t0, priors, labS, labH)
                 fr = f.reshape((M, 1))
@@ -337,7 +343,8 @@ class MarkAndRF:
                     q2pr = _f_q2
 
                 m_rnds = _N.random.rand(M)
-                _cdfs.smp_f(M, clstsz, cls_str_ind, v_sts, ux, px, oo.Nupx, xt0t1, t0, f, q2, l0, _f_u, q2pr, m_rnds)
+                _cdfs.smp_f(M, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _f_u, q2pr, m_rnds)
+                #f[0] = 0
                 smp_sp_prms[oo.ky_p_f, iter] = f
 
                 #tt5 = _tm.time()
@@ -386,8 +393,10 @@ class MarkAndRF:
 
                 #tt7 = _tm.time()
 
-                _cdfs.smp_q2(M, clstsz, cls_str_ind, v_sts, ux, px, oo.Nupx, xt0t1, t0, f, q2, l0, _Dq2_a, _Dq2_B, m_rnds)
+                _cdfs.smp_q2(M, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _Dq2_a, _Dq2_B, m_rnds)
                 smp_sp_prms[oo.ky_p_q2, iter]   = q2
+                #print "-----------------"
+                #print q2
 
 #                 #tt9 = _tm.time()
 
@@ -408,14 +417,16 @@ class MarkAndRF:
                 ###############  CONDITIONAL l0
                 ###############
                 #  _ss.gamma.rvs.  uses k, theta  k is 1/B (B is our thing)
-                iiq2 = 1./q2
-                iiq2r= iiq2.reshape((M, 1))
+                _cdfs.l0_spatial(M, oo.dt, f, q2, l0_exp_px)
 
-                fr = f.reshape((M, 1))
-                l0_intgrd   = _N.exp(-0.5*(fr - uxr)*(fr-uxr) * iiq2r)  
+                #iiq2 = 1./q2
+                #iiq2r= iiq2.reshape((M, 1))
+                #fr = f.reshape((M, 1))
+                #l0_intgrd   = _N.exp(-0.5*(fr - uxr)*(fr-uxr) * iiq2r)  
 
-                l0_exp_px   = _N.sum(l0_intgrd*pxr, axis=1) * _cdfs.dSilenceX
-                BL  = ((oo.dt)/_N.sqrt(twpi*q2))*l0_exp_px    #  dim M
+                #l0_exp_px   = _N.sum(l0_intgrd*pxr, axis=1) * _cdfs.dSilenceX
+                #BL  = ((oo.dt)/_N.sqrt(twpi*q2))*l0_exp_px    #  dim M
+                BL  = l0_exp_px    #  dim M
 
                 if (epc > 0) and oo.adapt:
                     _md_nd= _l0_a / _l0_B
@@ -432,11 +443,14 @@ class MarkAndRF:
                 
                 try:   #  if there is no prior, if a cluster 
                     l0 = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_))  #  check
+                    #l0 = _N.ones(M)#_ss.gamma.rvs(l0_a_, scale=(1/l0_B_))  #  check
                 except ValueError:
-                    _N.savetxt("fxux", (fr - ux)*(fr-ux))
-                    _N.savetxt("fr", fr)
-                    _N.savetxt("iiq2", iiq2)
-                    _N.savetxt("l0_intgrd", l0_intgrd)
+                    print "problem with l0"
+                    print l0_exp_px
+                    #_N.savetxt("fxux", (fr - ux)*(fr-ux))
+                    #_N.savetxt("fr", fr)
+                    #_N.savetxt("iiq2", iiq2)
+                    #_N.savetxt("l0_intgrd", l0_intgrd)
                     raise
 
                 smp_sp_prms[oo.ky_p_l0, iter] = l0

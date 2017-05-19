@@ -163,17 +163,17 @@ class MarkAndRF:
         l_sqrt_2pi_q2x = _N.log(sqrt_2pi_q2x)
 
         freeClstr = None
-        # if smth_pth_ker > 0:
-        #     gk     = gauKer(smth_pth_ker) # 0.1s  smoothing of motion
-        #     gk     /= _N.sum(gk)
-        #     xf     = _N.convolve(oo.dat[:, 0], gk, mode="same")
-        #     oo.dat[:, 0] = xf + nz_pth*_N.random.randn(len(oo.dat[:, 0]))
-        # else:
-        #     oo.dat[:, 0] += nz_pth*_N.random.randn(len(oo.dat[:, 0]))
+        if smth_pth_ker > 0:
+            gk     = gauKer(smth_pth_ker) # 0.1s  smoothing of motion
+            gk     /= _N.sum(gk)
+            xf     = _N.convolve(oo.dat[:, 0], gk, mode="same")
+            oo.dat[:, 0] = xf + nz_pth*_N.random.randn(len(oo.dat[:, 0]))
+        else:
+            oo.dat[:, 0] += nz_pth*_N.random.randn(len(oo.dat[:, 0]))
         x      = oo.dat[:, 0]
         mks    = oo.dat[:, 2:]
-        # if nz_pth > 0:
-        #     _N.savetxt(resFN("nzyx.txt", dir=oo.outdir), x, fmt="%.4f")
+        if nz_pth > 0:
+            _N.savetxt(resFN("nzyx.txt", dir=oo.outdir), x, fmt="%.4f")
 
         f_q2_rate = (oo.diffusePerMin**2)/60000.  #  unit of minutes  
         
@@ -217,7 +217,10 @@ class MarkAndRF:
 
             if epc == ep1:   ###  initialize
                 labS, labH, flatlabels, M, MF, hashthresh, nHSclusters = gAMxMu.initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=doSepHash, xLo=oo.xLo, xHi=oo.xHi, oneCluster=oo.oneCluster)
-                m1stHashClstr = 1 if oo.oneCluster else _N.min(_N.unique(labH)) 
+                if doSepHash:
+                    m1stHashClstr = 1 if oo.oneCluster else _N.min(_N.unique(labH)) 
+                else:
+                    m1stHashClstr = M
 
                 #nHSclusters.append(M - nHSclusters[0]-nHSclusters[1])   #  last are free clusters that are not the noise cluster
 

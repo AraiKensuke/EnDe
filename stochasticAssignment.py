@@ -88,11 +88,7 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
         #knownNonHclstrs  = _N.where(abvthrAtLeast1Ch & (freeClstr == False) & (q2 < wdSpc))[0]   
         allClstrs = _N.arange(M)
         knownNonHclstrs  = _N.where((freeClstr == False) & (allClstrs < m1stHashClstr))[0]
-        print "non-H clstrs"
-        print knownNonHclstrs
         knownHclstrs     = _N.where((freeClstr == False) & (allClstrs >= m1stHashClstr))[0]
-        print "H clstrs"
-        print knownHclstrs
 
         freeClstrs      = _N.where(freeClstr == True)[0]        
         knownClstrs       = _N.where(freeClstr == False)[0]        
@@ -110,7 +106,7 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
         fp = open(resFN("stochAss_cmp2Existing%d" % epc, dir=oo.outdir), "w")
         if len(knownNonHclstrs) > 0:   #  there are signal clusters available
             nNrstMKS_d = _N.sqrt(_N.min(qdrMKS[knownNonHclstrs], axis=0))  #  dim len(sts)
-            nNrstMKS_2H_d = _N.sqrt(_N.min(qdrMKS[knownHclstrs], axis=0))  #  dim len(sts)
+            #nNrstMKS_2H_d = _N.sqrt(_N.min(qdrMKS[knownHclstrs], axis=0))  #  dim len(sts)
             nNrstSPC_d = _N.sqrt(_N.min(qdrSPC[knownNonHclstrs], axis=0))
             closest_clust  = _N.sqrt(_N.min(qdrMKS[knownClstrs], axis=0))
             closest_clust_r= closest_clust.reshape((N, 1))
@@ -255,89 +251,6 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
         pickle.dump(farClusts, dmp, -1)
         dmp.close()
 
-        """
-        ##  points in newNonHashSpks but not in farMKinds
-        notFarMKSPinds = _N.setdiff1d(_N.arange(newNonHashSpks.shape[0]), farMKSPinds)
-
-        farMKSP = _N.empty((len(farMKSPinds), K+1))
-        farMKSP[:, 0]  = xASr[0, newNonHashSpks[farMKSPinds]]
-        farMKSP[:, 1:] = mASr[0, newNonHashSpks[farMKSPinds]]
-        notFarMKSP = _N.empty((len(notFarMKSPinds), K+1))
-        notFarMKSP[:, 0]  = xASr[0, newNonHashSpks[notFarMKSPinds]]
-        notFarMKSP[:, 1:] = mASr[0, newNonHashSpks[notFarMKSPinds]]
-
-        # farSP = _N.empty((len(farSPinds), K+1))
-        # farMK = _N.empty((len(farMKinds), K+1))
-        # farSP[:, 0]  = xASr[0, farSPinds]
-        # farSP[:, 1:] = mASr[0, farSPinds]
-        # farMK[:, 0]  = xASr[0, farMKinds]
-        # farMK[:, 1:] = mASr[0, farMKinds]
-
-        minK = 1
-        maxK = farMKSPinds.shape[0] / K
-        maxK = maxK if (maxK < 6) else 6
-
-        freeClstrs = _N.where(freeClstr == True)[0]
-        if maxK >= 2:
-            print "coming in here"
-            #labs, bics, bestLab, nClstrs = _oT.EMBICs(farMKSP, minK=minK, maxK=maxK, TR=1)
-            labs, labsH, clstrs = emMKPOS_sep1B(farMKSP, None, TR=1, wfNClstrs=[[1, 4], [1, 4]], spNClstrs=[[1, 4], [1, 3]])
-            nClstrs = clstrs[0]
-            bestLab    = labs
-
-            cls = clrs.get_colors(nClstrs)
-
-            _U.savetxtWCom(resFN("newSpksMKSP%d" % epc, dir=oo.outdir), farMKSP, fmt="%.3e %.3e %.3e %.3e %.3e", com=("# number of clusters %d" % nClstrs))
-            _U.savetxtWCom(resFN("newSpksMKSP_nf%d" % epc, dir=oo.outdir), notFarMKSP, fmt="%.3e %.3e %.3e %.3e %.3e", com=("# number of clusters %d" % nClstrs))
-
-            L = len(freeClstrs)
-            
-            unqLabs = _N.unique(bestLab)
-
-            upto    = nClstrs if nClstrs < L else L  #  this should just count large clusters
-            ii  = -1
-            fig = _plt.figure()
-            
-            for fid in unqLabs[0:upto]:
-                iths = farMKSPinds[_N.where(bestLab == fid)[0]]
-                ths = newNonHashSpks[iths]
-
-                for w in xrange(K):
-                    fig.add_subplot(2, 2, w+1)
-                    _plt.scatter(xASr[0, ths], mASr[0, ths, w], color=cls[ii])
-
-                if len(ths) > K:
-                    ii += 1
-                    im = freeClstrs[ii]   # Asts + t0 gives absolute time
-                    newNonHashSpksMemClstr[iths] = im
-
-                    #_u_u[im]  = _N.mean(mASr[0, ths], axis=0)
-                    u[im]     = _N.mean(mASr[0, ths], axis=0)
-                    #_f_u[im]  = _N.mean(xASr[0, ths], axis=0)
-                    f[im]     = _N.mean(xASr[0, ths], axis=0)
-                    q2[im]    = _N.std(xASr[0, ths], axis=0)**2 * 9
-                    #  l0 = Hz * sqrt(2*_N.pi*q2)
-                    l0[im]    =   10*_N.sqrt(q2[im])
-                    _f_q2[im] = 1
-                    #_u_Sg[im] = _N.cov(mASr[0, ths], rowvar=0)*25
-                    print "ep %(ep)d  new   cluster #  %(m)d" % {"ep" : epc, "m" : im}
-                    print _u_u[im]
-                    print _f_u[im]
-                    print _f_q2[im]
-                else:
-                    print "too small    this prob. doesn't represent a cluster"
-
-            _plt.savefig("newspks%d" % epc)
-
-        else:  #  just one cluster
-            im = freeClstrs[0]   # Asts + t0 gives absolute time
-
-
-            #_u_u[im]  = _N.mean(mASr[0, newNonHashSpks[farMKSPinds]], axis=0)
-            #_f_u[im]  = _N.mean(xASr[0, newNonHashSpks[farMKSPinds]], axis=0)
-            #_u_Sg[im] = _N.cov(mASr[0, newNonHashSpks[farMKSPinds]], rowvar=0)*16
-            #_f_q2[im] = _N.std(xASr[0, newNonHashSpks[farMKSPinds]], axis=0)**2 * 16
-        """
 
     ####  outside cmp2Existing here
     #   (Mx1) + (Mx1) - (MxN + MxN)
@@ -369,7 +282,9 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     gz[it] = (M1&M2).T
 
     if cmp2Existing and (M > 1):
-        for ii in xrange(2):
+        print "length of reassign_l8r   %d"  % len(reassign_l8r)
+        for ii in xrange(len(reassign_l8r)):
+
             gz[it, reassign_l8r[ii][:, 0]] = False
             gz[it, reassign_l8r[ii][:, 0], reassign_l8r[ii][:, 1]] = True
     #     #  gz   is ITERS x N x M   (N # of spikes in epoch)

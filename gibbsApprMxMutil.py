@@ -25,7 +25,10 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
     if oneCluster:
         unonhash = _N.arange(len(Asts))
         hashsp   = _N.array([])
-        hashthresh = _N.min(_x[:, 1:], axis=0)   #  no hash spikes
+        if len(Asts > 0):
+            hashthresh = _N.min(_x[:, 1:], axis=0)   #  no hash spikes
+        else:
+            hashthresh = -100.
 
         labS     = _N.zeros(len(Asts), dtype=_N.int)
         labH     = _N.array([], dtype=_N.int)
@@ -139,8 +142,8 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
         MF     = clstrs[0] + clstrs[1]   #  includes noise
 
 
-        MS = int(clstrs[0] * 1.01) 
-        MS = clstrs[0] if (MS == clstrs[0]) else MS
+        MS = int(clstrs[0] * 1.1) 
+        MS = clstrs[0] if (MS == clstrs[0]) else MS + 2
         M = int(MS + clstrs[1])   #  20% more clusters
 
         print "------------"
@@ -216,23 +219,27 @@ def declare_prior_hyp_params(M, MF, K, x, mks, Asts, t0, priors, labS, labH):
     #_u_u    = _N.tile(mkmn, M).T.reshape((M, K))
     #_u_Sg   = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*20  #  this 
 
-    allSg   = _N.zeros((K, K))
-    sd  = _N.sort(mks[Asts], axis=0)    #  first index is tetrode
+    if len(Asts) > 0:
+        allSg   = _N.zeros((K, K))
+        sd  = _N.sort(mks[Asts], axis=0)    #  first index is tetrode
 
-    mins= _N.min(sd, axis=0);     maxs= _N.max(sd, axis=0)
+        mins= _N.min(sd, axis=0);     maxs= _N.max(sd, axis=0)
 
-    Wdth= sd[-1] - sd[0]
-    ctr = sd[0] + 0.5*(sd[-1] - sd[0])
-    _u_u    = _N.tile(ctr, M).T.reshape((M, K))
+        Wdth= sd[-1] - sd[0]
+        ctr = sd[0] + 0.5*(sd[-1] - sd[0])
+        _u_u    = _N.tile(ctr, M).T.reshape((M, K))
 
-    _N.fill_diagonal(allSg, (5*Wdth)**2)
+        _N.fill_diagonal(allSg, (5*Wdth)**2)
 
-    #  xcorr(1, 2)**2 / var1 var2
-    for ix in xrange(K):
-        for iy in xrange(ix + 1, K):
-            pc, pv = _ss.pearsonr(mks[Asts, ix], mks[Asts, iy])
-            allSg[ix, iy]  = pc*pc * _N.sqrt(allSg[ix, ix] * allSg[iy, iy])
-            allSg[iy, ix]  = allSg[ix, iy]
+        #  xcorr(1, 2)**2 / var1 var2
+        for ix in xrange(K):
+            for iy in xrange(ix + 1, K):
+                pc, pv = _ss.pearsonr(mks[Asts, ix], mks[Asts, iy])
+                allSg[ix, iy]  = pc*pc * _N.sqrt(allSg[ix, ix] * allSg[iy, iy])
+                allSg[iy, ix]  = allSg[ix, iy]
+    else:
+        allSg   = _N.eye(K, K)   # no spikes
+        _u_u    = _N.tile(_N.zeros(K), M).T.reshape((M, K))
 
     #_u_Sg   = _N.tile(_N.identity(K), M).T.reshape((M, K, K))  #  this 
     _u_Sg   = _N.tile(allSg, M).T.reshape((M, K, K))  #  this 
@@ -257,17 +264,21 @@ def init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, 
     for im in xrange(MF):  #if lab < 0, these marks not used for init
         kinds = _N.where(flatlabels == im)[0]  #  inds
         #print "len   %d" % len(kinds)
-        f[im]  = _N.mean(x[Asts[kinds]+t0], axis=0)
-        u[im]  = _N.mean(mks[Asts[kinds]+t0], axis=0)
-        if len(kinds) > 1:
-            q2[im] = _N.std(x[Asts[kinds]+t0], axis=0)**2
+        if nSpks > 0:
+            f[im]  = _N.mean(x[Asts[kinds]+t0], axis=0)
+            u[im]  = _N.mean(mks[Asts[kinds]+t0], axis=0)
+            if len(kinds) > 1:
+                q2[im] = _N.std(x[Asts[kinds]+t0], axis=0)**2
+            else:
+                q2[im] = 0.1  #   just don't know about this one
+            if len(kinds) > K:
+                Sg[im] = _N.cov(mks[Asts[kinds]+t0], rowvar=0)
+            else:
+                Sg[im] = _N.cov(mks[Asts+t0], rowvar=0)
+
+                l0[im] = (len(kinds) / float(nSpks))*100
         else:
-            q2[im] = 0.1  #   just don't know about this one
-        if len(kinds) > K:
-            Sg[im] = _N.cov(mks[Asts[kinds]+t0], rowvar=0)
-        else:
-            Sg[im] = _N.cov(mks[Asts+t0], rowvar=0)
-        l0[im] = (len(kinds) / float(nSpks))*100
+            MF = 0  #  just go into next block and initialize
 
     for im in xrange(MF, M):  #if lab < 0, these marks not used for init
         f[im]  = _N.random.randn()*3
@@ -434,6 +445,7 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
     frm   = 1000  #  have to test for stationarity
 
     ##  
+    occ = None
     if nSpks > 0:
         #  ITERS x nSpks x M   
         occ   = _N.mean(_N.mean(gz[frm:ITERS-1], axis=0), axis=0)
