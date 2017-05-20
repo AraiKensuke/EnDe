@@ -395,8 +395,8 @@ class MarkAndRF:
 
                 _cdfs.smp_q2(M, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _Dq2_a, _Dq2_B, m_rnds)
                 smp_sp_prms[oo.ky_p_q2, iter]   = q2
-                #print "-----------------"
-                #print q2
+                # print "-----------------"
+                # print q2
 
 #                 #tt9 = _tm.time()
 

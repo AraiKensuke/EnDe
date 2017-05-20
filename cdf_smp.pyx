@@ -24,7 +24,11 @@ cdef double[::1] v_fx2
 cdef double[::1] v_qx2
 
 #####  variables for changing resolution of occupation function
-cdef double *p_riemann_xs, *p_px_all, *p_ibinszs, *p_q2_thr, *dSilenceXs
+cdef double *p_riemann_xs, 
+cdef double *p_px_all
+cdef double *p_ibinszs
+cdef double *p_q2_thr
+cdef double *dSilenceXs
 cdef int minSmps
 
 cdef long *Nupxs
@@ -348,7 +352,7 @@ def l0_spatial(long M, double dt, double[::1] v_fxd_fc, double[::1] v_fxd_q2, do
         sptlIntgrl = 0.0
         hlfIIQ2 = -0.5/q2c
         sd = sqrt(q2c)
-        #print "%(f).3f  %(s).3f" % {"f" : fc, "s" : sd}
+
         iL = int((fc-6*sd-x_Lo)*ibnsz)
 
         iR = int((fc+6*sd-x_Lo)*ibnsz)
@@ -403,8 +407,8 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
 
     cdef int bDone= 0
 
-    cdef double pmax = -1.e200
-    cdef double gpmax= -1.e200   #  global pmax
+    cdef double pmax = -1.e300
+    cdef double gpmax= -1.e300   #  global pmax
 
     cdef int lvl  = 0  #  how deep in discretization level.  maximum val of cldz+1
     cdef int L
@@ -440,6 +444,7 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
     cdef double fc = 0
     cdef long Nupx, iStart
     cdef double dSilenceX, ibnsz
+    cdef int istepbck = 0
 
     cdef double Mc, Sigma2c, q2_cnd_on, a, B, f_cnd_on, iq2_cnd_on
 
@@ -453,9 +458,20 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
         B         = p_params[1]
         f_cnd_on  = p_params[2]
 
+    #initial point, set pmax, gmax
+    if dist == __NRM:
+        getOccDens(q2_cnd_on, &Nupx, &iStart, &dSilenceX, &ibnsz)
+        p_cond_pstr[0] = pdfNRM(p_gx[0], q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, &p_riemann_xs[iStart], &p_px_all[iStart], Nupx, ibnsz, dt, l0, dSilenceX, x_Lo, x_Hi)
+    elif dist == __IG:
+        getOccDens(p_gx[0], &Nupx, &iStart, &dSilenceX, &ibnsz)
+        p_cond_pstr[0] = pdfIG(p_gx[0], f_cnd_on, a, B, &p_riemann_xs[iStart], &p_px_all[iStart], Nupx, ibnsz, dt, l0, dSilenceX, x_Lo, x_Hi)
+    pmax = p_cond_pstr[0]
+    gmax = pmax
+    imax = 0
+    
     while (cldz > -1) and (bDone == 0):
         if lvl == 0:  # 1st 2 passes skip sizes are the same
-            strt = 0
+            strt = 0   #  first point will have been done already
             skp  = p_twoPOW[cldz]          # 2**cldz
             #print "init skip %d skp" % skp
             initl_skp  = skp
@@ -510,21 +526,31 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
         #  start half the current skip size before and after iBdL and iBdR
         # now find left and right bounds
 
-        ix = strt
+        ix = strt  #  sampling has started from istrt.  
 
+        #printf("strt %d     stop %d     skip %d\n", strt, stop, skp)
+        istepbck = 0
         while (ix < gimax) and (p_cond_pstr[ix] < pthresh):
-            ix += skp
-        ix -= skp
+            # if we don't do this while, we still end up stepping back. 
+            istepbck += 1
+            ix += skp  
+        #  at this point, p_cond_str[ix] >= pthresh or ix >= gimax
+        if istepbck > 0:
+            ix -= skp  # step back, so p_cond_str[ix] is now < pthresh.
         if ix >= 0:
             iBdL = ix
         else:
             while ix < 0:
                 ix += skp
             iBdL = ix
+        ##########
+        istepbck = 0
         ix = stop
         while (ix > gimax) and (p_cond_pstr[ix] < pthresh):
+            istepbck += 1
             ix -= skp
-        ix += skp
+        if istepbck > 0:
+            ix += skp
 
         if ix <= p_twoPOW[STEPS]:
             iBdR = ix
@@ -570,6 +596,8 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
     #  midInds should be same as _N.arange(iBdL_glbl, iBdR_glbl+1, fine_skip)
     L   = (lft.shape[0] + rgt.shape[0] + narr_FM.shape[0])
     adtvInds = _N.empty(L, dtype=_N.int)
+    cdef long[::1] v_adtvInds = adtvInds
+    cdef long* p_adtvInds     = &v_adtvInds[0]
     adtvInds[0:lft.shape[0]] = lft
     adtvInds[lft.shape[0]:lft.shape[0] + narr_FM.shape[0]] = narr_FM
     adtvInds[lft.shape[0] + narr_FM.shape[0]:lft.shape[0] + narr_FM.shape[0]+rgt.shape[0]] = rgt
@@ -579,31 +607,34 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
     # print nSmpd
     # print adtvInds
 
+    for 0 <= l < L:   #  largest value should be 0, so exp doesn't -> 0
+        p_cond_pstr[p_adtvInds[l]] -= gpmax
+
     # print adtvInds.shape[0]
     # print narr_FM.shape[0]
     # print "----------"
-    for l in adtvInds:   #  largest value should be 0, so exp doesn't -> 0
-        if p_cond_pstr[l] > gpmax:   ####  TEMPORARY  for debug purposes
-            # print "------------   woa, %d" % l
-            # for ll in xrange(lvl):
-            #     ii0 = intvs_each_lvl[3*ll]
-            #     ii1 = intvs_each_lvl[3*ll+1]
-            #     printf("       %d  %d\n", ii0, ii1)
+    # for l in adtvInds:   #  largest value should be 0, so exp doesn't -> 0
+    #     if p_cond_pstr[l] > gpmax:   ####  TEMPORARY  for debug purposes
+    #         print "------------   woa, %d" % l
+        #     for ll in xrange(lvl):
+        #         ii0 = intvs_each_lvl[3*ll]
+        #         ii1 = intvs_each_lvl[3*ll+1]
+        #         printf("       %d  %d     %d\n", ii0, ii1, intvs_each_lvl[3*ll+2])
 
-            # print adtvInds
-            # print narr_FM
-            # print "offending val %(pcp).3e @ %(x).3e " % {"pcp" : p_cond_pstr[l], "x" : p_gx[l]}
+        #     print adtvInds
+        #     print narr_FM
+        #     print "offending val %(pcp).3e @ %(x).3e " % {"pcp" : p_cond_pstr[l], "x" : p_gx[l]}
 
-            # getOccDens(p_gx[l], &Nupx, &iStart, &dSilenceX, &ibnsz)            
-            # print iStart
-            # print dSilenceX
-            # print ibnsz
-            # print Nupx
-            tryagain = pdfIG(p_gx[l], f_cnd_on, a, B, &p_riemann_xs[iStart], &p_px_all[iStart], Nupx, ibnsz, dt, l0, dSilenceX, x_Lo, x_Hi)
-            print "try again val %.3e" % tryagain
-            p_cond_pstr[l] = tryagain
-            gpmax = tryagain
-        p_cond_pstr[l] -= gpmax
+        #     getOccDens(p_gx[l], &Nupx, &iStart, &dSilenceX, &ibnsz)            
+        #     print iStart
+        #     print dSilenceX
+        #     print ibnsz
+        #     print Nupx
+        #     tryagain = pdfIG(p_gx[l], f_cnd_on, a, B, &p_riemann_xs[iStart], &p_px_all[iStart], Nupx, ibnsz, dt, l0, dSilenceX, x_Lo, x_Hi)
+        #     print "try again val %.3e" % tryagain
+        #     p_cond_pstr[l] = tryagain
+        #     gpmax = tryagain
+        # p_cond_pstr[l] -= gpmax
     free(intvs_each_lvl)
     return adtvInds, L
 
