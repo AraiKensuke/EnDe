@@ -14,6 +14,8 @@ def hc_bcast1(double[:, ::1] fr, double [:, ::1] xASr, double[:, ::1] iq2r, doub
     #  f_intgrd  Nupx
     cdef int m, n, mN
 
+    cdef double pfrm
+    cdef double piq2rm
     cdef double *p_qdrSPC   = &qdrSPC[0, 0]
     cdef double *p_fr       = &fr[0, 0]
     cdef double *p_xASr     = &xASr[0, 0]
@@ -21,8 +23,11 @@ def hc_bcast1(double[:, ::1] fr, double [:, ::1] xASr, double[:, ::1] iq2r, doub
 
     for 0 <= m < M:
         mN = m*N
+        pfrm = p_fr[m]
+        piq2rm= p_iq2r[m]
         for 0 <= n < N:
-            p_qdrSPC[mN+n] = (p_fr[m] - p_xASr[n])*(p_fr[m] - p_xASr[n])*p_iq2r[m]
+            p_qdrSPC[mN+n] = (pfrm - p_xASr[n])*(pfrm - p_xASr[n])*piq2rm
+            #p_qdrSPC[mN+n] = (p_fr[m] - p_xASr[n])*(p_fr[m] - p_xASr[n])*p_iq2r[m]
 
 @cython.boundscheck(False)
 @cython.wraparound(False)

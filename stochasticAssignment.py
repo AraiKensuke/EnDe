@@ -24,9 +24,9 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     #  parameters l0, f, q2
     #  mASr, xASr   just the mark, position of spikes btwn t0 and t1
     #  qdrMKS   quadratic distance from all marks to the M cluster centers
-    t1 = _tm.time()
+
+    #tt1       = _tm.time()
     nSpks = len(Asts)
-    twpi = 2*_N.pi
 
     Kp1      = K+1
     pc       = _N.zeros(M)
@@ -41,16 +41,15 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     mkNrms = _N.log(1/_N.sqrt(twpi*_N.linalg.det(Sg)))
     mkNrms = mkNrms.reshape((M, 1))   #  M x 1
 
+    #tt2       = _tm.time()
     rnds       = _N.random.rand(nSpks)
-
+    #tt3       = _tm.time()
     pkFRr      = pkFR.reshape((M, 1))
     dmu        = (mASr - ur)     # mASr 1 x N x K,     ur  is M x 1 x K
     N          = mASr.shape[1]
-    #t2 = _tm.time()
-    #_N.einsum("mnj,mjk,mnk->mn", dmu, iSg, dmu, out=qdrMKS)
-    #t3 = _tm.time()
+    #tt4       = _tm.time()
     _fm.multi_qdrtcs_par_func(dmu, iSg, qdrMKS, M, N, K, nthrds=nthrds)
-
+    #tt5       = _tm.time()
     #  fr is    M x 1, xASr is 1 x N, iq2r is M x 1
     #qdrSPC     = (fr - xASr)*(fr - xASr)*iq2r  #  M x nSpks   # 0.01s
     qdrSPC     = _N.empty((M, N))
@@ -60,7 +59,7 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
 
     #  mAS = mks[Asts+t0] 
     #  xAS = x[Asts + t0]   #  position @ spikes
-
+    #tt6       = _tm.time()
     if cmp2Existing and (M > 1):   #  compare only non-hash spikes and non-hash clusters
         # realCl = _N.where(freeClstr == False)[0]
         # print freeClstr.shape
@@ -251,13 +250,13 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
         pickle.dump(farClusts, dmp, -1)
         dmp.close()
 
-
+    #tt7       = _tm.time()
     ####  outside cmp2Existing here
     #   (Mx1) + (Mx1) - (MxN + MxN)
     #cont       = pkFRr + mkNrms - 0.5*(qdrSPC + qdrMKS)
     cont = _N.empty((M, N))
     _hcb.hc_qdr_sum(pkFRr, mkNrms, qdrSPC, qdrMKS, cont, M, N)
-
+    #tt8       = _tm.time()
     mcontr     = _N.max(cont, axis=0).reshape((1, nSpks))  
     cont       -= mcontr
     _N.exp(cont, out=econt)
@@ -275,11 +274,25 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     """
 
     # print rat
-
+    #tt9       = _tm.time()
     M1 = rat[1:] >= rnds
     M2 = rat[0:-1] <= rnds
 
     gz[it] = (M1&M2).T
+    #tt10       = _tm.time()
+
+
+    # print "#st timing start"
+    # print "it2t1+=%.4e" % (tt2-tt1)
+    # print "it3t2+=%.4e" % (tt3-tt2)
+    # print "it4t3+=%.4e" % (tt4-tt3)
+    # print "it5t4+=%.4e" % (tt5-tt4)
+    # print "it6t5+=%.4e" % (tt6-tt5)
+    # print "it7t6+=%.4e" % (tt7-tt6)  # slow
+    # print "it8t7+=%.4e" % (tt8-tt7)  # slow
+    # print "it9t8+=%.4e" % (tt9-tt8)  # slow
+    # print "it10t9+=%.4e" % (tt10-tt9)  # slow
+    # print "#st timing end"
 
     if cmp2Existing and (M > 1):
         print "length of reassign_l8r   %d"  % len(reassign_l8r)

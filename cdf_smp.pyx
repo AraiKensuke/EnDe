@@ -12,6 +12,8 @@ import utilities as _U
 twoPOW = _N.array([1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072], dtype=_N.int)
 cdef long[::1] v_twoPOW = twoPOW
 cdef long* p_twoPOW = &v_twoPOW[0]
+cdef double x_Lo
+cdef double x_Hi
 
 cdef int __NRM = 0
 cdef int __IG  = 1
@@ -704,7 +706,7 @@ def clean_occ_resolutions():
     free(p_px_all);    free(p_riemann_xs);    free(p_q2_thr)
     free(Nupxs);       free(arr_0s)
 
-def change_occ_px(pth, x_Lo, x_Hi):
+def change_occ_px(pth, _x_Lo, _x_Hi):
     global p_px_all;    global Nupxs;         global n_res
     global p_q2_thr;    global arr_0s;        global p_riemann_xs
     N_pth = len(pth)
@@ -712,8 +714,8 @@ def change_occ_px(pth, x_Lo, x_Hi):
 
     cdef int i, j
     for 0 <= i < n_res:
-        dSilenceXs[i] = (N_pth / float(Nupxs[i]))*(x_Hi - x_Lo)
-        px, bns = _N.histogram(pth, _N.linspace(x_Lo, x_Hi, Nupxs[i]+1), normed=True)
+        dSilenceXs[i] = (N_pth / float(Nupxs[i]))*(_x_Hi - _x_Lo)
+        px, bns = _N.histogram(pth, _N.linspace(_x_Lo, _x_Hi, Nupxs[i]+1), normed=True)
 
         for 0 <= j < Nupxs[i]:
             p_px_all[arr_0s[i] + j] = px[j]

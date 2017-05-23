@@ -128,17 +128,17 @@ class MarkAndRF:
         #  grid over which conditional probability of q2 adaptively sampled
 
         freeClstr = None
-        # if smth_pth_ker > 0:
-        #     gk     = gauKer(smth_pth_ker) # 0.1s  smoothing of motion
-        #     gk     /= _N.sum(gk)
-        #     xf     = _N.convolve(oo.dat[:, 0], gk, mode="same")
-        #     oo.dat[:, 0] = xf + nz_pth*_N.random.randn(len(oo.dat[:, 0]))
-        # else:
-        #     oo.dat[:, 0] += nz_pth*_N.random.randn(len(oo.dat[:, 0]))
+        if smth_pth_ker > 0:
+            gk     = gauKer(smth_pth_ker) # 0.1s  smoothing of motion
+            gk     /= _N.sum(gk)
+            xf     = _N.convolve(oo.dat[:, 0], gk, mode="same")
+            oo.dat[:, 0] = xf + nz_pth*_N.random.randn(len(oo.dat[:, 0]))
+        else:
+            oo.dat[:, 0] += nz_pth*_N.random.randn(len(oo.dat[:, 0]))
         x      = oo.dat[:, 0]
         mks    = oo.dat[:, 2:]
-        # if nz_pth > 0:
-        #     _N.savetxt(resFN("nzyx.txt", dir=oo.outdir), x, fmt="%.4f")
+        if nz_pth > 0:
+            _N.savetxt(resFN("nzyx.txt", dir=oo.outdir), x, fmt="%.4f")
 
         f_q2_rate = (oo.diffusePerMin**2)/60000.  #  unit of minutes  
         
@@ -187,8 +187,14 @@ class MarkAndRF:
 
                 #nHSclusters.append(M - nHSclusters[0]-nHSclusters[1])   #  last are free clusters that are not the noise cluster
 
+                #  posteriors
                 u_u_  = _N.empty((M, K))
                 u_Sg_ = _N.empty((M, K, K))
+                Sg_nu_ = _N.empty(M)
+                Sg_PSI_ = _N.empty((M, K, K))
+                Sg     = _N.empty((M, K, K))   # sampled value
+                uptriinds = _N.triu_indices_from(Sg[0],1)
+
                 #######   containers for GIBBS samples iterations
                 smp_sp_prms = _N.zeros((3, ITERS, M))  
                 smp_mk_prms = [_N.zeros((K, ITERS, M)), 
@@ -220,14 +226,6 @@ class MarkAndRF:
 
                 ######  the hyperparameters for f, q2, u, Sg, l0 during Gibbs
                 #  f_u_, f_q2_, q2_a_, q2_B_, u_u_, u_Sg_, Sg_nu, Sg_PSI_, l0_a_, l0_B_
-
-            print _f_u
-            print _f_q2
-            print _l0_a
-            print _l0_B
-            print _q2_a
-            print _q2_B
-
 
             NSexp   = t1-t0    #  length of position data  #  # of no spike positions to sum
             xt0t1 = _N.array(x[t0:t1])
@@ -282,6 +280,7 @@ class MarkAndRF:
                     print "-------iter  %(i)d" % {"i" : iter}
 
                 _sA.stochasticAssignment(oo, epc, iter, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stHashClstr, ((epc > 0) and (iter == 0)), nthrds=oo.nThrds)
+                #tt2 = _tm.time()
                 ###############  FOR EACH CLUSTER
                 for m in xrange(M):   #  get the minds
                     minds = _N.where(gz[iter, :, m] == 1)[0]  
@@ -291,10 +290,10 @@ class MarkAndRF:
                     clstsz[m]        = L
                     v_sts[cls_str_ind[m]:cls_str_ind[m+1]] = sts
 
-                #tt2 = _tm.time()
+                #tt3 = _tm.time()
                 mcs = _N.empty((M, K))   # cluster sample means
 
-                #tt3 = _tm.time()
+                #tt4 = _tm.time()
 
                 ###############
                 ###############     u
@@ -333,7 +332,7 @@ class MarkAndRF:
                 smp_mk_hyps[oo.ky_h_u_u][:, iter] = u_u_.T
                 smp_mk_hyps[oo.ky_h_u_Sg][:, :, iter] = u_Sg_.T
 
-                #tt4 = _tm.time()
+                #tt5 = _tm.time()
                 ###############
                 ###############  Conditional f
                 ###############
@@ -347,35 +346,35 @@ class MarkAndRF:
                 #f[0] = 0
                 smp_sp_prms[oo.ky_p_f, iter] = f
 
-                #tt5 = _tm.time()
+                #tt6 = _tm.time()
                 ##############
                 ##############  VARIANCE, COVARIANCE
                 ##############
+
                 for m in xrange(M):
                     #if clstsz[m] > K:
                     ##  dof of posterior distribution of cluster covariance
-                    Sg_nu_ = _Sg_nu[m, 0] + clstsz[m]
+                    Sg_nu_[m] = _Sg_nu[m, 0] + clstsz[m]
                     ##  dof of posterior distribution of cluster covariance
                     ur = u[m].reshape((1, K))
                     clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
                     #clstx    = l_sts[m]]
                     #  dot((clstx-ur).T, (clstx-ur))==ZERO(K) when clstsz ==0
-                    Sg_PSI_ = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
+                    Sg_PSI_[m] = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
                     # else:
                     #     Sg_nu_ = _Sg_nu[m, 0] 
                     #     ##  dof of posterior distribution of cluster covariance
                     #     ur = u[m].reshape((1, K))
                     #     Sg_PSI_ = _Sg_PSI[m]
-                    Sg[m] = s_u.sample_invwishart(Sg_PSI_, Sg_nu_)
-                    smp_mk_hyps[oo.ky_h_Sg_nu][0, iter, m] = Sg_nu_
-                    smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, iter, m] = Sg_PSI_
-
+                smp_mk_hyps[oo.ky_h_Sg_nu][0, iter] = Sg_nu_
+                smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, iter] = Sg_PSI_.T
+                s_u.m_sample_invwishart(Sg_PSI_, Sg_nu_, K, uptriinds, Sg)
                 
                 ##  dof of posterior distribution of cluster covariance
 
                 smp_mk_prms[oo.ky_p_Sg][:, :, iter] = Sg.T
 
-                #tt6 = _tm.time()
+                #tt7 = _tm.time()
                 ##############
                 ##############  SAMPLE SPATIAL VARIANCE
                 ##############
@@ -391,27 +390,16 @@ class MarkAndRF:
                     _Dq2_a = _q2_a
                     _Dq2_B = _q2_B
 
-                #tt7 = _tm.time()
+                #tt8 = _tm.time()
 
                 _cdfs.smp_q2(M, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _Dq2_a, _Dq2_B, m_rnds)
                 smp_sp_prms[oo.ky_p_q2, iter]   = q2
                 # print "-----------------"
                 # print q2
 
-#                 #tt9 = _tm.time()
+                #tt9 = _tm.time()
 
 
-
-                # print "timing start"
-                # print (tt2-tt1)
-                # print (tt3-tt2)
-                # print (tt4-tt3)
-                # print (tt5-tt4)
-                # print (tt6-tt5)
-                # print (tt7-tt6)  # slow
-                # print (tt8-tt7)
-                # print (tt9-tt8)
-                # print "timing end"
 
                 ###############
                 ###############  CONDITIONAL l0
@@ -456,6 +444,21 @@ class MarkAndRF:
                 smp_sp_prms[oo.ky_p_l0, iter] = l0
                 smp_sp_hyps[oo.ky_h_l0_a, iter] = l0_a_
                 smp_sp_hyps[oo.ky_h_l0_B, iter] = l0_B_
+
+                #tt10 = _tm.time()
+                # print "#timing start"
+                # print "nt+= 1"
+                # print "t2t1+=%.4e" % (tt2-tt1)
+                # print "t3t2+=%.4e" % (tt3-tt2)
+                # print "t4t3+=%.4e" % (tt4-tt3)
+                # print "t5t4+=%.4e" % (tt5-tt4)
+                # print "t6t5+=%.4e" % (tt6-tt5)
+                # print "t7t6+=%.4e" % (tt7-tt6)  # slow
+                # print "t8t7+=%.4e" % (tt8-tt7)
+                # print "t9t8+=%.4e" % (tt9-tt8)
+                # print "t10t9+=%.4e" % (tt10-tt9)
+                # print "#timing end"
+
 
             ttB = _tm.time()
             print (ttB-ttA)

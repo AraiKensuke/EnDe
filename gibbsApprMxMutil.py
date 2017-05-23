@@ -92,7 +92,7 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
             # 0...clstrs[0]-2     clstrs[0]-1...clstrs[0]+clstrs[1]-2  (no nz)
             contiguous_pack2(labS, startAt=0)
 
-            clstrs[0] = len(_N.unique(labS)) 
+             clstrs[0] = len(_N.unique(labS)) 
             clstrs[1] = len(_N.unique(labH))
 
             # print "----------"
