@@ -126,11 +126,14 @@ def EMBICs(mks, TR=5, minK=2, maxK=15):
     return labs, bics, bestLab, nClstrs
 
 
-def EMposBICs(pos, TR=5, minK=1, maxK=15):
+def EMposBICs(pos, TR=5, minK=1, maxK=1):
     """
+    When maxK==2, don't do anything
     """
-    bics = _N.empty(((maxK-minK), TR))
-    labs = _N.empty((maxK-minK, TR, pos.shape[0]), dtype=_N.int)
+    bics = _N.zeros(((maxK-minK), TR))
+    labs = _N.zeros((maxK-minK, TR, pos.shape[0]), dtype=_N.int)
+    nClstrs= 1
+    bestLab= labs[0, 0]
 
     for K in xrange(minK, maxK):
         for tr in xrange(TR):
@@ -140,10 +143,11 @@ def EMposBICs(pos, TR=5, minK=1, maxK=15):
             bics[K-minK, tr] = gmm.bic(pos)
             labs[K-minK, tr] = gmm.predict(pos)
 
-    coords = _N.where(bics == _N.min(bics))
-    bestLab = labs[coords[0][0], coords[1][0]]
+    if maxK > 1:
+        coords = _N.where(bics == _N.min(bics))
+        bestLab = labs[coords[0][0], coords[1][0]]
 
-    nClstrs = coords[0][0] + minK
+        nClstrs = coords[0][0] + minK
 
     return labs, bics, bestLab, nClstrs
 

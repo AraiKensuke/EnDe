@@ -214,9 +214,9 @@ def smp_f(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def smp_q2(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts, 
-          double[::1] xt0t1, int t0, 
-          double[::1] f, double[::1] q2, double[::1] l0, 
-          double[::1] _q2_a, double[::1] _q2_B, double[::1] m_rands):
+           double[::1] xt0t1, int t0, 
+           double[::1] f, double[::1] q2, double[::1] l0, 
+           double[::1] _q2_a, double[::1] _q2_B, double[::1] m_rands, int ep):
     cdef int m
     cdef double tmp, fm
     cdef double* _p_q2_a = &_q2_a[0]

@@ -74,6 +74,8 @@ class MarkAndRF:
 
     q2_lvls    = _N.array([0.02**2, 0.05**2, 0.1**2, 0.2**2, 0.5**2, 1**2, 6**2, 100000**2])
     Nupx_lvls  = _N.array([1000, 600, 200, 100, 60, 20, 12, 8])
+
+    priors     = None
     
     def __init__(self, outdir, fn, intvfn, xLo=0, xHi=3, seed=1041, adapt=True, t_hlf_l0_mins=None, t_hlf_q2_mins=None, oneCluster=False):
         oo     = self
@@ -109,6 +111,8 @@ class MarkAndRF:
         oo.nThrds = nThrds
         twpi     = 2*_N.pi
         pcklme   = {}
+
+        oo.priors = priors
 
         ep2 = oo.epochs if (ep2 == None) else ep2
         oo.epochs = ep2-ep1
@@ -158,9 +162,7 @@ class MarkAndRF:
             if epc > 0:
                 tm1= oo.intvs[epc-1]
                 #  0 10 30     20 - 5  = 15    0.5*((10+30) - (10+0)) = 15
-                dt = 0.5*((t1+t0) - (t0+tm1))
-
-            dt = (t1-t0)*0.5
+                DT = t0-tm1
 
             posbins  = _N.linspace(oo.xLo, oo.xHi, oo.Nupx+1)
             #  _N.sum(px)*(xbns[1]-xbns[0]) = 1
@@ -182,10 +184,9 @@ class MarkAndRF:
             Asts    = _N.where(oo.dat[t0:t1, 1] == 1)[0]   #  based at 0
 
             if epc == ep1:   ###  initialize
-                labS, labH, flatlabels, M, MF, hashthresh, nHSclusters = gAMxMu.initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=doSepHash, xLo=oo.xLo, xHi=oo.xHi, oneCluster=oo.oneCluster)
-                m1stHashClstr = 1 if oo.oneCluster else _N.min(_N.unique(labH)) 
+                labS, labH, flatlabels, M, hashthresh, nHSclusters = gAMxMu.initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=doSepHash, xLo=oo.xLo, xHi=oo.xHi, oneCluster=oo.oneCluster)
 
-                #nHSclusters.append(M - nHSclusters[0]-nHSclusters[1])   #  last are free clusters that are not the noise cluster
+                m1stSignalClstr = 0 if oo.oneCluster else nHSclusters[0]
 
                 #  posteriors
                 u_u_  = _N.empty((M, K))
@@ -216,9 +217,9 @@ class MarkAndRF:
                 l0, f, q2, u, Sg = gAMxMu.declare_params(M, K)   #  nzclstr not inited  # sized to include noise cluster if needed
                 l0_exp_px = _N.empty(M)
                 _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, \
-                    _Sg_PSI = gAMxMu.declare_prior_hyp_params(M, MF, K, x, mks, Asts, t0, priors, labS, labH)
+                    _Sg_PSI = gAMxMu.declare_prior_hyp_params(M, nHSclusters, K, x, mks, Asts, t0, priors, labS, labH)
                 fr = f.reshape((M, 1))
-                gAMxMu.init_params_hyps(oo, M, MF, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, \
+                gAMxMu.init_params_hyps(oo, M, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, \
                     _Sg_PSI, Asts, t0, x, mks, flatlabels, nHSclusters)
 
                 U   = _N.empty(M)
@@ -272,18 +273,18 @@ class MarkAndRF:
             iiq2r= iiq2.reshape((M, 1))
             #sLLkPr      = _N.empty((M, oo.q2ss))
 
-            for iter in xrange(ITERS):
+            for itr in xrange(ITERS):
                 #tt1 = _tm.time()
                 iSg = _N.linalg.inv(Sg)
 
-                if (iter % 100) == 0:    
-                    print "-------iter  %(i)d" % {"i" : iter}
+                if (itr % 100) == 0:    
+                    print "-------itr  %(i)d" % {"i" : itr}
 
-                _sA.stochasticAssignment(oo, epc, iter, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stHashClstr, ((epc > 0) and (iter == 0)), nthrds=oo.nThrds)
+                _sA.stochasticAssignment(oo, epc, itr, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, ((epc > 0) and (itr == 0)), nthrds=oo.nThrds)
                 #tt2 = _tm.time()
                 ###############  FOR EACH CLUSTER
                 for m in xrange(M):   #  get the minds
-                    minds = _N.where(gz[iter, :, m] == 1)[0]  
+                    minds = _N.where(gz[itr, :, m] == 1)[0]  
                     sts  = Asts[minds] + t0   #  sts is in absolute time
                     L    = len(sts)
                     cls_str_ind[m+1] = L + cls_str_ind[m]
@@ -313,12 +314,17 @@ class MarkAndRF:
                     else:
                         u_Sg_[m] = _N.array(_u_Sg[m])
                         u_u_[m] = _N.array(_u_u[m])
+                        # if (epc == 1) and (itr < 10):
+                        #     print "u_Sg_[%d]" % m
+                        #     print u_Sg_[m]
+                        #     print "u_u_[%d]" % m
+                        #     print u_u_[m]
 
                 ucmvnrms= _N.random.randn(M, K)
                 try:
                     C       = _N.linalg.cholesky(u_Sg_)
                 except _N.linalg.linalg.LinAlgError:
-                    print "linalg error in u_Sg_, iter %d" % iter
+                    print "linalg error in u_Sg_, itr %d" % itr
                     print u_Sg_
 
                     dmp = open("cholesky.dmp", "wb")
@@ -327,24 +333,31 @@ class MarkAndRF:
 
                     raise
                 u       = _N.einsum("njk,nk->nj", C, ucmvnrms) + u_u_
+                # if epc == 1:
+                #     u[5] = _N.array([ 4.9,  4.7,  2.8,  3.8])
 
-                smp_mk_prms[oo.ky_p_u][:, iter] = u.T  # dim of u wrong
-                smp_mk_hyps[oo.ky_h_u_u][:, iter] = u_u_.T
-                smp_mk_hyps[oo.ky_h_u_Sg][:, :, iter] = u_Sg_.T
+                smp_mk_prms[oo.ky_p_u][:, itr] = u.T  # dim of u wrong
+                smp_mk_hyps[oo.ky_h_u_u][:, itr] = u_u_.T
+                smp_mk_hyps[oo.ky_h_u_Sg][:, :, itr] = u_Sg_.T
 
                 #tt5 = _tm.time()
                 ###############
                 ###############  Conditional f
                 ###############
                 if (epc > 0) and oo.adapt:
-                    q2pr = _f_q2 + f_q2_rate * dt
+                    q2pr = _f_q2 + f_q2_rate * DT
                 else:
                     q2pr = _f_q2
 
                 m_rnds = _N.random.rand(M)
+                
                 _cdfs.smp_f(M, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _f_u, q2pr, m_rnds)
+                # if epc == 1:
+                #     f[:] = -400
+                #     f[5] = 3
+
                 #f[0] = 0
-                smp_sp_prms[oo.ky_p_f, iter] = f
+                smp_sp_prms[oo.ky_p_f, itr] = f
 
                 #tt6 = _tm.time()
                 ##############
@@ -366,13 +379,15 @@ class MarkAndRF:
                     #     ##  dof of posterior distribution of cluster covariance
                     #     ur = u[m].reshape((1, K))
                     #     Sg_PSI_ = _Sg_PSI[m]
-                smp_mk_hyps[oo.ky_h_Sg_nu][0, iter] = Sg_nu_
-                smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, iter] = Sg_PSI_.T
-                s_u.m_sample_invwishart(Sg_PSI_, Sg_nu_, K, uptriinds, Sg)
+                    Sg[m] = _ss.invwishart.rvs(df=Sg_nu_[m], scale=Sg_PSI_[m])
+
+                smp_mk_hyps[oo.ky_h_Sg_nu][0, itr] = Sg_nu_
+                smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, itr] = Sg_PSI_.T
+                #s_u.m_sample_invwishart(Sg_PSI_, Sg_nu_, K, uptriinds, Sg)
                 
                 ##  dof of posterior distribution of cluster covariance
 
-                smp_mk_prms[oo.ky_p_Sg][:, :, iter] = Sg.T
+                smp_mk_prms[oo.ky_p_Sg][:, :, itr] = Sg.T
 
                 #tt7 = _tm.time()
                 ##############
@@ -384,16 +399,20 @@ class MarkAndRF:
                 #  B' = MODE * (a' - 1)
                 if (epc > 0) and oo.adapt:
                     _md_nd= _q2_B / (_q2_a + 1)
-                    _Dq2_a = _q2_a * _N.exp(-dt/tau_q2)
-                    _Dq2_B = _Dq2_a / _md_nd
+                    _Dq2_a = _q2_a * _N.exp(-DT/tau_q2)
+                    _Dq2_B = _md_nd * (_Dq2_a + 1)
                 else:
                     _Dq2_a = _q2_a
                     _Dq2_B = _q2_B
 
                 #tt8 = _tm.time()
 
-                _cdfs.smp_q2(M, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _Dq2_a, _Dq2_B, m_rnds)
-                smp_sp_prms[oo.ky_p_q2, iter]   = q2
+                _cdfs.smp_q2(M, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _Dq2_a, _Dq2_B, m_rnds, epc)
+                # if epc == 1:
+                #     #q2[:] = 0.0001
+                #     q2[5] = 0.5
+
+                smp_sp_prms[oo.ky_p_q2, itr]   = q2
                 # print "-----------------"
                 # print q2
 
@@ -417,10 +436,13 @@ class MarkAndRF:
                 BL  = l0_exp_px    #  dim M
 
                 if (epc > 0) and oo.adapt:
-                    _md_nd= _l0_a / _l0_B
+                    _mn_nd= _l0_a / _l0_B
+                    #  variance is a/b^2
+                    #  a/2 / B/2    variance is a/2 / B^2/4 = 2a^2 / B^2  
+                    #  variance increases by 2
 
-                    _Dl0_a = _l0_a * _N.exp(-dt/tau_l0)
-                    _Dl0_B = _Dl0_a / _md_nd
+                    _Dl0_a = _l0_a * _N.exp(-DT/tau_l0)
+                    _Dl0_B = _Dl0_a / _mn_nd
                 else:
                     _Dl0_a = _l0_a
                     _Dl0_B = _l0_B
@@ -428,9 +450,17 @@ class MarkAndRF:
                 aL  = clstsz
                 l0_a_ = aL + _Dl0_a
                 l0_B_ = BL + _Dl0_B
-                
+
+
+                # _ss.gamma.rvs(20+20, scale=(1/(50+50.))) ~ 0.4
+                # _ss.gamma.rvs(20+ 0, scale=(1/(50+50.))) ~ 0.2
+                #  if no spikes observed, sampled l0 is smaller.  
                 try:   #  if there is no prior, if a cluster 
-                    l0 = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_))  #  check
+                    l0 = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_), size=M)  #  check
+                    # if epc == 1:
+                    #     l0[:] = 1e-200
+                    #     l0[5] = 300.
+
                     #l0 = _N.ones(M)#_ss.gamma.rvs(l0_a_, scale=(1/l0_B_))  #  check
                 except ValueError:
                     print "problem with l0"
@@ -441,9 +471,9 @@ class MarkAndRF:
                     #_N.savetxt("l0_intgrd", l0_intgrd)
                     raise
 
-                smp_sp_prms[oo.ky_p_l0, iter] = l0
-                smp_sp_hyps[oo.ky_h_l0_a, iter] = l0_a_
-                smp_sp_hyps[oo.ky_h_l0_B, iter] = l0_B_
+                smp_sp_prms[oo.ky_p_l0, itr] = l0
+                smp_sp_hyps[oo.ky_h_l0_a, itr] = l0_a_
+                smp_sp_hyps[oo.ky_h_l0_B, itr] = l0_B_
 
                 #tt10 = _tm.time()
                 # print "#timing start"
@@ -463,7 +493,7 @@ class MarkAndRF:
             ttB = _tm.time()
             print (ttB-ttA)
             
-            gAMxMu.finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_hyps, smp_sp_prms, smp_mk_hyps, smp_mk_prms, freeClstr, M, K, priors, m1stHashClstr)
+            gAMxMu.finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_hyps, smp_sp_prms, smp_mk_hyps, smp_mk_prms, freeClstr, M, K, priors, m1stSignalClstr)
             #  MAP of nzclstr
             pcklme["smp_sp_hyps"] = smp_sp_hyps
             pcklme["smp_mk_hyps"] = smp_mk_hyps

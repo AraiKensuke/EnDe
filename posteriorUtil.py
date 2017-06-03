@@ -7,48 +7,50 @@ import scipy.special as _ssp
 _GAMMA         = 0
 _INV_GAMMA     = 1
 
-def MAPvalues(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, gk, l_trlsNearMAP):
+def findstat(smp_sp_prms, blksz, initBlk):
+    """
+    find stationary region of samples
+    """
+    smps   = _N.array(smp_sp_prms)    #  make a copy
+    ITRS   = smps.shape[1]
+    ITRSa  = ITRS/blksz
+    M      = smps.shape[2]
+    smps[2:] = _N.sqrt(smps[2:])
+    fsmps  = _N.empty((6, ITRSa, M))
+    fsmps[0:3] = _N.mean(smps.reshape((3, ITRSa, blksz, M)), axis=2)
+    fsmps[3:6] = _N.std(smps.reshape((3, ITRSa, blksz, M)), axis=2)
+
+    big1      = 9
+    big2      = 3
+
+    #  ITRSa = 10, initBlk = 3, last 3 used to mn    (7,8,9)   0,1,2,3,4,5,6
+    dsts = _N.zeros((6, M, ITRSa-initBlk))
+
+    for n in xrange(0, ITRSa-initBlk):  #  n is
+        sd = _N.std(fsmps[:, n+1:, :], axis=1)  #  
+        mn = _N.mean(fsmps[:, n+1:, :], axis=1)
+
+        dsts[:, :, n] = (fsmps[:, n+1] - mn)/sd
+
+    statry_frm_here = _N.empty(M, dtype=_N.int)
+    for m in xrange(M):
+        lstchgpts = []
+        for ip in xrange(6):   # parameters
+            bigabv  = _N.where(_N.abs(dsts[ip, m]) > big1)[0]   #  single big or 2 smaller cons
+            consabv = _N.where((dsts[ip, m, 0:-1] < -big2) & (dsts[ip, m, 1:] < -big2))[0]
+            consbel = _N.where((dsts[ip, m, 0:-1] >  big2) & (dsts[ip, m, 1:] >  big2))[0]
+
+            lstchgpts.extend(bigabv)
+            lstchgpts.extend(consabv+1)
+            lstchgpts.extend(consbel+1)
+
+        statry_frm_here[m] = lstchgpts[-1]+2 if len(lstchgpts) > 0 else 0
+    return statry_frm_here
+
+def MAPvalues2(epc, smp_prms, postMode, frms, ITERS, M, nprms, occ, l_trlsNearMAP, alltrials=False):
 
     for m in xrange(M):
-        fig = _plt.figure(figsize=(11, 4))
-        trlsNearMAP = _N.arange(0, ITERS-frm)
-        for ip in xrange(nprms):  # params
-            fig.add_subplot(1, nprms, ip+1)
-            L     = _N.min(smp_prms[ip, frm:, m]);   H     = _N.max(smp_prms[ip, frm:, m])
-            AMP   = H-L
-            L     -= 0.1*AMP
-            H     += 0.1*AMP
-            cnts, bns = _N.histogram(smp_prms[ip, frm:, m], bins=_N.linspace(L, H, 60))
-            ###  take the iters that gave 25% top counts
-            ###  intersect them for each param.
-            ###  
-            col = nprms*m+ip
-            
-            xfit = 0.5*(bns[0:-1] + bns[1:])
-            yfit = cnts
-
-            fcnts = _N.convolve(cnts, gk, mode="same")
-            _plt.plot(xfit, fcnts)
-            ib  = _N.where(fcnts == _N.max(fcnts))[0][0]
-
-            xLo  = xfit[_N.where(fcnts > fcnts[ib]*0.6)[0][0]]
-            xHi  = xfit[_N.where(fcnts > fcnts[ib]*0.6)[0][-1]]
-
-            if occ[m] > 0:
-                these=_N.where((smp_prms[ip, frm:, m] > xLo) & (smp_prms[ip, frm:, m] < xHi))[0]
-                trlsNearMAP = _N.intersect1d(these, trlsNearMAP)
-
-            xMAP  = bns[ib]                        
-            postMode[epc, col] = xMAP
-
-        if l_trlsNearMAP is not None:
-            trlsNearMAP += frm
-            l_trlsNearMAP.append(trlsNearMAP)
-
-def MAPvalues2(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, l_trlsNearMAP, alltrials=False):
-    print "IN MAPvalues2 - not mean"
-    N   = smp_prms.shape[1] - frm
-    for m in xrange(M):
+        frm = frms[m]
         #fig = _plt.figure(figsize=(11, 4))
         trlsNearMAP = _N.arange(0, ITERS-frm)
         if alltrials:
@@ -64,8 +66,6 @@ def MAPvalues2(epc, smp_prms, postMode, frm, ITERS, M, nprms, occ, l_trlsNearMAP
             if l_trlsNearMAP is not None:
                 # trlsNearMAP for each params added to list
                 l_trlsNearMAP.append(trlsNearMAP)  
-
-
 
 def gam_inv_gam_dist_ML(smps, dist=_GAMMA, clstr=None):
 
