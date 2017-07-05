@@ -50,7 +50,7 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     dmu        = (mASr - ur)     # mASr 1 x N x K,     ur  is M x 1 x K
     N          = mASr.shape[1]
     #tt4       = _tm.time()
-    _fm.multi_qdrtcs_par_func(dmu, iSg, qdrMKS, M, N, K, nthrds=nthrds)
+    _fm.multi_qdrtcs_par_func_sym(dmu, iSg, qdrMKS, M, N, K, nthrds=nthrds)
     #tt5       = _tm.time()
     #  fr is    M x 1, xASr is 1 x N, iq2r is M x 1
     #qdrSPC     = (fr - xASr)*(fr - xASr)*iq2r  #  M x nSpks   # 0.01s

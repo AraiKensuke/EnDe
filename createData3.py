@@ -207,8 +207,8 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, l_l0_chpts, l_ctr_
     #  change place field location
     Lam   = f*dt*_N.exp(-0.5*(pths-ctr)**2 / sx)
 
-    _N.savetxt("lam", Lam.T)
-    _N.savetxt("pths", pths)
+    #_N.savetxt("lam", Lam.T)
+    #_N.savetxt("pths", pths)
 
     rnds = _N.random.rand(M, NT)
 

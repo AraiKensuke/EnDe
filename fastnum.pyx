@@ -83,10 +83,28 @@ cdef void inner_loop(double *p_v, double *p_iSg, double *p_qdr, int N, int k, in
         for i in range(k):
             mkk_ik = mkk + i*k
             for j in range(k):            
-                #p_qdr[mN_n] += p_v[mNk_nk + i] * p_iSg[mkk_ik + j] * p_v[mNk_nk + j]
                 tot += p_v[mNk_nk + i] * p_iSg[mkk_ik + j] * p_v[mNk_nk + j]
         p_qdr[mN_n] = tot
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef void inner_loop_sym(double *p_v, double *p_iSg, double *p_qdr, int N, int k, int mN, int mNk, int mkk) nogil:
+    cdef int n, i, j, ik, mNk_nk, mN_n, mkk_ik
+    cdef double p_v_mNk_nki
+    cdef double tot
+    for n in range(N):
+        mNk_nk = mNk + n*k
+        mN_n   = mN + n
+        tot = 0
+
+        for i in range(k):
+            mkk_ik = mkk + i*k
+            p_v_mNk_nki= p_v[mNk_nk + i]
+            tot += p_v_mNk_nki * p_iSg[mkk_ik + i] * p_v_mNk_nki
+
+            for j in range(i+1,k):            
+                tot += 2*p_v_mNk_nki * p_iSg[mkk_ik + j] * p_v[mNk_nk + j]
+        p_qdr[mN_n] = tot
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -119,6 +137,21 @@ def multi_qdrtcs_par_func(double[:, :, ::1] v, double[:, :, ::1] iSg, double[:, 
         for m in prange(M):
             inner_loop(p_v, p_iSg, p_qdr, N, k, m*N, m*N*k, m*k*k)
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def multi_qdrtcs_par_func_sym(double[:, :, ::1] v, double[:, :, ::1] iSg, double[:, ::1] qdr, int M, int N, int k, int nthrds=4):
+    #  fxs       M x fss   
+    #  fxrux     Nupx    
+    #  f_intgrd  Nupx
+    cdef int m, mNk, mkk, nk, ik
+
+    cdef double *p_v   = &v[0, 0, 0]
+    cdef double *p_iSg = &iSg[0, 0, 0]
+    cdef double *p_qdr = &qdr[0, 0]
+
+    with nogil, parallel(num_threads=nthrds):
+        for m in prange(M):
+            inner_loop_sym(p_v, p_iSg, p_qdr, N, k, m*N, m*N*k, m*k*k)
 
 @cython.boundscheck(False)
 @cython.wraparound(False)

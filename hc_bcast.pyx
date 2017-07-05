@@ -64,12 +64,16 @@ def hc_qdr_sum(double[:, ::1] pkFRr, double [:, ::1] mkNrms, double[:, ::1] qdrS
     cdef double *p_qdrMKS     = &qdrMKS[0, 0]
     cdef double *p_cont       = &cont[0, 0]
     cdef double pkFRr_m, mkNrms_m
+    cdef double norm
 
     for 0 <= m < M:
         mN = m*N
         pkFRr_m = p_pkFRr[m]
         mkNrms_m = p_mkNrms[m]
+        #norm    = p_pkFRr[m] + p_mkNrms[m]
         for 0 <= n < N:
+            #mNn = mN+n
+            #p_cont[mNn] = norm - 0.5*(p_qdrSpc[mNn] + p_qdrMKS[mNn])
             p_cont[mN+n] = pkFRr_m + mkNrms_m - 0.5*(p_qdrSpc[mN+n] + p_qdrMKS[mN+n])
 
 @cython.boundscheck(False)

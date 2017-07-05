@@ -18,6 +18,7 @@ import stochasticAssignment as _sA
 import cdf_smp as _cdfs
 
 import clrs 
+import compress_gz as c_gz
 
 class MarkAndRF:
     ky_p_l0 = 0;    ky_p_f  = 1;    ky_p_q2 = 2
@@ -502,7 +503,7 @@ class MarkAndRF:
             pcklme["sp_prmPstMd"] = oo.sp_prmPstMd
             pcklme["mk_prmPstMd"] = oo.mk_prmPstMd
             pcklme["intvs"]       = oo.intvs
-            pcklme["occ"]         = gz
+            pcklme["occ"]         = c_gz.gz2cgz(gz)
             pcklme["nz_pth"]         = nz_pth
             pcklme["M"]           = M
                 

@@ -14,7 +14,7 @@ class priors:
     #  _ss.gamma.rvs(l0_a_, scale=(1/l0_B_))
     #  mean is l0_a_*l0_B_.  Small l0_a_ gives higher variability
     _l0_a   = [1.1, 1.1]   # (a-1) / B    
-    _l0_B   = [1./200, 1/5.]   #0.1/(1./2000)
+    _l0_B   = [1./200, 20]   #0.1/(1./2000)
 
     _u_Sg   = None
     _u_u    = None

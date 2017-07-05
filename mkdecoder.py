@@ -42,6 +42,8 @@ class mkdecoder:
     tt0      = None
     tt1      = None
 
+    maze     = None
+
     dbgMvt   = False
     spdMult   = 0.5
 
@@ -61,6 +63,7 @@ class mkdecoder:
         """
         """
         oo = self
+        oo.maze = maze
         oo.kde = kde
 
         oo.spdMult = spdMult
@@ -141,12 +144,12 @@ class mkdecoder:
                 oo.xTrs[i, i] = 1-p1   
                 if i == 0:
                     #oo.xTrs[0, oo.Nx-1] = p1*0.5
-                    oo.xTrs[0, oo.Nx-1] = p1*0.9  #  backwards
+                    oo.xTrs[0, oo.Nx-1] = p1*0.8  #  backwards
                 if i >= 0:
-                    oo.xTrs[i-1, i] = p1*0.1
-                    oo.xTrs[i, i-1] = p1*0.9
+                    oo.xTrs[i-1, i] = p1*0.2
+                    oo.xTrs[i, i-1] = p1*0.8
                 if i == oo.Nx-1:
-                    oo.xTrs[oo.Nx-1, 0] = p1*0.1
+                    oo.xTrs[oo.Nx-1, 0] = p1*0.2
         elif maze == mz_W:
             ##  W-maze
             for i in xrange(0, oo.Nx/2):
@@ -255,8 +258,14 @@ class mkdecoder:
 
             #  transition convolved with previous posterior
 
-            _N.multiply(oo.xTrs, oo.pX_Nm[t-1], out=oo.intgrd2d)   
-            oo.intgrl = _N.trapz(oo.intgrd2d, dx=oo.dxp, axis=1)
+            ####  INSTEAD OF THIS
+            if oo.maze == mz_W:
+                _N.multiply(oo.xTrs, oo.pX_Nm[t-1], out=oo.intgrd2d)   
+                oo.intgrl = _N.trapz(oo.intgrd2d, dx=oo.dxp, axis=1)
+            else:
+                ####  DO THIS
+                oo.intgrl = _N.dot(oo.xTrs, oo.pX_Nm[t-1])
+                oo.intgrl /= _N.sum(oo.intgrl)
             #for ixk in xrange(oo.Nx):   #  above trapz over 2D array
             #    oo.intgrl[ixk] = _N.trapz(oo.intgrd2d[ixk], dx=oo.dxp)
 
@@ -381,8 +390,10 @@ class mkdecoder:
 
             #  transition convolved with previous posterior
 
-            _N.multiply(oo.xTrs, oo.pX_Nm[t-1], out=oo.intgrd2d)   
-            oo.intgrl = _N.trapz(oo.intgrd2d, dx=oo.dxp, axis=1)
+            oo.intgrl = _N.dot(oo.xTrs, oo.pX_Nm[t-1])
+            oo.intgrl /= _N.sum(oo.intgrl)
+            #_N.multiply(oo.xTrs, oo.pX_Nm[t-1], out=oo.intgrd2d)   
+            #oo.intgrl = _N.trapz(oo.intgrd2d, dx=oo.dxp, axis=1)
             #for ixk in xrange(oo.Nx):   #  above trapz over 2D array
             #    oo.intgrl[ixk] = _N.trapz(oo.intgrd2d[ixk], dx=oo.dxp)
 

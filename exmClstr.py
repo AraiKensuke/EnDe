@@ -1,4 +1,5 @@
 import mvn
+import mkdecoder as _mkd
 from EnDedirs import resFN, datFN
 import numpy as _N
 import matplotlib.pyplot as _plt
@@ -257,7 +258,7 @@ def timeline(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1, xL=0, xH=3, ytic
 
 
 
-def pos_timeline(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1, xL=0, xH=3, yticks=[0, 1, 2, 3], thin=1, t0=None, t1=None, skp=1):
+def pos_timeline(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1, xL=0, xH=3, yticks=[0, 1, 2, 3], yticksD=[0, 1, 2, 3], thin=1, t0=None, t1=None, skp=1, maze=_mkd.mz_CRCL):
     d = _N.loadtxt(datFN("%s.dat" % datfn))   #  marks
     t0 = 0 if (t0 is None) else t0
     t1 = d.shape[0] if (t1 is None) else t1
@@ -283,11 +284,17 @@ def pos_timeline(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1, xL=0, xH=3, 
     _plt.scatter(_N.arange(d[t0:t1:100].shape[0], dtype=_N.float)/10., d[t0:t1:100, 0], s=9, color="black")
     _plt.scatter(sts[::skp]/1000., d[sts[::skp], 0], s=1, color="orange")
 
+    if maze == _mkd.mz_W:
+        _plt.axhline(y=-6, ls="--", lw=1, color="black")
+        _plt.axhline(y=-3, ls=":", lw=1, color="black")
+        _plt.axhline(y=0,  ls="--", lw=1, color="black")
+        _plt.axhline(y=3,  ls=":", lw=1, color="black")
+        _plt.axhline(y=6,  ls="--", lw=1, color="black")
     mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
     #itv[-1] = 0.97
     for ep in xrange(epochs):
-        _plt.axvline(x=(itv[ep+1]*N/1000.), color="red", ls="--")
-    mF.setTicksAndLims(xlabel="time (s)", ylabel="position", xticks=None, yticks=yticks, xticksD=None, yticksD=None, xlim=[t0/1000., t1/1000.], ylim=[xL-0.3, xH+0.3], tickFS=15, labelFS=18)
+        _plt.axvline(x=(itv[ep+1]*N/1000.), color="red", ls="-.")
+    mF.setTicksAndLims(xlabel="time (s)", ylabel="position", xticks=None, yticks=yticks, xticksD=None, yticksD=yticksD, xlim=[t0/1000., t1/1000.], ylim=[xL-0.3, xH+0.3], tickFS=15, labelFS=18)
 
     choutfn = "%(of)s_%(1)d,%(2)d" % {"of" : outfn, "1" : (ch1-1), "2" : (ch2-1)}
     fig.subplots_adjust(bottom=0.28, left=0.1, top=0.96, right=0.99)
