@@ -164,14 +164,13 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, l_l0_chpts, l_ctr_
 
             r   = _N.interp(x, xp, rp)       #  creates a velocity vector
             #  create movement without regard for place field
-            frqmxR = frqmx*(1+0.15*_N.random.randn())
-            offs = 1 + 0.015*_N.random.randn(N)
+            frqmxR = _N.abs(frqmx*(1+0.25*_N.random.randn()))
             _N.linspace(0, 1, N, endpoint=False)
             rscld_t = _N.random.rand(N)   #  rscld_t
             rscld_t /= (_N.max(rscld_t)*1.01)
             rscld_t.sort()
             phi0 = _N.random.rand()*2*_N.pi
-            #r += Amx*(offs+_N.sin(2*_N.pi*_N.linspace(0, 1, N, endpoint=False)*frqmxR)**2)
+
             r += _N.exp(Amx*_N.sin(2*_N.pi*rscld_t*frqmxR + phi0))
             pth = _N.zeros(N+1)
             for n in xrange(1, N+1):
@@ -208,8 +207,8 @@ def create(Lx, Hx, N, mvPat, RTs, frqmx, Amx, pT, l_sx_chpts, l_l0_chpts, l_ctr_
     #  change place field location
     Lam   = f*dt*_N.exp(-0.5*(pths-ctr)**2 / sx)
 
-    _N.savetxt("lam", Lam.T)
-    _N.savetxt("pths", pths)
+    #_N.savetxt("lam", Lam.T)
+    #_N.savetxt("pths", pths)
 
     rnds = _N.random.rand(M, NT)
 

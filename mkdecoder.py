@@ -42,6 +42,8 @@ class mkdecoder:
     tt0      = None
     tt1      = None
 
+    maze     = None
+
     dbgMvt   = False
     spdMult   = 0.5
 
@@ -61,6 +63,7 @@ class mkdecoder:
         """
         """
         oo = self
+        oo.maze = maze
         oo.kde = kde
 
         oo.spdMult = spdMult
@@ -141,12 +144,12 @@ class mkdecoder:
                 oo.xTrs[i, i] = 1-p1   
                 if i == 0:
                     #oo.xTrs[0, oo.Nx-1] = p1*0.5
-                    oo.xTrs[0, oo.Nx-1] = p1*0.9  #  backwards
+                    oo.xTrs[0, oo.Nx-1] = p1*0.8  #  backwards
                 if i >= 0:
-                    oo.xTrs[i-1, i] = p1*0.1
-                    oo.xTrs[i, i-1] = p1*0.9
+                    oo.xTrs[i-1, i] = p1*0.2
+                    oo.xTrs[i, i-1] = p1*0.8
                 if i == oo.Nx-1:
-                    oo.xTrs[oo.Nx-1, 0] = p1*0.1
+                    oo.xTrs[oo.Nx-1, 0] = p1*0.2
         elif maze == mz_W:
             ##  W-maze
             for i in xrange(0, oo.Nx/2):
@@ -225,6 +228,7 @@ class mkdecoder:
 
         ones = _N.ones(oo.Nx)
         for t in xrange(t0+1,t1): # start at 1 because initial condition
+            #print "t %d" % t
             #tt1 = _tm.time()
             for nt in xrange(oo.nTets):
                 oo.Lklhd[nt, t] = pNkmk0[:, nt]
@@ -243,16 +247,6 @@ class mkdecoder:
                         #mkint = _hb.evalAtFxdMks_new(fxdMks, l0sr, us, iSgs, i2pidcovs, M, oo.Nx, oo.mdim + 1)*oo.dt
                         #print mkint1
                         #print mkint2
-                        if t >= 276590:
-                            print "-------   uFE %d" % uFE
-                            print t
-                            print mkint
-                            "^^^^^^^^^^^^^"
-                            print prms[nt][0][uFE]
-                            print l0s
-                            # print us
-                            # print covs
-                            print iSgs
                         oo.Lklhd[nt, t] *= mkint
                         oo.svMkIntnsty[nt].append(mkint)
 
@@ -264,26 +258,35 @@ class mkdecoder:
 
             #  transition convolved with previous posterior
 
-            _N.multiply(oo.xTrs, oo.pX_Nm[t-1], out=oo.intgrd2d)   
-            oo.intgrl = _N.trapz(oo.intgrd2d, dx=oo.dxp, axis=1)
+            ####  INSTEAD OF THIS
+            if oo.maze == mz_W:
+                _N.multiply(oo.xTrs, oo.pX_Nm[t-1], out=oo.intgrd2d)   
+                oo.intgrl = _N.trapz(oo.intgrd2d, dx=oo.dxp, axis=1)
+            else:
+                ####  DO THIS
+                oo.intgrl = _N.dot(oo.xTrs, oo.pX_Nm[t-1])
+                oo.intgrl /= _N.sum(oo.intgrl)
             #for ixk in xrange(oo.Nx):   #  above trapz over 2D array
             #    oo.intgrl[ixk] = _N.trapz(oo.intgrd2d[ixk], dx=oo.dxp)
 
             #tt3 = _tm.time()
-            oo.pX_Nm[t] = oo.intgrl * _N.product(oo.Lklhd[:, t], axis=0)
+            oo.pX_Nm[t] = oo.intgrl * _N.product(oo.Lklhd[:, t], axis=0)   #  product of all tetrodes
             A = _N.trapz(oo.pX_Nm[t], dx=oo.dxp)
             if A == 0:
                 print "A is %(A).5f at time %(t)d" % {"A": A, "t" : t}
                 fig = _plt.figure()
 
                 #_plt.plot(_N.product(oo.Lklhd[:, t], axis=0))
-                print "t=%d" % t
+                #print "t=%d" % t
                 for tet in xrange(4):
-                    print oo.Lklhd[tet, t]
+                    #print oo.Lklhd[tet, t]
                     fig = _plt.figure()
                     _plt.plot(oo.Lklhd[tet, t])
 
-            assert A > 0, "A   %.4f" % A
+            if _N.isnan(A):
+                print "nan" 
+                print mkint
+            assert A > 0, "A   %(A).4f,  t is %(t)d" % {"A" : A, "t" : t}
 
             oo.pX_Nm[t] /= A
             #tt4 = _tm.time()
@@ -327,6 +330,7 @@ class mkdecoder:
                     ivar = 1./var
                     cmps[m] = (1/_N.sqrt(2*_N.pi*var)) * _N.exp(-0.5*ivar*(oo.xp - us[m, 0])**2)
                 oo.Lam_MoMks[:, nt]   = _N.sum(l0s*cmps, axis=0)
+
 
     def decodeKDE(self, t0, t1):
         """
@@ -377,7 +381,10 @@ class mkdecoder:
                     mkint = _ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx, oo.dxp, oo.occ)
                     oo.svMkIntnsty[nt].append(mkint)
                     #dens.append(_ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx, oo.dxp, oo.occ))
-                    oo.Lklhd[nt, t] *= mkint
+                    if _N.sum(mkint) > 0:  #  if firing rate is 0, ignore this spike
+                        oo.Lklhd[nt, t] *= mkint
+                    else:
+                        print "mark so far away that mk intensity is 0.  ignoring"
 
             ttt1 =0
             ttt2 =0
@@ -394,6 +401,19 @@ class mkdecoder:
 
             #tt3 = _tm.time()
             oo.pX_Nm[t] = oo.intgrl * _N.product(oo.Lklhd[:, t], axis=0)
+            if t == 299344:
+                print "t=299344"
+                print oo.intgrl
+                print _N.product(oo.Lklhd[:, t], axis=0)
+                print mkint
+                print fxdMks[0, 1:]
+            if t == 299345:            
+                print "t=299345"
+                print oo.intgrl
+                print _N.product(oo.Lklhd[:, t], axis=0)
+                print mkint
+                print fxdMks[0, 1:]
+
             A = _N.trapz(oo.pX_Nm[t], dx=oo.dxp)
             oo.pX_Nm[t] /= A
             #tt4 = _tm.time()

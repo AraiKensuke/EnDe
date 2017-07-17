@@ -33,16 +33,18 @@ def sample_niw(mu_0,lmbda_0,kappa_0,nu_0):
 def sample_invwishart(lmbda,dof):
     # TODO make a version that returns the cholesky
     # TODO allow passing in chol/cholinv of matrix parameter lmbda
-    n = int(lmbda.shape[0])
+    n = lmbda.shape[0]
     chol = np.linalg.cholesky(lmbda)
 
     if (dof <= 81+n) and (dof == np.round(dof)):
-        x = np.random.randn(int(dof),int(n))
+        x = np.random.randn(int(dof),int(n))    # [dof x k]
     else:
-        x = np.diag(np.sqrt(stats.chi2.rvs(dof-(np.arange(n)))))
+        x = np.diag(np.sqrt(stats.chi2.rvs(dof-(np.arange(n)))))  #  k 
 
-        x[np.triu_indices_from(x,1)] = np.random.randn(int(n*(n-1)/2))
-    R = np.linalg.qr(x,'r')
+    x[np.triu_indices_from(x,1)] = np.random.randn(int(n*(n-1)/2))
+
+
+    R = np.linalg.qr(x,'r')   #  x shape not fixed for given k.  
     try:
         T = scipy.linalg.solve_triangular(R.T,chol.T).T
     #  if dof too small, we get problems
@@ -53,6 +55,30 @@ def sample_invwishart(lmbda,dof):
         print dof
         raise
     return np.dot(T,T.T)
+
+#  uptriinds = np.triu_indices_from(x,1)
+def m_sample_invwishart(PSIs, dofs, K, uptriinds, iws):   # k = PSIs.shape[0]
+    # TODO make a version that returns the cholesky
+    # TODO allow passing in chol/cholinv of matrix parameter lmbda
+
+    M    = PSIs.shape[0]
+    chol = np.linalg.cholesky(PSIs)
+
+    for m in xrange(M):
+        dof = dofs[m]
+        if (dof <= 81+K) and (dof == np.round(dof)):
+            x = np.random.randn(int(dof), K)    # [dof x k]
+        else:
+            x = np.diag(np.sqrt(stats.chi2.rvs(dof-(np.arange(K)))))  #  k 
+
+            x[uptriinds] = np.random.randn(K*(K-1)/2)
+
+        R = np.linalg.qr(x,'r')   #  x shape not fixed for given k.  
+
+        T = scipy.linalg.solve_triangular(R.T,chol[m].T).T
+
+        iws[m] = np.dot(T,T.T)#, out=iws[m])
+        #np.dot(T,T.T, out=iws[m])#, out=iws[m])
 
 def sample_wishart(sigma, dof):
     '''

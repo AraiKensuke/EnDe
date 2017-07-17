@@ -1,14 +1,14 @@
 import EnDedirs as _edd
 #  in terms of relative length
-firstT   = 3.6
+firstT   = 3.
 minT     = 0.5
-maxT     = 1.5
+maxT     = 2.5
 
-epochs   = 32
+epochs   = 30
 
 intvs = _N.empty(epochs+1)
 
-eqI   = True
+eqI   = False
 t     = 0
 intvs[0] = 0
 for epc in xrange(epochs):

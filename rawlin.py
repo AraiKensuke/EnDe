@@ -14,8 +14,8 @@ import EnDedirs as _edd
 #  for day3, ex 
 day    = 6
 sdy    = ("0%d" % day) if (day < 10) else "%d" % day
-ep=6-1;
-"""
+ep=2-1;
+
 anim1 = "bon"
 anim2 = "bond"
 anim3 = "Bon"
@@ -23,13 +23,16 @@ anim3 = "Bon"
 anim1 = "fra"
 anim2 = "frank"
 anim3 = "Fra"
-
-basedir = "/Users/arai"
+"""
+basedir = "/Volumes/Seagate Expansion Drive"
 #  experimental data mark, position container
 
-frip = "%(bd)s/Dropbox (EastWestSideHippos)/BostonData/%(s3)s/%(s1)sripplescons%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3, "bd" : basedir}
-flnp = "%(bd)s/Dropbox (EastWestSideHippos)/BostonData/%(s3)s/%(s1)slinpos%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3, "bd" : basedir}
-frwp = "%(bd)s/Dropbox (EastWestSideHippos)/BostonData/%(s3)s/%(s1)srawpos%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3, "bd" : basedir}
+# frip = "%(bd)s/Dropbox (EastWestSideHippos)/BostonData/%(s3)s/%(s1)sripplescons%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3, "bd" : basedir}
+# flnp = "%(bd)s/Dropbox (EastWestSideHippos)/BostonData/%(s3)s/%(s1)slinpos%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3, "bd" : basedir}
+# frwp = "%(bd)s/Dropbox (EastWestSideHippos)/BostonData/%(s3)s/%(s1)srawpos%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3, "bd" : basedir}
+frip = "%(bd)s/%(s3)s/%(s1)sripplescons%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3, "bd" : basedir}
+flnp = "%(bd)s/%(s3)s/%(s1)slinpos%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3, "bd" : basedir}
+frwp = "%(bd)s/%(s3)s/%(s1)srawpos%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3, "bd" : basedir}
 
 rip = _sio.loadmat(frip)    #  load matlab .mat files
 mLp = _sio.loadmat(flnp)
@@ -436,6 +439,7 @@ svecT_ms = _N.linspace(t0, t1, t1-t0, endpoint=False)    #
 svecL0_ms = _N.interp(svecT_ms, svecT*1000, svecL0)
 
 prmfilepath = "%(bd)s/Dropbox (EastWestSideHippos)/BostonData/%(s2)s%(dy)s" %  {"s1" : anim1, "dy" : sdy, "s2" : anim2, "bd" : basedir}
+prmfilepath = "%(bd)s/%(s2)s/%(s2)s%(dy)s" %  {"s1" : anim1, "dy" : sdy, "s2" : anim2, "bd" : basedir}
 onlydirs = [f for f in listdir(prmfilepath) if isdir(join(prmfilepath, f))]
 srtdirs  = _N.sort(onlydirs)
 
@@ -461,8 +465,14 @@ for dir in srtdirs:
     if os.access(prmfn, os.F_OK):
         it += 1
         A = _sio.loadmat(prmfn)
-        t_champs = A["filedata"][0,0]["params"][:, 0:5]  # time and amplitudes
+        t_champs = _N.array(A["filedata"][0,0]["params"][:, 0:5], dtype=_N.float16)  # time and amplitudes
         t_champs[:, 1:5] /= 50.
+
+
+
+
+
+
 
         #  tm/10000.    -->  seconds
         #  vecT  is sampled every 33.4 ms?     #  let's intrapolate this 
@@ -495,11 +505,12 @@ for dir in srtdirs:
                 y.append(t_champs[imk, 1])
                 rngT.append(now_s)
                 rngX.append(svecL0[fd[0]])
-                if marks[ind, it] is None:
-                    marks[ind, it] = [t_champs[imk, 1:]]
+                if marks[ind, it] is None:  #  1st spike in this time bin
+                    marks[ind, it] = [_N.array(t_champs[imk, 1:], dtype=_N.float32)]
                 else:
-                    print "here"
-                    marks[ind, it].append(t_champs[imk, 1:])
+                    #  2nd or more spikes in this time bin
+                    print "more than 2 spikes in this time bin"
+                    marks[ind, it].append(_N.array(t_champs[imk, 1:], dtype=_N.float32))
 
 x  = []
 xt = []
@@ -519,7 +530,7 @@ for nr in xrange(trgns.shape[0]):
     _plt.plot(_N.arange(t0, t1), svecL0_ms[t0:t1])
 
 emc = EMC.ExperimentalMarkContainer(anim2, day, ep+1)
-emc.pos   = svecL0_ms   #  marks and position are not aligned
+emc.pos   = _N.array(svecL0_ms, dtype=_N.float16)   #  marks and position are not aligned
 emc.marks = marks
 emc.tetlist = tetlist
 emc.minds = minds

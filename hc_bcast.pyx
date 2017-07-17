@@ -14,6 +14,8 @@ def hc_bcast1(double[:, ::1] fr, double [:, ::1] xASr, double[:, ::1] iq2r, doub
     #  f_intgrd  Nupx
     cdef int m, n, mN
 
+    cdef double pfrm
+    cdef double piq2rm
     cdef double *p_qdrSPC   = &qdrSPC[0, 0]
     cdef double *p_fr       = &fr[0, 0]
     cdef double *p_xASr     = &xASr[0, 0]
@@ -21,8 +23,11 @@ def hc_bcast1(double[:, ::1] fr, double [:, ::1] xASr, double[:, ::1] iq2r, doub
 
     for 0 <= m < M:
         mN = m*N
+        pfrm = p_fr[m]
+        piq2rm= p_iq2r[m]
         for 0 <= n < N:
-            p_qdrSPC[mN+n] = (p_fr[m] - p_xASr[n])*(p_fr[m] - p_xASr[n])*p_iq2r[m]
+            p_qdrSPC[mN+n] = (pfrm - p_xASr[n])*(pfrm - p_xASr[n])*piq2rm
+            #p_qdrSPC[mN+n] = (p_fr[m] - p_xASr[n])*(p_fr[m] - p_xASr[n])*p_iq2r[m]
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -59,12 +64,16 @@ def hc_qdr_sum(double[:, ::1] pkFRr, double [:, ::1] mkNrms, double[:, ::1] qdrS
     cdef double *p_qdrMKS     = &qdrMKS[0, 0]
     cdef double *p_cont       = &cont[0, 0]
     cdef double pkFRr_m, mkNrms_m
+    cdef double norm
 
     for 0 <= m < M:
         mN = m*N
         pkFRr_m = p_pkFRr[m]
         mkNrms_m = p_mkNrms[m]
+        #norm    = p_pkFRr[m] + p_mkNrms[m]
         for 0 <= n < N:
+            #mNn = mN+n
+            #p_cont[mNn] = norm - 0.5*(p_qdrSpc[mNn] + p_qdrMKS[mNn])
             p_cont[mN+n] = pkFRr_m + mkNrms_m - 0.5*(p_qdrSpc[mN+n] + p_qdrMKS[mN+n])
 
 @cython.boundscheck(False)
