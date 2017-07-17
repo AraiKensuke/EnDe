@@ -270,7 +270,7 @@ class mkdecoder:
             #    oo.intgrl[ixk] = _N.trapz(oo.intgrd2d[ixk], dx=oo.dxp)
 
             #tt3 = _tm.time()
-            oo.pX_Nm[t] = oo.intgrl * _N.product(oo.Lklhd[:, t], axis=0)
+            oo.pX_Nm[t] = oo.intgrl * _N.product(oo.Lklhd[:, t], axis=0)   #  product of all tetrodes
             A = _N.trapz(oo.pX_Nm[t], dx=oo.dxp)
             if A == 0:
                 print "A is %(A).5f at time %(t)d" % {"A": A, "t" : t}
@@ -331,6 +331,7 @@ class mkdecoder:
                     cmps[m] = (1/_N.sqrt(2*_N.pi*var)) * _N.exp(-0.5*ivar*(oo.xp - us[m, 0])**2)
                 oo.Lam_MoMks[:, nt]   = _N.sum(l0s*cmps, axis=0)
 
+
     def decodeKDE(self, t0, t1):
         """
         decode activity from [t0:t1]
@@ -380,7 +381,10 @@ class mkdecoder:
                     mkint = _ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx, oo.dxp, oo.occ)
                     oo.svMkIntnsty[nt].append(mkint)
                     #dens.append(_ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx, oo.dxp, oo.occ))
-                    oo.Lklhd[nt, t] *= mkint
+                    if _N.sum(mkint) > 0:  #  if firing rate is 0, ignore this spike
+                        oo.Lklhd[nt, t] *= mkint
+                    else:
+                        print "mark so far away that mk intensity is 0.  ignoring"
 
             ttt1 =0
             ttt2 =0
@@ -390,15 +394,26 @@ class mkdecoder:
 
             #  transition convolved with previous posterior
 
-            oo.intgrl = _N.dot(oo.xTrs, oo.pX_Nm[t-1])
-            oo.intgrl /= _N.sum(oo.intgrl)
-            #_N.multiply(oo.xTrs, oo.pX_Nm[t-1], out=oo.intgrd2d)   
-            #oo.intgrl = _N.trapz(oo.intgrd2d, dx=oo.dxp, axis=1)
+            _N.multiply(oo.xTrs, oo.pX_Nm[t-1], out=oo.intgrd2d)   
+            oo.intgrl = _N.trapz(oo.intgrd2d, dx=oo.dxp, axis=1)
             #for ixk in xrange(oo.Nx):   #  above trapz over 2D array
             #    oo.intgrl[ixk] = _N.trapz(oo.intgrd2d[ixk], dx=oo.dxp)
 
             #tt3 = _tm.time()
             oo.pX_Nm[t] = oo.intgrl * _N.product(oo.Lklhd[:, t], axis=0)
+            if t == 299344:
+                print "t=299344"
+                print oo.intgrl
+                print _N.product(oo.Lklhd[:, t], axis=0)
+                print mkint
+                print fxdMks[0, 1:]
+            if t == 299345:            
+                print "t=299345"
+                print oo.intgrl
+                print _N.product(oo.Lklhd[:, t], axis=0)
+                print mkint
+                print fxdMks[0, 1:]
+
             A = _N.trapz(oo.pX_Nm[t], dx=oo.dxp)
             oo.pX_Nm[t] /= A
             #tt4 = _tm.time()
