@@ -401,18 +401,6 @@ class mkdecoder:
 
             #tt3 = _tm.time()
             oo.pX_Nm[t] = oo.intgrl * _N.product(oo.Lklhd[:, t], axis=0)
-            if t == 299344:
-                print "t=299344"
-                print oo.intgrl
-                print _N.product(oo.Lklhd[:, t], axis=0)
-                print mkint
-                print fxdMks[0, 1:]
-            if t == 299345:            
-                print "t=299345"
-                print oo.intgrl
-                print _N.product(oo.Lklhd[:, t], axis=0)
-                print mkint
-                print fxdMks[0, 1:]
 
             A = _N.trapz(oo.pX_Nm[t], dx=oo.dxp)
             oo.pX_Nm[t] /= A
