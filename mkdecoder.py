@@ -217,7 +217,10 @@ class mkdecoder:
             oo.svMkIntnsty.append([])
 
         oo.init_pX_Nm(t0)   #  flat pX_Nm  init cond at start of decode
+        tt1 = _tm.time()
         oo.LmdMargOvrMrks(0, t0, prms=prms, uFE=uFE)
+        tt2 = _tm.time()
+        print "tt2-tt1  %.3f" % (tt2-tt1)
         pNkmk0   = _N.exp(-oo.dt * oo.Lam_MoMks)  #  one for each tetrode
 
         fxdMks = _N.empty((oo.Nx, oo.mdim+1))  #  for each pos, a fixed mark
@@ -227,28 +230,34 @@ class mkdecoder:
         dens = []
 
         ones = _N.ones(oo.Nx)
+
+        #tspk = 0
         for t in xrange(t0+1,t1): # start at 1 because initial condition
             #print "t %d" % t
-            #tt1 = _tm.time()
+
             for nt in xrange(oo.nTets):
                 oo.Lklhd[nt, t] = pNkmk0[:, nt]
 
                 if (oo.mkpos[nt][t, 1] == 1):
                     fxdMks[:, 1:] = oo.mkpos[nt][t, 2:]
                     if not oo.ignorespks:
-                        mkint = _ku.evalAtFxdMks_new(fxdMks, l0s, us, covs, iSgs, i2pidcovsr)*oo.dt
+                        #mkint = _ku.evalAtFxdMks_new(fxdMks, l0s, us, covs, iSgs, i2pidcovsr)*oo.dt
                         # print fxdMks.shape
                         # print l0s.shape
                         # print us.shape
                         # print iSgs.shape
                         # print i2pidcovs.shape
-                        #l0sr = _N.array(l0s[:, 0])
+                        #tt1 = _tm.time()
+                        l0sr = _N.array(l0s[:, 0])
                         #mkint2 = _hb.evalAtFxdMks_new(fxdMks, l0sr, us, iSgs, i2pidcovs, M, oo.Nx, oo.mdim + 1)*oo.dt
-                        #mkint = _hb.evalAtFxdMks_new(fxdMks, l0sr, us, iSgs, i2pidcovs, M, oo.Nx, oo.mdim + 1)*oo.dt
+                        mkint = _hb.evalAtFxdMks_new(fxdMks, l0sr, us, iSgs, i2pidcovs, M, oo.Nx, oo.mdim + 1)*oo.dt
                         #print mkint1
                         #print mkint2
+                        #tt2 = _tm.time()
                         oo.Lklhd[nt, t] *= mkint
                         oo.svMkIntnsty[nt].append(mkint)
+                        #tspk += tt2-tt1
+
 
             ttt1 =0
             ttt2 =0
@@ -258,7 +267,7 @@ class mkdecoder:
 
             #  transition convolved with previous posterior
 
-            ####  INSTEAD OF THIS
+            ####  INSTEAD OF THIS   #  
             if oo.maze == mz_W:
                 _N.multiply(oo.xTrs, oo.pX_Nm[t-1], out=oo.intgrd2d)   
                 oo.intgrl = _N.trapz(oo.intgrd2d, dx=oo.dxp, axis=1)
@@ -292,6 +301,7 @@ class mkdecoder:
             #tt4 = _tm.time()
             #print "%(1).3e   %(2).3e   %(3).3e" % {"1" : (tt2-tt1), "2" : (tt3-tt2), "3" : (tt4-tt3)}
             #print "%(1).3e   %(2).3e" % {"1" : ttt1, "2" : ttt2}
+        #print "tspk  is %.3f" % tspk
         tEnd = _tm.time()
         #print "decode   %(1).3e" % {"1" : (tEnd-tStart)}
         #_N.savetxt("densGT", _N.array(dens))
@@ -339,7 +349,13 @@ class mkdecoder:
         oo = self
 
         oo.init_pX_Nm(t0)   #  flat pX_Nm  init cond at start of decode
+
+        tt1 = _tm.time()
         oo.LmdMargOvrMrks(0, t0)
+        tt2 = _tm.time()
+        print "tt2-tt1  %.3f" % (tt2-tt1)
+
+
 
         ##  each 
 
@@ -369,16 +385,21 @@ class mkdecoder:
             sptl.append(-0.5*ibx2*(oo.xpr - oo.tr_pos[nt])**2)  #  this piece doesn't need to be evalu
             oo.svMkIntnsty.append([])
 
+        #tspk = 0
         ###############################
         for t in xrange(t0+1,t1): # start at 1 because initial condition
-            #tt1 = _tm.time()
+
             for nt in xrange(oo.nTets):
                 oo.Lklhd[nt, t] = pNkmk0[:, nt]
 
                 if (oo.mkpos[nt][t, 1] == 1):
                     fxdMks[:, 1:] = oo.mkpos[nt][t, 2:]
                         #(atMark, fld_x, tr_pos, tr_mks, all_pos, mdim, Bx, cBm, bx)
+                    #tt1 = _tm.time()
                     mkint = _ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx, oo.dxp, oo.occ)
+                    #tt2 = _tm.time()
+                    #tspk += tt2-tt1
+
                     oo.svMkIntnsty[nt].append(mkint)
                     #dens.append(_ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx, oo.dxp, oo.occ))
                     if _N.sum(mkint) > 0:  #  if firing rate is 0, ignore this spike
@@ -407,6 +428,7 @@ class mkdecoder:
             #tt4 = _tm.time()
             #print "%(1).3e   %(2).3e   %(3).3e" % {"1" : (tt2-tt1), "2" : (tt3-tt2), "3" : (tt4-tt3)}
             #print "%(1).3e   %(2).3e" % {"1" : ttt1, "2" : ttt2}
+        #print "tspk  is %.3f" % tspk
         tEnd = _tm.time()
 
         #_N.savetxt("densKDE", _N.array(dens))

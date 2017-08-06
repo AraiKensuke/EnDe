@@ -77,6 +77,7 @@ def evalAtFxdMks_new(fxdMks, l0, us, Sgs, iSgs, i2pidcovsr):
     #  fxdMks is a 
     fxdMksr= fxdMks.reshape(Nx, 1, pmdim)
 
+    #  
     #  cmps is spatial contribution 
     cmps = i2pidcovsr*_N.exp(-0.5*_N.einsum("xmj,xmj->mx", fxdMksr-us, _N.einsum("mjk,xmk->xmj", iSgs, fxdMksr - us)))
 
