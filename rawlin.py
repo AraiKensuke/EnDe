@@ -14,8 +14,8 @@ import EnDedirs as _edd
 #  for day3, ex 
 
 animals = [["bon", "bond", "Bon"], ["fra", "frank", "Fra"], ["gov", "GovernmentData", "Gov"]]
-#basedir = "/Volumes/Seagate Expansion Drive"
-basedir = "/Volumes/ExtraDisk/LorenData"
+basedir = "/Volumes/Seagate Expansion Drive"
+#basedir = "/Volumes/ExtraDisk/LorenData"
 
 exf("rawlin_debugFigs.py")
 exf("rawlin_funcs.py")
@@ -28,7 +28,7 @@ for an in animals[0:1]:
     anim3 = an[2]
 
     #for day in xrange(0, 12):
-    for day in xrange(9, 10):
+    for day in xrange(3, 4):
         sdy    = ("0%d" % day) if (day < 10) else "%d" % day
 
         frip = "%(bd)s/%(s3)s/%(s1)sripplescons%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3, "bd" : basedir}
@@ -45,7 +45,7 @@ for an in animals[0:1]:
 
 
             #for epc in range(0, _pts.shape[1], 2):
-            for epc in range(4, 5):
+            for epc in range(0, 1):
                 ep=epc+1;
 
             #  experimental data mark, position container
@@ -74,28 +74,46 @@ for an in animals[0:1]:
                     lindist=mLp["linpos"][0,ex][0,ep]["statematrix"][0][0]["lindist"][0,0].T[0]
 
                     seg_ts = a[0,0].T[0]
+                    force_24 = _N.ones(len(seg_ts), dtype=_N.int)*-1
                     ##  t135, l_intv_cnt1s, tFilled, tsFilled
                     scxMin, scxMax, scyMin, scyMax, nzinds = get_boundaries(r)
-                    t135, intv_cnt1s, tFilled, tsFilled, seg1, seg2, seg3, seg4, seg5 = continuous(seg_ts, r, time, lindist)
-                    #  tFilled at this point has vals 1, 3, 5 or -1 only
-                    real_arm_events = find_actual_arm_events(intv_cnt1s, t135, tFilled)
 
-                    """
-                       run hard-coded file.  Outside of "real" arm events.  
-                    """
-
-                    hfn = "exceptions-%(ex)d-%(ep)d.py" % {"ex" : (ex+1), "ep" : (ep+1)}
+                    if day > 9:
+                        hfn = "tFilled_hc-%(an)s%(dy)d0%(ep)d.py" % {"dy" : day, "ep" : (ep+1), "an" : anim2}
+                    else:
+                        hfn = "tFilled_hc-%(an)s0%(dy)d0%(ep)d.py" % {"dy" : day, "ep" : (ep+1), "an" : anim2}
 
                     if os.access(hfn, os.F_OK):
+                        print "found %s" % hfn
                         exf(hfn)
 
-                    x = 1; y = 2
+                    #  tFilled only created, but is in initial state of -1
+                    #  intv_cnt1s, t135 created using seg_ts
+                    t135, intv_cnt1s, tFilled, tsFilled, seg1, seg2, seg3, seg4, seg5 = continuous(seg_ts, r, time, lindist)  #  tFilled
 
-                    ###  debug by _plt.plot(seg_ts)
-                    ###  btwnfigs(0, 1000, 2000, seg_ts, r, 1, 2, scxMin, scxMax, scyMin, scyMax)
-                    #  now look at what happens between the stable time in the arm.  
+                    """
+                    run hard-coded file.  Outside of "real" arm events.  
+                    hard-coded file should modify tFilled.
+                    look at linpos.png output, and 
+                    btwnfigs(day, ep, 22500, 24000, seg_ts, tFilled, r, 1, 2, scxMin, scxMax, scyMin, scyMax)
+                    """
 
-                    smooth_over_deviations(day, ep, real_arm_events, seg_ts, t135, tFilled)
+
+                    # #  tFilled at this point has vals 1, 3, 5 or -1 only
+                    real_arm_events = find_actual_arm_events(intv_cnt1s, t135, tFilled)
+
+                    # x = 1; y = 2
+
+                    # ###  debug by _plt.plot(seg_ts)
+                    # ###  btwnfigs(0, 1000, 2000, seg_ts, r, 1, 2, scxMin, scxMax, scyMin, scyMax)
+                    # #  now look at what happens between the stable time in the arm.  
+                    fig = _plt.figure()
+                    _plt.plot(tFilled)
+                    smooth_over_deviations(day, ep, real_arm_events, seg_ts, t135, tFilled, force_24)
+
+                    fig = _plt.figure()
+                    _plt.plot(tFilled)
+                    _plt.plot(seg_ts)
 
                     segN_mm = _N.empty((5, 2))  #  min, max lin distance for this segment
                     min_max_lindist_for_segments(tFilled, segN_mm)
@@ -173,12 +191,23 @@ for an in animals[0:1]:
                     #prmfilepath = "%(bd)s/Dropbox (EastWestSideHippos)/BostonData/%(s2)s%(dy)s" %  {"s1" : anim1, "dy" : sdy, "s2" : anim2, "bd" : basedir}
                     prmfilepath = "%(bd)s/%(s2)s/%(s2)s%(dy)s" %  {"s1" : anim1, "dy" : sdy, "s2" : anim2, "bd" : basedir}
 
+                    fig = _plt.figure(figsize=(11, 7))
+                    fig.add_subplot(3, 1, 1)
+                    _plt.plot(svecT, svecL0, color="black")
+                    _plt.xlim(svecT[0], svecT[-1])
+                    _plt.ylim(-6.2, 6.2)
+                    fig.add_subplot(3, 1, 2)
+                    _plt.plot(svecL0, color="black")
+                    _plt.xlim(0, len(svecL0))
+                    _plt.ylim(-6.2, 6.2)
+                    fig.add_subplot(3, 1, 3)
+                    _plt.plot(tFilled, color="black")
+                    _plt.xlim(0, len(tFilled))
+                    _plt.yticks(range(1, 6))
+                    _plt.ylim(0.9, 5.1)
 
-                    fig = _plt.figure(figsize=(6, 3))
-                    _plt.plot(svecT, svecL0)
                     png = _edd.resFN("%(anim)s%(sdy)s0%(ep)s_linpos.png" % {"anim" : anim2, "sdy" : sdy, "ep" : (ep+1)})
                     print png
-                    _plt.xlim(svecT[0], svecT[-1])
                     _plt.savefig(png)
                     _plt.close()
                     tp  = _N.empty((svecT.shape[0], 2))
@@ -187,6 +216,8 @@ for an in animals[0:1]:
                     datfn = _edd.resFN("%(anim)s%(sdy)s0%(ep)s_tpos.dat" % {"anim" : anim2, "sdy" : sdy, "ep" : (ep+1)})
                     _N.savetxt(datfn, tp, fmt="%.4f %.4f")
 
+
+                    """
                     onlydirs = [f for f in listdir(prmfilepath) if isdir(join(prmfilepath, f))]
                     srtdirs  = _N.sort(onlydirs)
 
@@ -289,3 +320,4 @@ for an in animals[0:1]:
 
 
 
+                    """

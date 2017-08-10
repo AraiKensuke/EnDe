@@ -41,10 +41,19 @@ def btwnfigs(day, ep, t0, t1, seg_ts, tFilled, r, x, y, scxMin, scxMax, scyMin, 
     _plt.ylim(scyMin, scyMax)
     fig.add_subplot(1, 3, 2)
     _plt.plot(range(t0-20, t1+20), seg_ts[t0-20:t1+20], color="black", lw=4)
+    _plt.xlim(t0-20, t1+20)
+    _plt.xticks(_N.arange(t0, t1, (t1-t0)/5))
     _plt.ylim(0.5, 5.5)
+    _plt.grid()
     fig.add_subplot(1, 3, 3)
     _plt.plot(range(t0-20, t1+20), tFilled[t0-20:t1+20], color="black", lw=4)
+    _plt.xlim(t0-20, t1+20)
     _plt.ylim(0.5, 5.5)
+    _plt.xticks(_N.arange(t0, t1, (t1-t0)/5))
+    _plt.grid()
+    
+
+    fig.subplots_adjust(left=0.04, bottom=0.1, top=0.95, right=0.99)
 
     _plt.savefig("btwn_%(dy)d_%(ep)d_%(1)d_%(2)d" % {"dy" : day, "ep" : (ep+1), "1" : t0, "2" : t1})
     _plt.close()

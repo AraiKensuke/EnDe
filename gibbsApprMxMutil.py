@@ -256,10 +256,10 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
 
     blksz= 20
     initBlk = 10
-    frms = _pU.findstat(smp_sp_prms, blksz, initBlk)
+    #frms = _pU.findstat(smp_sp_prms, blksz, initBlk)
 
     #frms *= blksz
-    frms = _N.ones(M, dtype=_N.int)*4000
+    frms = _N.ones(M, dtype=_N.int)*5000
 
     occ = None
     if nSpks > 0:

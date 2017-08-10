@@ -204,16 +204,23 @@ class mkdecoder:
         ##  each 
 
         oo.svMkIntnsty = []
+        l0s = []
+        us  = []
+        covs= []
+        M   = []
+        iSgs= []
+        i2pidcovs = []
+        i2pidcovsr = []
 
         for nt in xrange(oo.nTets):
-            l0s   = prms[nt][0][uFE]
-            us    = prms[nt][1][uFE]
-            covs  = prms[nt][2][uFE]
-            M     = covs.shape[0]
+            l0s.append(prms[nt][0][uFE])
+            us.append(prms[nt][1][uFE])
+            covs.append(prms[nt][2][uFE])
+            M.append(covs[nt].shape[0])
 
-            iSgs  = _N.linalg.inv(covs)
-            i2pidcovs = (1/_N.sqrt(2*_N.pi))**(oo.mdim+1)*(1./_N.sqrt(_N.linalg.det(covs)))
-            i2pidcovsr= i2pidcovs.reshape((M, 1))
+            iSgs.append(_N.linalg.inv(covs[nt]))
+            i2pidcovs.append((1/_N.sqrt(2*_N.pi))**(oo.mdim+1)*(1./_N.sqrt(_N.linalg.det(covs[nt]))))
+            #i2pidcovsr.append(i2pidcovs.reshape((M, 1)))
             oo.svMkIntnsty.append([])
 
         oo.init_pX_Nm(t0)   #  flat pX_Nm  init cond at start of decode
@@ -248,9 +255,9 @@ class mkdecoder:
                         # print iSgs.shape
                         # print i2pidcovs.shape
                         #tt1 = _tm.time()
-                        l0sr = _N.array(l0s[:, 0])
+                        l0sr = _N.array(l0s[nt][:, 0])
                         #mkint2 = _hb.evalAtFxdMks_new(fxdMks, l0sr, us, iSgs, i2pidcovs, M, oo.Nx, oo.mdim + 1)*oo.dt
-                        mkint = _hb.evalAtFxdMks_new(fxdMks, l0sr, us, iSgs, i2pidcovs, M, oo.Nx, oo.mdim + 1)*oo.dt
+                        mkint = _hb.evalAtFxdMks_new(fxdMks, l0sr, us[nt], iSgs[nt], i2pidcovs[nt], M[nt], oo.Nx, oo.mdim + 1)*oo.dt
                         #print mkint1
                         #print mkint2
                         #tt2 = _tm.time()

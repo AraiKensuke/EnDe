@@ -1,4 +1,36 @@
 from filter import gauKer
+
+#def insertVal_into_tFilled(t0, t1, val, tFilled, t135):
+def insertVal_into_tFilled(t0, t1, val, tFilled):
+    """
+    """
+    # l135 = t135.tolist()
+    # #  inserting a value of 2, 4.  if location is currently in t135, remove it
+    # if (val == 2) or (val == 4):
+    #     chinds = _N.where((t135 >= t0) & (t135 < t1))[0]
+
+    #     for t in chinds[::-1]:
+    #         l135.pop(t)
+    # #  inserting a value of 1, 3, 5.  add times to t135
+    # #  t0 = 10  t1 = 20
+    # #  t135 = 9 10 11 15 16 18 22
+    # #  is135already = 10 11 15 16 18
+    # #  btwnt0t1     = 10 11 12 13 14 15 16 17 18 19
+    # #  not135       = 12 13 14 17 19
+    # #  
+    # elif (val == 1) or (val == 3) or (val == 5):
+    #     is135already = _N.where((t135 >= t0) & (t135 < t1))[0]
+    #     btwnt0t1     = _N.arange(t0, t1)
+    #     not135       = _N.setdiff1d(btwnt0t1, is135already)
+
+    #     l135.extend(not135)
+        
+    tFilled[t0:t1] = val
+    # t135 = _N.array(l135)
+    # t135.sort()
+    # return t135
+            
+
 def get_boundaries(rawpos):
     """
     from rawpos which aren't occluded, find the corners of range of motion.
@@ -91,7 +123,6 @@ def find_actual_arm_events(intv_cnt1s, t135, tFilled):
     """
     when between arms  (seg 4 and 5)
     """
-
     real_arm_events  = []
 
     #fig = _plt.figure()
@@ -128,7 +159,7 @@ def find_actual_arm_events(intv_cnt1s, t135, tFilled):
 
 
 
-def smooth_over_deviations(day, ep, real_arm_events, seg_ts, t135, tFilled):
+def smooth_over_deviations(day, ep, real_arm_events, seg_ts, t135, tFilled, force_24):
     """
     In between being in arms 1, 3 or 5  - we get spurious transitions between
     for example, 5->4->5->4->1.  Smooth over this so it looks like 5->4->1
@@ -140,37 +171,47 @@ def smooth_over_deviations(day, ep, real_arm_events, seg_ts, t135, tFilled):
 
         t0 = t135[intv_cnt1s[ip, 1]]
         t1 = t135[intv_cnt1s[i,   0]]
-        if (seg_ts[t0-1] == 1) and (seg_ts[t1+1] == 1):
-            tFilled[t0:t1] = 1
-        elif (seg_ts[t0-1] == 1) and (seg_ts[t1+1] == 3):
-            tFilled[t0:t1] = 2
-        elif (seg_ts[t0-1] == 1) and (seg_ts[t1+1] == 5):
-            tFilled[t0:t1] = 4
-        elif (seg_ts[t0-1] == 3) and (seg_ts[t1+1] == 3):
-            tFilled[t0:t1] = 3
-        elif (seg_ts[t0-1] == 3) and (seg_ts[t1+1] == 1):
-            tFilled[t0:t1] = 2
-        elif (seg_ts[t0-1] == 3) and (seg_ts[t1+1] == 5):
-            tFilled[t0:t1] = seg_ts[t0:t1]
-            ##  assumption in going 3->5  went 2 -> 4 without returning to 
-            is3 = _N.where(tFilled[t0:t1] == 3)[0]
-            tFilled[t0+is3] = 2
-            is5 = _N.where(tFilled[t0:t1] == 5)[0]
-            tFilled[t0+is5] = 4
-            #btwnfigs(day, ep, t0, t1, seg_ts, tFilled, r, 1, 2, scxMin, scxMax, scyMin, scyMax)
-        elif (seg_ts[t0-1] == 5) and (seg_ts[t1+1] == 5):
-            tFilled[t0:t1] = 3
-        elif (seg_ts[t0-1] == 5) and (seg_ts[t1+1] == 1):
-            tFilled[t0:t1] = 4
-        elif (seg_ts[t0-1] == 5) and (seg_ts[t1+1] == 3):
-            tFilled[t0:t1] = seg_ts[t0:t1]
-            is3 = _N.where(tFilled[t0:t1] == 3)[0]
-            tFilled[t0+is3] = 2
-            is5 = _N.where(tFilled[t0:t1] == 5)[0]
-            tFilled[t0+is5] = 4
-            #btwnfigs(day, ep, t0, t1, seg_ts, tFilled, r, 1, 2, scxMin, scxMax, scyMin, scyMax)
+        inbtwn = _N.where(force_24[t0:t1] > 0)[0]
+        if len(inbtwn) == 0:
+            if (seg_ts[t0-1] == 1) and (seg_ts[t1+1] == 1):
+                tFilled[t0:t1] = 1
+            elif (seg_ts[t0-1] == 1) and (seg_ts[t1+1] == 3):
+                tFilled[t0:t1] = 2
+            elif (seg_ts[t0-1] == 1) and (seg_ts[t1+1] == 5):
+                tFilled[t0:t1] = 4
+            elif (seg_ts[t0-1] == 3) and (seg_ts[t1+1] == 3):
+                print "ignored everything in between  %(1)d %(2)d" % {"1" : t0, "2" : t1}
+                tFilled[t0:t1] = 3
+            elif (seg_ts[t0-1] == 3) and (seg_ts[t1+1] == 1):
+                tFilled[t0:t1] = 2
+            elif (seg_ts[t0-1] == 3) and (seg_ts[t1+1] == 5):
+                tFilled[t0:t1] = seg_ts[t0:t1]
+                ##  assumption in going 3->5  went 2 -> 4 without returning to 
+                is3 = _N.where(tFilled[t0:t1] == 3)[0]
+                tFilled[t0+is3] = 2
+                is5 = _N.where(tFilled[t0:t1] == 5)[0]
+                tFilled[t0+is5] = 4
+                #btwnfigs(day, ep, t0, t1, seg_ts, tFilled, r, 1, 2, scxMin, scxMax, scyMin, scyMax)
+            elif (seg_ts[t0-1] == 5) and (seg_ts[t1+1] == 5):
+                tFilled[t0:t1] = 3
+            elif (seg_ts[t0-1] == 5) and (seg_ts[t1+1] == 1):
+                tFilled[t0:t1] = 4
+            elif (seg_ts[t0-1] == 5) and (seg_ts[t1+1] == 3):
+                tFilled[t0:t1] = seg_ts[t0:t1]
+                is3 = _N.where(tFilled[t0:t1] == 3)[0]
+                tFilled[t0+is3] = 2
+                is5 = _N.where(tFilled[t0:t1] == 5)[0]
+                tFilled[t0+is5] = 4
+                #btwnfigs(day, ep, t0, t1, seg_ts, tFilled, r, 1, 2, scxMin, scxMax, scyMin, scyMax)
+            else:
+                print "came to else"
         else:
-            print "came to else"
+            #  hard code what happens between
+            #  t0, t1
+            print "force_24 found"
+            tFilled[t0 + inbtwn] = force_24[t0 + inbtwn]
+            tFilled[t0:t0+inbtwn[0]] = force_24[t0 + inbtwn[0]]
+            tFilled[t0+inbtwn[-1]:t1] = force_24[t0+inbtwn[-1]:t1]
 
 
     #  now take a look at tFilled.  Are there any segments that are short lived?
@@ -195,7 +236,7 @@ def smooth_over_deviations(day, ep, real_arm_events, seg_ts, t135, tFilled):
             tFilled[t0+shldb2] = 2
             tFilled[t0+shldb4] = 4
             
-            btwnfigs(day, ep, t0, t1, seg_ts, tFilled, r, 1, 2, scxMin, scxMax, scyMin, scyMax)
+            #btwnfigs(day, ep, t0, t1, seg_ts, tFilled, r, 1, 2, scxMin, scxMax, scyMin, scyMax)
 
 
 def min_max_lindist_for_segments(tFilled, segN_mm, ):
