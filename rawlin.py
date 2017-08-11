@@ -14,8 +14,10 @@ import EnDedirs as _edd
 #  for day3, ex 
 
 animals = [["bon", "bond", "Bon"], ["fra", "frank", "Fra"], ["gov", "GovernmentData", "Gov"]]
-basedir = "/Volumes/Seagate Expansion Drive"
+#basedir = "/Volumes/Seagate Expansion Drive"
 #basedir = "/Volumes/ExtraDisk/LorenData"
+basedir = "/Users/arai/TEMP/LorenData"
+
 
 exf("rawlin_debugFigs.py")
 exf("rawlin_funcs.py")
