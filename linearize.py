@@ -28,6 +28,11 @@ segs      = _N.empty((Nsgs, 2, 2))
 length    = _N.empty(Nsgs)
 offset    = _N.array([0, 1, 2, 1, 2])
 
+#  regular lindist     #  0 to 3
+#  lin_inout           #  inbound outbound  0 to 6
+#  lin_lr              #  -3 to 3
+#  lin_lr_inout        #  -3 to 3
+
 ii     = 0
 
 r      = None
@@ -51,11 +56,21 @@ def onclick(event):
 seg_ts = None
 inout  = None   # inbound - outbound
 a_inout  = None   # inbound - outbound
+lr       = None
 
 lindist  = None        #  linearization with no left-right
+lin_lr   = None
+lin_inout= None
+lin_lr_inout = None
+scxMin = None
+scxMax = None
+scyMin = None 
+scyMax = None
 
 def done():
-    global r, seg_ts, segs, Nsgs, inout, a_inout, lindist
+    global r, seg_ts, segs, Nsgs, inout, a_inout, lindist, lin_lr, lin_inout, lin_lr_inout, lr
+    global scxMin, scxMax, scyMin, scyMax
+
     hdir = _N.empty(2)
     vdir = _N.empty(2)
     linp = _N.empty(2)
@@ -68,7 +83,7 @@ def done():
     ||       ||       ||
     L4===4===L1===2===L2
     """
-    scxMin, scxmax, scyMin, scyMax = get_boundaries(r)
+    scxMin, scxMax, scyMin, scyMax = get_boundaries(r)
     segs_from_landmarks(segs, landmarks, length)
     e = inout_dir(segs, Nsgs)
     a_s, b_s, c_s = slopes_of_segs(segs)
@@ -87,10 +102,19 @@ def done():
     N           = r.shape[0]
     seg_ts        = _N.empty(N, dtype=_N.int)
     lindist         = _N.empty(N)
+    lin_lr          = _N.empty(N)
+    lin_inout       = _N.empty(N)
+    lin_lr_inout    = _N.empty(N)
+    lr              = _N.ones(N, dtype=_N.int) * -3
+
     inout         = _N.empty(N, dtype=_N.int)
     a_inout         = _N.empty(N)
-    xp          = 0.5*(r[:, 1] + r[:, 3])
-    yp          = 0.5*(r[:, 2] + r[:, 4])
+    gk          = gauKer(10)
+    gk          /= _N.sum(gk)
+    fx          = _N.convolve(0.5*(r[:, 1] + r[:, 3]), gk, mode="same")
+    fy          = _N.convolve(0.5*(r[:, 2] + r[:, 4]), gk, mode="same")
+    xp          = fx
+    yp          = fy
     xpyp        = _N.empty((N, 2))
     xpyp[:, 0]  = xp
     xpyp[:, 1]  = yp
@@ -106,26 +130,31 @@ def done():
     online = _N.empty(Nsgs, dtype=bool)
     mins   = _N.empty(Nsgs)
 
-    for n in xrange(0, N):
+    for n in xrange(N):
         x0 = xpyp[n, 0]
         y0 = xpyp[n, 1]
         #  xcs, ycs: pt on all line segs closest to x0, y0 (may b byond endpts)
         xcs = (b_s*(b_s*x0 - a_s*y0) - a_s*c_s) / (a_s*a_s + b_s*b_s)
         ycs = (-a_s*(b_s*x0 - a_s*y0) - b_s*c_s) / (a_s*a_s + b_s*b_s)
         
-        iclsest = lindist_x0y0(n, x0, y0, segs, rdists, seg_ts, Nsgs, online, offset, xcs, ycs, clrs, mins, linp)
+        find_clsest(n, x0, y0, segs, rdists, seg_ts, Nsgs, online, offset, xcs, ycs, mins, linp)
 
+    # fig = _plt.figure()
+    # _plt.plot(seg_ts)
+    # clean_seg_ts(seg_ts)
+
+    # _plt.plot(seg_ts)
+    lindist_x0y0(N, xpyp, segs, rdists, seg_ts, Nsgs, online, offset, a_s, b_s, c_s, mins, linp)
+
+    #a_inout_x0y0(N, a_inout, r, hdir, vdir, seg_ts, e)
+    thr = 0.33
+    a_inout_x0y0(N, a_inout, inout, r, seg_ts, thr, e)
         #_plt.plot([x0, x0], [y0, y0], ms=10, marker=".", color=clr)
 
-        a_inout_x0y0(n, r, hdir, vdir, iclsest, e)
 
-    gk = gauKer(10)
-    gk /= _N.sum(gk)
-    finout = _N.convolve(a_inout, gk, mode="same")
-    gt0     = _N.where(finout > 0)[0]
-    lt0     = _N.where(finout <= 0)[0]
-    inout[gt0] = 1
-    inout[lt0] = -1
+    make_lin_inout(N, lindist, inout, lin_inout)
+    make_lin_lr(N, lr, lindist, seg_ts, r)
+    #make_lin_lr_inout()
 
     
 ############################################
@@ -182,7 +211,7 @@ for an in animals[0:1]:
 
                     zrrp = _N.where((r[:, 1] > 0) & (r[:, 2] > 0) & (r[:, 3] > 0) & (r[:, 4] > 0))[0]
 
-                    szrrp = zrrp
+                    szrrp = zrrp[::4]
                     fig  = _plt.figure()
                     _plt.scatter(0.5*(r[szrrp, 1]+r[szrrp, 3]), 0.5*(r[szrrp, 2] + r[szrrp, 4]), s=3, color="grey")
 
@@ -209,5 +238,3 @@ for an in animals[0:1]:
                 
                 
                 #  crds = N x 2
-
-                
