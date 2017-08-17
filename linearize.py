@@ -35,10 +35,14 @@ offset    = _N.array([0, 1, 2, 1, 2])
 
 ii     = 0
 
+anim1     = None
+anim2     = None
+day    = None
+ep     = None
 r      = None
 
 def onclick(event):
-    global ix, iy
+    global ix, iy, an, day, ep
     global ii
     ix, iy = event.xdata, event.ydata
     print 'x = %d, y = %d'%(
@@ -58,7 +62,10 @@ inout  = None   # inbound - outbound
 a_inout  = None   # inbound - outbound
 lr       = None
 
+fspd     = None
+
 lindist  = None        #  linearization with no left-right
+raw_lindist  = None        #  linearization with no left-right
 lin_lr   = None
 lin_inout= None
 lin_lr_inout = None
@@ -68,8 +75,9 @@ scyMin = None
 scyMax = None
 
 def done():
-    global r, seg_ts, segs, Nsgs, inout, a_inout, lindist, lin_lr, lin_inout, lin_lr_inout, lr
+    global r, seg_ts, segs, Nsgs, inout, a_inout, lindist, lin_lr, lin_inout, lin_lr_inout, lr, raw_lindist
     global scxMin, scxMax, scyMin, scyMax
+    global an, day, ep
 
     hdir = _N.empty(2)
     vdir = _N.empty(2)
@@ -109,7 +117,7 @@ def done():
 
     inout         = _N.empty(N, dtype=_N.int)
     a_inout         = _N.empty(N)
-    gk          = gauKer(10)
+    gk          = gauKer(30)
     gk          /= _N.sum(gk)
     fx          = _N.convolve(0.5*(r[:, 1] + r[:, 3]), gk, mode="same")
     fy          = _N.convolve(0.5*(r[:, 2] + r[:, 4]), gk, mode="same")
@@ -139,22 +147,52 @@ def done():
         
         find_clsest(n, x0, y0, segs, rdists, seg_ts, Nsgs, online, offset, xcs, ycs, mins, linp)
 
+
     # fig = _plt.figure()
     # _plt.plot(seg_ts)
     # clean_seg_ts(seg_ts)
 
     # _plt.plot(seg_ts)
-    lindist_x0y0(N, xpyp, segs, rdists, seg_ts, Nsgs, online, offset, a_s, b_s, c_s, mins, linp)
 
-    #a_inout_x0y0(N, a_inout, r, hdir, vdir, seg_ts, e)
-    thr = 0.33
-    a_inout_x0y0(N, a_inout, inout, r, seg_ts, thr, e)
+    raw_lindist        = _N.zeros(N)
+    lindist_x0y0(N, xpyp, segs, rdists, seg_ts, Nsgs, online, offset, a_s, b_s, c_s, mins, linp, raw_lindist)
+    
+    smooth_lindist(raw_lindist, lindist)
+
+    # fig = _plt.figure(figsize=(10, 4))
+    # _plt.plot(lindist)
+    # gk = gauKer(8)   #  don't want to make this too large.  if we just pass  through the choice point, we can miss it.
+    # gk /= _N.sum(gk)
+    # flindist = _N.convolve(lindist, gk, mode="same")
+    # lindist  = flindist
+    
+    # rm_lindist_jumps(N, lindist, seg_ts)
+    fig = _plt.figure(figsize=(10, 4))
+    _plt.plot(lindist)
+
+
+
+    spd_thr = 0.35
+    a_inout_x0y0(N, a_inout, inout, r, seg_ts, spd_thr, e)
         #_plt.plot([x0, x0], [y0, y0], ms=10, marker=".", color=clr)
-
 
     make_lin_inout(N, lindist, inout, lin_inout)
     make_lin_lr(N, lr, lindist, seg_ts, r)
-    #make_lin_lr_inout()
+    make_lin_lr_inout(N, lin_lr_inout, lindist, lr, inout)
+
+
+    t0 = 0
+    winsz = 1000
+    t1 = 0
+    iw    = -1
+    while t1 < N:
+        iw += 1
+        t0 = iw*winsz
+        t1 = (iw+1)*winsz if (iw+1)*winsz < N else N-1
+        #btwnfigs(anim2, day, ep, t0, t1, inout, [-1.1, 1.1], seg_ts+1, [0.9, 5.1], r, 1, 2, scxMin, scxMax, scyMin, scyMax)
+        btwnfigs(anim2, day, ep, t0, t1, inout, [-1.1, 1.1], lin_lr_inout, [-6.1, 6.1], r, 1, 2, scxMin, scxMax, scyMin, scyMax)
+        #btwnfigs(anim2, day, ep, t0, t1, lindist, [-0.1, 3.1], seg_ts+1, [0.9, 5.1], r, 1, 2, scxMin, scxMax, scyMin, scyMax)
+
 
     
 ############################################
@@ -238,3 +276,4 @@ for an in animals[0:1]:
                 
                 
                 #  crds = N x 2
+

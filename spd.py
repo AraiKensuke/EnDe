@@ -33,7 +33,7 @@ for an in animals[0:1]:
 
     #for day in xrange(0, 12):
     #for day in xrange(10, 11):
-    for day in xrange(3, 4):
+    for day in xrange(10, 11):
         sdy    = ("0%d" % day) if (day < 10) else "%d" % day
 
         frip = "%(bd)s/%(s3)s/%(s1)sripplescons%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3, "bd" : basedir}
@@ -94,11 +94,11 @@ for an in animals[0:1]:
 
                 cohrnt_mv(fx, fy, rst, mvg)
 
-                # fig = _plt.figure(figsize=(13, 7))
-                # fig.add_subplot(2, 1, 1)
-                # _plt.scatter(rst, fx[rst], marker=".", color="black", s=3)
-                # _plt.scatter(mvg, fx[mvg], marker=".", color="orange", s=3)
-                # fig.add_subplot(2, 1, 2)
-                # _plt.scatter(rst, fy[rst], marker=".", color="black", s=3)
-                # _plt.scatter(mvg, fy[mvg], marker=".", color="orange", s=3)
+                fig = _plt.figure(figsize=(13, 7))
+                fig.add_subplot(2, 1, 1)
+                _plt.scatter(rst, fx[rst], marker=".", color="black", s=3)
+                _plt.scatter(mvg, fx[mvg], marker=".", color="orange", s=3)
+                fig.add_subplot(2, 1, 2)
+                _plt.scatter(rst, fy[rst], marker=".", color="black", s=3)
+                _plt.scatter(mvg, fy[mvg], marker=".", color="orange", s=3)
                 
