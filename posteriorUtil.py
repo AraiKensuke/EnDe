@@ -2,10 +2,38 @@ import numpy as _N
 from filter import gauKer
 import matplotlib.pyplot as _plt
 import scipy.special as _ssp
+import scipy.stats as _ss
 #from scipy.spatial.distance import cdist, euclidean
 
 _GAMMA         = 0
 _INV_GAMMA     = 1
+
+def smpling_from_stationary(smps, blksz=200):
+    SMPS, M   = smps.shape[1:]
+
+    wins      = SMPS/blksz - 1
+
+    pvs       = _N.empty((M, 3, wins))
+    ds        = _N.empty((M, 3, wins))
+    frms      = _N.empty(M, dtype=_N.int)
+
+    for m in xrange(2, M):
+        diffDist = 0
+        i = wins
+        while (diffDist <= 1) and (i > 0):
+            i -= 1
+            it0 = i*blksz
+            it1 = (i+1)*blksz
+
+            for d in xrange(3):
+                kss, pv = _ss.ks_2samp(smps[d, SMPS-blksz:SMPS, m], smps[d, it0:it1, m])
+                pvs[m, d, i] = pv
+
+                if pv < 0.01:
+                    diffDist += 1
+            frms[m] = it1
+
+    return pvs, frms
 
 def findstat(smp_sp_prms, blksz, initBlk):
     """
@@ -18,34 +46,56 @@ def findstat(smp_sp_prms, blksz, initBlk):
     smps[2:] = _N.sqrt(smps[2:])
     fsmps  = _N.empty((6, ITRSa, M))
     fsmps[0:3] = _N.mean(smps.reshape((3, ITRSa, blksz, M)), axis=2)
-    fsmps[3:6] = _N.std(smps.reshape((3, ITRSa, blksz, M)), axis=2)
+    fsmps[3:6] = _N.log(_N.std(smps.reshape((3, ITRSa, blksz, M)), axis=2))
 
     big1      = 9
     big2      = 3
 
     #  ITRSa = 10, initBlk = 3, last 3 used to mn    (7,8,9)   0,1,2,3,4,5,6
-    dsts = _N.zeros((6, M, ITRSa-initBlk))
+    z_scrs = _N.zeros((6, M, ITRSa-initBlk))
+    pc_mn   = _N.zeros((6, M, ITRSa-initBlk))
+    pz_mn   = _N.zeros((6, M, ITRSa-initBlk))
+    pc_sd   = _N.zeros((6, M, ITRSa-initBlk))
+    pz_sd   = _N.zeros((6, M, ITRSa-initBlk))
+    iblks   = _N.arange(ITRSa)
 
+    #  ITRSa=9, initBlk=3
+    #  n=0.    1: (8 blocks used to calculate STD)
+    #  n=1.    2: (7 blocks used to calculate STD)
+    #  ...
+    #  n=5     6: (3 blocks used to calculate STD)
+    
     for n in xrange(0, ITRSa-initBlk):  #  n is
-        sd = _N.std(fsmps[:, n+1:, :], axis=1)  #  
+    #for n in xrange(ITRSa-initBlk - 30, ITRSa-initBlk-29):  #  n is
+        sd = _N.std( fsmps[:, n+1:, :], axis=1)  #  
         mn = _N.mean(fsmps[:, n+1:, :], axis=1)
+        z_scrs[:, :, n] = (fsmps[:, n] - mn)/sd
+        # for m in xrange(M):
+        #     for ip in xrange(6):
+        #         pc_mn[ip, m, n], pz_mn[ip, m, n] = _ss.pearsonr(iblks[n+1:], fsmps[ip, n+1:, m])
+        #         fig = _plt.figure()
+        #         _plt.plot(iblks[n+1:], fsmps[ip, n+1:, m])
+        #         print "%(pc).4f  %(pz).4f" % {"pc" : pc_mn[ip, m, n], "pz" : pz_mn[ip, m, n]}
+        #         #if pz_mn[ip, m, n] < 0.05:
+        #         #    print pc_mn[ip, m, n]
 
-        dsts[:, :, n] = (fsmps[:, n+1] - mn)/sd
+    #  sd, mn   are 6 x M,   dsts     is  6 x M x (ITRSa-initBlk)
 
-    statry_frm_here = _N.empty(M, dtype=_N.int)
+    # stat_frm_here = _N.empty(M, dtype=_N.int)
+
     for m in xrange(M):
-        lstchgpts = []
+        iLast = 0
         for ip in xrange(6):   # parameters
-            bigabv  = _N.where(_N.abs(dsts[ip, m]) > big1)[0]   #  single big or 2 smaller cons
-            consabv = _N.where((dsts[ip, m, 0:-1] < -big2) & (dsts[ip, m, 1:] < -big2))[0]
-            consbel = _N.where((dsts[ip, m, 0:-1] >  big2) & (dsts[ip, m, 1:] >  big2))[0]
+            fig = _plt.figure()
+            _plt.plot(z_scrs[ip, m])
+    #         zscrH = _N.where(_N.abs(z_scrs[ip, m]) > 10)[0]
+    #         if len(zscrH) > 0:
+    #             mx_izscrH = _N.max(zscrH)+1
+    #             iLast = mx_izscrH if iLast < mx_izscrH else iLast
 
-            lstchgpts.extend(bigabv)
-            lstchgpts.extend(consabv+1)
-            lstchgpts.extend(consbel+1)
-
-        statry_frm_here[m] = lstchgpts[-1]+2 if len(lstchgpts) > 0 else 0
-    return statry_frm_here
+    #     stat_frm_here[m] = iLast
+    # stat_frm_here *= blksz
+    # return stat_frm_here
 
 def MAPvalues2(epc, smp_prms, postMode, frms, ITERS, M, nprms, occ, l_trlsNearMAP, alltrials=False):
 

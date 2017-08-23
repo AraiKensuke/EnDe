@@ -69,8 +69,11 @@ def datFN(fn, dir=None, create=False):
     dD = __EnDeDataDir__
 
     if dir != None:
-        dD = "%(dd)s/%(ed)s" % {"dd" : __EnDeDataDir__, "ed" : dir}
-        if not os.access("%s" % dD, os.F_OK) and create:
-            os.mkdir(dD)
+        lvls = dir.split("/")
+        for lvl in lvls:
+            dD += "/%s" % lvl
+            if not os.access("%s" % dD, os.F_OK) and create:
+                os.mkdir(dD)
     return "%(dd)s/%(fn)s" % {"dd" : dD, "fn" : fn}
+
 

@@ -105,28 +105,33 @@ def evalAtFxdMks_new(double[:, ::1] fxdMks, double[::1] l0, double[:, ::1] us, d
     #  fxdMks is a 
 
     #  cmps is spatial contribution due to component m.  
-    for 0 <= m < M:
-        mNx = m*Nx
-        mpmdim = m*pmdim
-        mpmdim2= mpmdim*pmdim
 
-        for 0 <= ix < Nx:
-            ixpmdim = ix*pmdim
-            mNxix = mNx + ix
-            tmp = 0
-            for 0 <= j < pmdim:
-                jpmdim = j*pmdim
-                outer = p_fxdMks[ixpmdim+j]-p_us[mpmdim+j]
-                for 0 <= k < pmdim:
-                    #mxval[m, ix] += (fxdMks[ix, j]-us[m, j])*iSgs[m, j, k]*(fxdMks[ix, k]-us[m, k])
-                    p_mxval[mNxix] += outer*p_iSgs[mpmdim2 + jpmdim + k]*(p_fxdMks[ixpmdim+k]-p_us[mpmdim+k])
-
-
-        #  cmps = i2pidcovsr*_N.exp(-0.5*_N.einsum("xmj,xmj->mx", fxdMksr-us, _N.einsum("mjk,xmk->xmj", iSgs, fxdMksr - us)))
-    for 0 <= ix < Nx:
+    with nogil:
         for 0 <= m < M:
-            p_zs[ix] += p_l0[m] * p_i2pidcovs[m] * exp(-0.5*p_mxval[m*Nx+ix])
-            #p_zs[ix] += l0[m] * i2pidcovs[m] * _N.exp(-0.5*mxval[m, ix])
+            mNx = m*Nx
+            mpmdim = m*pmdim
+            mpmdim2= mpmdim*pmdim
+
+            for 0 <= ix < Nx:
+                ixpmdim = ix*pmdim
+                mNxix = mNx + ix
+                tmp = 0
+                for 0 <= j < pmdim:
+                    jpmdim = j*pmdim
+                    outer = p_fxdMks[ixpmdim+j]-p_us[mpmdim+j]
+                    #for 0 <= k < pmdim:
+                    k = j
+                    tmp += outer*p_iSgs[mpmdim2 + jpmdim + k]*(p_fxdMks[ixpmdim+k]-p_us[mpmdim+k])
+                    for j+1 <= k < pmdim:
+                        #mxval[m, ix] += (fxdMks[ix, j]-us[m, j])*iSgs[m, j, k]*(fxdMks[ix, k]-us[m, k])
+                        tmp += 2*outer*p_iSgs[mpmdim2 + jpmdim + k]*(p_fxdMks[ixpmdim+k]-p_us[mpmdim+k])
+                    p_mxval[mNxix] = tmp
+
+            #  cmps = i2pidcovsr*_N.exp(-0.5*_N.einsum("xmj,xmj->mx", fxdMksr-us, _N.einsum("mjk,xmk->xmj", iSgs, fxdMksr - us)))
+        for 0 <= ix < Nx:
+            for 0 <= m < M:
+                p_zs[ix] += p_l0[m] * p_i2pidcovs[m] * exp(-0.5*p_mxval[m*Nx+ix])
+                #p_zs[ix] += l0[m] * i2pidcovs[m] * _N.exp(-0.5*mxval[m, ix])
 
     return zs
 

@@ -109,7 +109,8 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
 
         MS     = int(clstrs[1]) 
         #MS = MS + 2 if (MS < 3) else int(_N.ceil(MS*1.1)+1)
-        MS = MS + 1
+        #MS = MS + 1
+        MS = MS + 10
         M      = clstrs[0] + MS
         print "------------"
         print "hash clusters %d" % clstrs[0]
@@ -256,10 +257,11 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
 
     blksz= 20
     initBlk = 10
-    frms = _pU.findstat(smp_sp_prms, blksz, initBlk)
+    pvs, frms = _pU.smpling_from_stationary(smp_sp_prms)
+    frms[0:2] = ITERS-500  #  just last 500 samples
 
     #frms *= blksz
-    frms = _N.ones(M, dtype=_N.int)*4000
+    #frms = _N.ones(M, dtype=_N.int)*5000
 
     occ = None
     if nSpks > 0:
@@ -295,13 +297,14 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
         _q2_a[m], _q2_B[m] = _pU.gam_inv_gam_dist_ML(smp_sp_prms[2, frm::skp, m], dist=_pU._INV_GAMMA, clstr=m)
         #print "ML fit of smps  _q2_a[%(m)d] %(a).3f  _q2_B[%(m)d] %(B).3f" % {"m" : m, "a" : _q2_a[m], "B" : _q2_B[m]}
 
+    #  modes
     oo.sp_prmPstMd[epc, oo.ky_p_f::3] = _f_u
     oo.sp_prmPstMd[epc, oo.ky_p_l0::3] = (_l0_a - 1) / _l0_B
     oo.sp_prmPstMd[epc, oo.ky_p_q2::3] = _q2_B / (_q2_a + 1) 
     #  go through each cluster, find the iters that are 
 
     #for
-    MAPvalues2(epc, smp_sp_hyps, oo.sp_hypPstMd, frms, ITERS, M, 6, occ, None)
+    #MAPvalues2(epc, smp_sp_hyps, oo.sp_hypPstMd, frms, ITERS, M, 6, occ, None)
 
     #pcklme["cp%d" % epc] = _N.array(smp_sp_prms)
     #trlsNearMAP = _N.array(list(set(trlsNearMAP_D)))+frm   #  use these trials to pick out posterior params for MARK part
@@ -371,7 +374,10 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
 
             bBad = (_l0_a[m] is None) or (_l0_B[m] is None) or _N.isnan(_l0_a[m]) or _N.isnan(_l0_B[m]) or (_q2_a[m] is None) or (_q2_B[m] is None) or _N.isnan(_q2_a[m]) or _N.isnan(_q2_B[m])
             if bBad:
-                print "cluster who's posterior difficult to estimate found.   occupancy %d" % occ[m]
+                if not _N.isnan(occ[m]):
+                    print "cluster who's posterior difficult to estimate found.   occupancy %.3f" % occ[m]
+                else:
+                    print "cluster who's posterior difficult to estimate found.   occupancy was nan"
             if bBad or ((occ[m] < minAss) and (l0[m] / _N.sqrt(twpi*q2[m]) < 0.1)) or \
                (f[m] < oo.xLo-sq25[m]) or (f[m] > oo.xHi+sq25[m]):
                 print "resetting  cluster %(m)d   %(l0).3f  %(f).3f" % {"m" : m, "l0" : (l0[m] / _N.sqrt(twpi*q2[m])), "f" : f[m]}
