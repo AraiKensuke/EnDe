@@ -300,8 +300,13 @@ class mkdecoder:
                     _plt.plot(oo.Lklhd[tet, t])
 
             if _N.isnan(A):
-                print "nan" 
+                print "A is nan at t=%(t)d  t0=%(t0)d" % {"t" : t, "t0" : t0}
+                print oo.pX_Nm[t-1]
+                print oo.pX_Nm[t]
+                print oo.Lklhd[:, t-1]
+                print oo.Lklhd[:, t]
                 print mkint
+                
             assert A > 0, "A   %(A).4f,  t is %(t)d" % {"A" : A, "t" : t}
 
             oo.pX_Nm[t] /= A

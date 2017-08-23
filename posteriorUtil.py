@@ -8,6 +8,33 @@ import scipy.stats as _ss
 _GAMMA         = 0
 _INV_GAMMA     = 1
 
+def smpling_from_stationary(smps, blksz=200):
+    SMPS, M   = smps.shape[1:]
+
+    wins      = SMPS/blksz - 1
+
+    pvs       = _N.empty((M, 3, wins))
+    ds        = _N.empty((M, 3, wins))
+    frms      = _N.empty(M, dtype=_N.int)
+
+    for m in xrange(2, M):
+        diffDist = 0
+        i = wins
+        while (diffDist <= 1) and (i > 0):
+            i -= 1
+            it0 = i*blksz
+            it1 = (i+1)*blksz
+
+            for d in xrange(3):
+                kss, pv = _ss.ks_2samp(smps[d, SMPS-blksz:SMPS, m], smps[d, it0:it1, m])
+                pvs[m, d, i] = pv
+
+                if pv < 0.01:
+                    diffDist += 1
+            frms[m] = it1
+
+    return pvs, frms
+
 def findstat(smp_sp_prms, blksz, initBlk):
     """
     find stationary region of samples

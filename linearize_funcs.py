@@ -202,7 +202,7 @@ def rm_lindist_jumps(N, lindist, seg_ts):
             lindist[bj1[0]:bj2[0]] = _N.interp(xs, xp, yp)
 
             
-def make_lin_lr_inout(N, lin_lr_inout, lindist, lr, inout):
+def build_lin_lr_inout(N, lin_lr_inout, lindist, lr, inout):
     #  lindist is 0 to 3
 
     for n in xrange(N):
@@ -276,19 +276,15 @@ def make_lin_inout(N, lindist, inout, lin_inout):
     v = r[1:] - r[0:-1]
 
 def make_lin_lr(N, lr, lindist, seg_ts, r):
+    #  OUTPUT to array lr.  -1 is left 1 is right turn.
     global __HW, __CP
-    # gk = gauKer(2)
-    # gk /= _N.sum(gk)
-    # lindist = _N.convolve(_lindist, gk, mode="same")
-    #  find points where lindist near 0 and lindist near 1.
-    #  if we're near lindist == 1, if it starts increasing afterwards, 
+
     nearHW = _N.where(lindist < 0.2)[0]
     nearCP = _N.where((lindist > 0.8) & (lindist < 1.2))[0]
     dnearHW = _N.diff(nearHW)
     dnearCP = _N.diff(nearCP)
     hw_visits = _N.array(nearHW[_N.where(dnearHW > 30)[0]].tolist()  + [nearHW[-1]])
     cp_visits = _N.array(nearCP[_N.where(dnearCP > 30)[0]].tolist()  + [nearCP[-1]])
-
 
     #  If for each point nearHW 
     #  its possible f
@@ -353,14 +349,15 @@ def make_lin_lr(N, lr, lindist, seg_ts, r):
     while i < N:
         i += 1
 
-        if (lr[i] == -3) or (lr[i] == 0):
+        if (lr[i] == -3) or (lr[i] == 0):   #  undef (=-3) or home well (=0).
             print "come here   %d" % i
             i1 = i
             while (i < N) and ((lr[i] == -3) or (lr[i] == 0)):
                 i += 1 
             i2 = i
 
-            if i2 < N:
+            #  if undef until end, i2 == N.  Last data unknown whether L or R
+            if i2 < N:  
                 print "here   %(i1)d  %(i2)d == %(lr)d" % {"i1" : i1, "i2" : i2, "lr" : lr[i2+2]}
                 
                 lr[i1:i2] = lr[i2+1]
@@ -414,6 +411,9 @@ def cohrnt_mv(fx, fy, rst, mvg):
     print len(coherent)
 
 def smooth_lindist(raw_lindist, lindist):
+    """
+    lindist sometimes passes through CP very fast, going from 2->4 or 4->2.  
+    """
     gk = gauKer(10)
     gk /= _N.sum(gk)
     flindist = _N.convolve(raw_lindist, gk, mode="same")
@@ -444,4 +444,70 @@ def smooth_lindist(raw_lindist, lindist):
             ((lindist[mnma] > 0.5) and (lindist[mnma] < 1.5)):
             lindist[mnma-30:mnma+30] = flindist2[mnma-30:mnma+30]
 
-    
+
+def cpify_LR_inout(lr, inout):
+    """
+    output only change points to lr and inout
+
+    1 1 1 1 -1 -1 1 1 
+
+    cp looks like   0  1
+                    4 -1
+                    6  1
+    """
+    dlr      = _N.diff(lr)
+    dinout   = _N.diff(inout)
+
+    origsig  = [lr, inout]
+
+    iis = -1
+    outs     = []
+    for diffsig in [dlr, dinout]:
+        iis += 1
+        sig = origsig[iis]
+        cps = _N.where(diffsig != 0)[0]
+        
+        #  t0   state
+        #  t1   state
+        #  ...
+        #  tN   state
+
+        out = _N.empty((len(cps)+1, 2), dtype=_N.int)
+        out[0, 0] = 0
+        out[0, 1] = sig[0]
+
+        for t in xrange(len(cps)):
+            out[t+1, 0] = cps[t]+1
+            out[t+1, 1] = sig[cps[t]+1]
+        outs.append(out)
+    return outs[0], outs[1]
+
+def thaw_LR_inout(N, cp_lr, cp_inout):
+    """
+    thaw change point file.  specify an N, because that is not included 
+    """
+    lr       = _N.empty(N, dtype=_N.int)
+    inout    = _N.empty(N, dtype=_N.int)
+
+    origsig  = [lr, inout]
+
+    lr[0]    = cp_lr[0, 0]
+    inout[0] = cp_inout[0, 0]
+
+    iis = -1
+    t0       = 0
+    for cpsig in [cp_lr, cp_inout]:
+        iis += 1
+        sig  = origsig[iis]
+
+        for i in xrange(cpsig.shape[0]-1):
+            t0 = cpsig[i, 0]
+            t1 = cpsig[i+1, 0]
+            sig[t0:t1] = cpsig[i, 1]
+
+        t0  = cpsig[-1, 0]
+        val = cpsig[-1, 1]
+
+        sig[t0:] = val
+
+    return origsig[0], origsig[1]

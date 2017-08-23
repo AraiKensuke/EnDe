@@ -6,6 +6,7 @@ from os import listdir
 from os.path import isdir, join
 import EnDedirs as _edd
 from filter import gauKer
+import utilities as _U
 
 #  The animal tends to spend much of its time in arms 1, 3, 5
 #  At least for well-trained animals, animals also do not turn around in 
@@ -75,6 +76,10 @@ scyMin = None
 scyMax = None
 
 def done():
+    """
+    come here after 6 landmarks chosen
+    """
+
     global r, seg_ts, segs, Nsgs, inout, a_inout, lindist, lin_lr, lin_inout, lin_lr_inout, lr, raw_lindist
     global scxMin, scxMax, scyMin, scyMax
     global an, day, ep
@@ -178,9 +183,23 @@ def done():
 
     make_lin_inout(N, lindist, inout, lin_inout)
     make_lin_lr(N, lr, lindist, seg_ts, r)
-    make_lin_lr_inout(N, lin_lr_inout, lindist, lr, inout)
+    build_lin_lr_inout(N, lin_lr_inout, lindist, lr, inout)
 
+    #  inout 
+    cp_lr, cp_inout = cpify_LR_inout(lr, inout)
 
+    sday = ("0%d" % day) if (day < 10) else ("%d" % day)
+    fn = _edd.datFN("lindist.dat", dir="linearize/%(an)s%(dy)s0%(ep)d" % {"dy" : sday, "ep" : (ep+1), "an" : anim2}, create=True)
+    _N.savetxt(fn, lindist, fmt="%.3f")
+    fn = _edd.datFN("cp_lr.dat", dir="linearize/%(an)s%(dy)s0%(ep)d" % {"dy" : sday, "ep" : (ep+1), "an" : anim2})
+    _U.savetxtWCom(fn, cp_lr, fmt="%d %d", com=("# N=%d.  1st column time, 2nd column  - inout value from this time until time in next row" % N))
+    fn = _edd.datFN("cp_inout.dat", dir="linearize/%(an)s%(dy)s0%(ep)d" % {"dy" : sday, "ep" : (ep+1), "an" : anim2})
+    _U.savetxtWCom(fn, cp_inout, fmt="%d %d", com=("# N=%d.  1st column time, 2nd column  - inout value from this time until time in next row" % N))
+    fn = _edd.datFN("lin_lr_inout.dat", dir="linearize/%(an)s%(dy)s0%(ep)d" % {"dy" : sday, "ep" : (ep+1), "an" : anim2})
+    _N.savetxt(fn, lin_lr_inout, fmt="%.3f")
+    
+    """
+    """
     t0 = 0
     winsz = 1000
     t1 = 0

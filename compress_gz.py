@@ -14,8 +14,8 @@ def gz2cgz(gz):
     return cgz
 
 def cgz2gz(cgz, M):
-    ITERS = gz.shape[0]
-    nSpks = gz.shape[1]
+    ITERS = cgz.shape[0]
+    nSpks = cgz.shape[1]
 
     gz = _N.zeros((ITERS, nSpks, M), dtype=_N.bool)
     for it in xrange(ITERS):
