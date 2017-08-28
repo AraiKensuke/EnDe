@@ -14,7 +14,7 @@ import posteriorUtil as _pU
 twpi = 2*_N.pi
 wdSpc = 1
 
-def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneCluster=False):
+def initClusters(oo, M_max, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneCluster=False):
     n0 = 0
     n1 = len(Asts)
     print "gibbsApprMxMutil.initClusters   %d spikes" % (n1-n0)
@@ -109,33 +109,23 @@ def initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneC
 
         MS     = int(clstrs[1]) 
         #MS = MS + 2 if (MS < 3) else int(_N.ceil(MS*1.1)+1)
-        #MS = MS + 1
+        #MS = MS + 3
         MS = MS + 10
-        M      = clstrs[0] + MS
+        M_use      = clstrs[0] + MS
         print "------------"
         print "hash clusters %d" % clstrs[0]
         print "signal clusters %d" % MS
         print "------------"
 
         #M = int(clstrs[0] + clstrs[1]) + 1   #  20% more clusters
-        print "clusters:  %d" % M
+        print "clusters:  %d" % M_use
 
-    #####  MODES  - find from the sampling
-    oo.sp_prmPstMd = _N.zeros((oo.epochs, 3*M))   # mode of params
-    oo.sp_hypPstMd  = _N.zeros((oo.epochs, (2+2+2)*M)) # hyperparam
-    oo.mk_prmPstMd = [_N.zeros((oo.epochs, M, K)),
-                      _N.zeros((oo.epochs, M, K, K))]
-                      # mode of params
-    oo.mk_hypPstMd  = [_N.zeros((oo.epochs, M, K)),
-                       _N.zeros((oo.epochs, M, K, K)), # hyperparam
-                       _N.zeros((oo.epochs, M, 1)), # hyperparam
-                       _N.zeros((oo.epochs, M, K, K))]
 
     _N.savetxt("flatlabels", flatlabels, fmt="%d")
     ##################
 
     # flatlabels + lab = same content, but flatlabels are temporally correct
-    return labS, labH, flatlabels, M, hashthresh, clstrs
+    return labS, labH, flatlabels, M_use, hashthresh, clstrs
 
 
 def declare_params(M, K, uAll=None, SgAll=None):
@@ -244,14 +234,14 @@ def init_params_hyps(oo, M, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, _q2_
             Sg[im] = _N.eye(K)
             l0[im] = 1
 
-    oo.sp_prmPstMd[0, oo.ky_p_l0::3] = l0
-    oo.sp_prmPstMd[0, oo.ky_p_f::3] = f
-    oo.sp_prmPstMd[0, oo.ky_p_q2::3] = q2
-    oo.mk_prmPstMd[oo.ky_p_u][0] = u
-    oo.mk_prmPstMd[oo.ky_p_Sg][0] = Sg
+    oo.sp_prmPstMd[oo.ky_p_l0:oo.ky_p_l0+3*M:3] = l0
+    oo.sp_prmPstMd[oo.ky_p_f:oo.ky_p_f+3*M:3] = f
+    oo.sp_prmPstMd[oo.ky_p_q2:oo.ky_p_q2+3*M:3] = q2
+    oo.mk_prmPstMd[oo.ky_p_u][0:M] = u
+    oo.mk_prmPstMd[oo.ky_p_Sg][0:M] = Sg
 
 
-def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_hyps, smp_sp_prms, smp_mk_hyps, smp_mk_prms, freeClstr, M, K, priors, m1stSignalClstr, ):
+def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_prms, smp_mk_prms, smp_mk_hyps, freeClstr, M_use, K, priors, m1stSignalClstr, ):
     #  finish epoch doesn't deal with noise cluster
     tt2 = _tm.time()
 
@@ -260,21 +250,15 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
     pvs, frms = _pU.smpling_from_stationary(smp_sp_prms)
     frms[0:2] = ITERS-500  #  just last 500 samples
 
-    #frms *= blksz
-    #frms = _N.ones(M, dtype=_N.int)*5000
-
     occ = None
     if nSpks > 0:
         #  gz is ITERS x nSpks x M
-        occ   = _N.empty(M)
-        for m in xrange(M):
+        occ   = _N.empty(M_use)
+        for m in xrange(M_use):
            occ[m]   = _N.mean(_N.mean(gz[frms[m]:ITERS-1, :, m], axis=0), axis=0)
 
     ##  
-
-    oo.smp_sp_hyps = smp_sp_hyps
     oo.smp_sp_prms = smp_sp_prms
-    oo.smp_mk_hyps = smp_mk_hyps
     oo.smp_mk_prms = smp_mk_prms
 
     l_trlsNearMAP = []
@@ -282,7 +266,7 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
     skp = 2
     print "-------------"
     #  marginal posteriors of the spatial and cluster params
-    for m in xrange(M):
+    for m in xrange(M_use):
         frm       = frms[m]
         f_smps    = smp_sp_prms[1, frm::skp, m]
         _f_u[m]      = _N.mean(f_smps)
@@ -298,9 +282,9 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
         #print "ML fit of smps  _q2_a[%(m)d] %(a).3f  _q2_B[%(m)d] %(B).3f" % {"m" : m, "a" : _q2_a[m], "B" : _q2_B[m]}
 
     #  modes
-    oo.sp_prmPstMd[epc, oo.ky_p_f::3] = _f_u
-    oo.sp_prmPstMd[epc, oo.ky_p_l0::3] = (_l0_a - 1) / _l0_B
-    oo.sp_prmPstMd[epc, oo.ky_p_q2::3] = _q2_B / (_q2_a + 1) 
+    oo.sp_prmPstMd[oo.ky_p_f::3] = _f_u
+    oo.sp_prmPstMd[oo.ky_p_l0::3] = (_l0_a - 1) / _l0_B
+    oo.sp_prmPstMd[oo.ky_p_q2::3] = _q2_B / (_q2_a + 1) 
     #  go through each cluster, find the iters that are 
 
     #for
@@ -326,25 +310,25 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
 
     ##  params and hyper parms for mark
 
-    for m in xrange(M):
+    for m in xrange(M_use):
         frm  = frms[m]
         u[m] = _N.mean(smp_mk_prms[0][:, frm:, m], axis=1)
 
         Sg[m] = _N.mean(smp_mk_prms[1][:, :, frm:, m], axis=2)
-        oo.mk_prmPstMd[oo.ky_p_u][epc, m] = u[m]
-        oo.mk_prmPstMd[oo.ky_p_Sg][epc, m]= Sg[m]
+        oo.mk_prmPstMd[oo.ky_p_u][m] = u[m]
+        oo.mk_prmPstMd[oo.ky_p_Sg][m]= Sg[m]
         _u_u[m]    = _N.mean(smp_mk_hyps[oo.ky_h_u_u][:, frm:, m], axis=1)
         _u_Sg[m]   = _N.mean(smp_mk_hyps[oo.ky_h_u_Sg][:, :, frm:, m], axis=2)
 
         _Sg_nu[m]  = _N.mean(smp_mk_hyps[oo.ky_h_Sg_nu][0, frm:, m], axis=0)
         _Sg_PSI[m] = _N.mean(smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, frm:, m], axis=2)
-        oo.mk_hypPstMd[oo.ky_h_u_u][epc, m]   = _u_u[m]
-        oo.mk_hypPstMd[oo.ky_h_u_Sg][epc, m]  = _u_Sg[m]
-        oo.mk_hypPstMd[oo.ky_h_Sg_nu][epc, m] = _Sg_nu[m]
-        oo.mk_hypPstMd[oo.ky_h_Sg_PSI][epc, m]= _Sg_PSI[m]
+        # oo.mk_hypPstMd[oo.ky_h_u_u][epc, m]   = _u_u[m]
+        # oo.mk_hypPstMd[oo.ky_h_u_Sg][epc, m]  = _u_Sg[m]
+        # oo.mk_hypPstMd[oo.ky_h_Sg_nu][epc, m] = _Sg_nu[m]
+        # oo.mk_hypPstMd[oo.ky_h_Sg_PSI][epc, m]= _Sg_PSI[m]
 
-    u         = oo.mk_prmPstMd[oo.ky_p_u][epc]
-    Sg        = oo.mk_prmPstMd[oo.ky_p_Sg][epc]
+    u         = oo.mk_prmPstMd[oo.ky_p_u]
+    Sg        = oo.mk_prmPstMd[oo.ky_p_Sg]
 
     ###  hack here.  If we don't reset the prior for 
     ###  what happens when a cluster is unused?
@@ -357,13 +341,13 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
 
     sq25  = 5*_N.sqrt(q2)
 
-    if M > 1:
+    if M_use > 1:
         #occ = _N.mean(_N.sum(gz[frm:], axis=1), axis=0)  # avg. # of marks assigned to this cluster
         socc = _N.sort(occ)
         minAss = (0.5*(socc[-2]+socc[-1])*0.01)  #  if we're 100 times smaller than the average of the top 2, let's consider it empty
 
-    if oo.resetClus and (M > 1):
-        for m in xrange(M):
+    if oo.resetClus and (M_use > 1):
+        for m in xrange(M_use):
             #  Sg and q2 are treated differently.  Even if no spikes are
             #  observed, q2 is updated, while Sg is not.  
             #  This is because NO spikes in physical space AND trajectory
@@ -380,33 +364,95 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
                     print "cluster who's posterior difficult to estimate found.   occupancy was nan"
             if bBad or ((occ[m] < minAss) and (l0[m] / _N.sqrt(twpi*q2[m]) < 0.1)) or \
                (f[m] < oo.xLo-sq25[m]) or (f[m] > oo.xHi+sq25[m]):
-                print "resetting  cluster %(m)d   %(l0).3f  %(f).3f" % {"m" : m, "l0" : (l0[m] / _N.sqrt(twpi*q2[m])), "f" : f[m]}
-                iclstr = 1 if m >= m1stSignalClstr else 0
-                _q2_a[m] = priors._q2_a[iclstr]
-                _q2_B[m] = priors._q2_B[iclstr]
-                _f_u[m]  = priors._f_u[iclstr]
-                _f_q2[m] = priors._f_q2[iclstr]
-                _l0_a[m] = priors._l0_a[iclstr]
-                _l0_B[m] = priors._l0_B[iclstr]
-                _u_u[m]  = priors._u_u
-                _u_Sg[m]  = priors._u_Sg[0]
-                _Sg_nu[m]  = priors._Sg_nu
-                _Sg_PSI[m]  = priors._Sg_PSI
-                print _Sg_nu[m]
-                print _Sg_PSI[m]
+                             
+                reset_cluster(epc, m, l0, f, q2, freeClstr, _q2_a, _q2_B, _f_u, _f_q2, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, oo, priors, m1stSignalClstr)
+                # print "resetting  cluster %(m)d   %(l0).3f  %(f).3f" % {"m" : m, "l0" : (l0[m] / _N.sqrt(twpi*q2[m])), "f" : f[m]}
+                # iclstr = 1 if m >= m1stSignalClstr else 0
+                # _q2_a[m] = priors._q2_a[iclstr]
+                # _q2_B[m] = priors._q2_B[iclstr]
+                # _f_u[m]  = priors._f_u[iclstr]
+                # _f_q2[m] = priors._f_q2[iclstr]
+                # _l0_a[m] = priors._l0_a[iclstr]
+                # _l0_B[m] = priors._l0_B[iclstr]
+                # _u_u[m]  = priors._u_u
+                # _u_Sg[m]  = priors._u_Sg[0]
+                # _Sg_nu[m]  = priors._Sg_nu
+                # _Sg_PSI[m]  = priors._Sg_PSI
                 
-                oo.sp_prmPstMd[epc, oo.ky_p_l0+3*m] = 0   # no effect on decode
-                oo.sp_prmPstMd[epc, oo.ky_p_q2+3*m] = 10000.
+                # oo.sp_prmPstMd[epc, oo.ky_p_l0+3*m] = 0   # no effect on decode
+                # oo.sp_prmPstMd[epc, oo.ky_p_q2+3*m] = 10000.
 
-                freeClstr[m] = True
+                # freeClstr[m] = True
             else:
                 freeClstr[m] = False
 
     
-    rsmp_sp_prms = smp_sp_prms.swapaxes(1, 0).reshape(ITERS, 3*M, order="F")
+    rsmp_sp_prms = smp_sp_prms.swapaxes(1, 0).reshape(ITERS, 3*M_use, order="F")
 
-    _N.savetxt(resFN("posParams_%d.dat" % epc, dir=oo.outdir), rsmp_sp_prms, fmt=("%.4f %.4f %.4f " * M))   #  the params for the non-noise
+    _N.savetxt(resFN("posParams_%d.dat" % epc, dir=oo.outdir), rsmp_sp_prms, fmt=("%.4f %.4f %.4f " * M_use))   #  the params for the non-noise
     #_N.savetxt(resFN("posHypParams.dat", dir=oo.outdir), smp_sp_hyps[:, :, 0].T, fmt="%.4f %.4f %.4f %.4f %.4f %.4f")
 
 
+def copy_slice_params(M_use, l0_M, f_M, q2_M, u_M, Sg_M):
+    l0 = _N.array(l0_M[0:M_use], copy=True)
+    f  = _N.array(f_M[0:M_use], copy=True)
+    q2 = _N.array(q2_M[0:M_use], copy=True)
+    u  = _N.array(u_M[0:M_use], copy=True)
+    Sg = _N.array(Sg_M[0:M_use], copy=True)
 
+    return l0, f, q2, u, Sg
+
+
+def copy_slice_hyp_params(M_use, _l0_a_M, _l0_B_M, _f_u_M, _f_q2_M, _q2_a_M, _q2_B_M, _u_u_M, _u_Sg_M, _Sg_nu_M, _Sg_PSI_M):
+    _l0_a  = _N.array(_l0_a_M[0:M_use], copy=True)
+    _l0_B  = _N.array(_l0_B_M[0:M_use], copy=True)
+    _f_u   = _N.array(_f_u_M[0:M_use], copy=True)
+    _f_q2  = _N.array(_f_q2_M[0:M_use], copy=True)
+    _q2_a  = _N.array(_q2_a_M[0:M_use], copy=True)
+    _q2_B  = _N.array(_q2_B_M[0:M_use], copy=True)
+    _u_u   = _N.array(_u_u_M[0:M_use], copy=True)
+    _u_Sg  = _N.array(_u_Sg_M[0:M_use], copy=True)
+    _Sg_nu = _N.array(_Sg_nu_M[0:M_use], copy=True)
+    _Sg_PSI= _N.array(_Sg_PSI_M[0:M_use], copy=True)
+
+    return _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI
+
+def reset_cluster(epc, m, l0, f, q2, freeClstr, _q2_a, _q2_B, _f_u, _f_q2, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, oo, priors, m1stSignalClstr):
+    print "resetting  cluster %(m)d   %(l0).3f  %(f).3f" % {"m" : m, "l0" : (l0[m] / _N.sqrt(twpi*q2[m])), "f" : f[m]}
+    iclstr = 1 if m >= m1stSignalClstr else 0
+    _q2_a[m] = priors._q2_a[iclstr]
+    _q2_B[m] = priors._q2_B[iclstr]
+    _f_u[m]  = priors._f_u[iclstr]
+    _f_q2[m] = priors._f_q2[iclstr]
+    _l0_a[m] = priors._l0_a[iclstr]
+    _l0_B[m] = priors._l0_B[iclstr]
+    _u_u[m]  = priors._u_u
+    _u_Sg[m]  = priors._u_Sg[0]
+    _Sg_nu[m]  = priors._Sg_nu
+    _Sg_PSI[m]  = priors._Sg_PSI
+                
+    oo.sp_prmPstMd[oo.ky_p_l0+3*m] = 0   # no effect on decode
+    oo.sp_prmPstMd[oo.ky_p_q2+3*m] = 10000.
+
+    freeClstr[m] = True
+    
+def copy_back_params(M_use, l0, f, q2, u, Sg, M_max, l0_M, f_M, q2_M, u_M, Sg_M):
+    l0_M[0:M_use] = l0
+    f_M[0:M_use]  = f
+    q2_M[0:M_use] = q2
+    u_M[0:M_use]  = u
+    Sg_M[0:M_use] = Sg
+
+def copy_back_hyp_params(M_use, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, M_max, _l0_a_M, _l0_B_M, _f_u_M, _f_q2_M, _q2_a_M, _q2_B_M, _u_u_M, _u_Sg_M, _Sg_nu_M, _Sg_PSI_M):
+    _l0_a_M[0:M_use] = _l0_a
+    _l0_B_M[0:M_use] = _l0_B
+    _f_u_M[0:M_use]  = _f_u
+    _f_q2_M[0:M_use] = _f_q2
+    _q2_a_M[0:M_use] = _q2_a
+    _q2_B_M[0:M_use] = _q2_B
+
+    _u_u_M[0:M_use]  = _u_u
+    _u_Sg_M[0:M_use] = _u_Sg
+
+    _Sg_nu_M[0:M_use]  = _Sg_nu
+    _Sg_PSI_M[0:M_use] = _Sg_PSI

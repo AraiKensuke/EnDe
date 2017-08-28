@@ -34,6 +34,7 @@ class MarkAndRF:
     #  position dependent firing rate
     ######################################  PRIORS
     twpi = 2*_N.pi
+    NExtrClstr = 5
 
     #  sizes of arrays
     NposHistBins = 200      #   # points to sample position with  (uniform lam(x)p(x))
@@ -155,6 +156,9 @@ class MarkAndRF:
         _cdfs.init(oo.dt, oo.f_L, oo.f_H, oo.q2_L, oo.q2_H, f_STEPS, q2_STEPS, f_SMALL, q2_SMALL, f_cldz, q2_cldz, minSmps)
         _cdfs.init_occ_resolutions(oo.xLo, oo.xHi, oo.q2_lvls, oo.Nupx_lvls)
 
+        M_max   = 100   #  100 clusters, max
+        M_use    = 0     #  number of non-free + 5 free clusters
+
         for epc in xrange(ep1, ep2):
             print "^^^^^^^^^^^^^^^^^^^^^^^^    epoch %d" % epc
 
@@ -185,80 +189,137 @@ class MarkAndRF:
             Asts    = _N.where(oo.dat[t0:t1, 1] == 1)[0]   #  based at 0
 
             if epc == ep1:   ###  initialize
-                labS, labH, flatlabels, M, hashthresh, nHSclusters = gAMxMu.initClusters(oo, K, x, mks, t0, t1, Asts, doSepHash=doSepHash, xLo=oo.xLo, xHi=oo.xHi, oneCluster=oo.oneCluster)
+                labS, labH, flatlabels, M_use, hashthresh, nHSclusters = gAMxMu.initClusters(oo, M_max, K, x, mks, t0, t1, Asts, doSepHash=doSepHash, xLo=oo.xLo, xHi=oo.xHi, oneCluster=oo.oneCluster)
 
                 m1stSignalClstr = 0 if oo.oneCluster else nHSclusters[0]
 
-                #  posteriors
-                u_u_  = _N.empty((M, K))
-                u_Sg_ = _N.empty((M, K, K))
-                Sg_nu_ = _N.empty(M)
-                Sg_PSI_ = _N.empty((M, K, K))
-                Sg     = _N.empty((M, K, K))   # sampled value
-                uptriinds = _N.triu_indices_from(Sg[0],1)
+                #  hyperparams of posterior. Not needed for all params
+                u_u_  = _N.empty((M_use, K))
+                u_Sg_ = _N.empty((M_use, K, K))
+                Sg_nu_ = _N.empty(M_use)
+                Sg_PSI_ = _N.empty((M_use, K, K))
+                #Sg_     = _N.empty((M_max, K, K))   # sampled value
+                #uptriinds = _N.triu_indices_from(Sg[0],1)
 
                 #######   containers for GIBBS samples iterations
-                smp_sp_prms = _N.zeros((3, ITERS, M))  
-                smp_mk_prms = [_N.zeros((K, ITERS, M)), 
-                               _N.zeros((K, K, ITERS, M))]
-                smp_sp_hyps = _N.zeros((6, ITERS, M))
-                smp_mk_hyps = [_N.zeros((K, ITERS, M)), 
-                               _N.zeros((K, K, ITERS, M)),
-                               _N.zeros((1, ITERS, M)), 
-                               _N.zeros((K, K, ITERS, M))]
+                smp_sp_prms = _N.zeros((3, ITERS, M_use))  
+                smp_mk_prms = [_N.zeros((K, ITERS, M_use)), 
+                               _N.zeros((K, K, ITERS, M_use))]
+                #  need mark hyp params cuz I calculate prior hyp from sampled hyps, unlike where I fit a distribution to sampled parameters and find best hyps from there.  Is there a better way?
+                smp_mk_hyps = [_N.zeros((K, ITERS, M_use)),   
+                               _N.zeros((K, K, ITERS, M_use)),
+                               _N.zeros((1, ITERS, M_use)), 
+                               _N.zeros((K, K, ITERS, M_use))]
                 oo.smp_sp_prms = smp_sp_prms
                 oo.smp_mk_prms = smp_mk_prms
-                oo.smp_sp_hyps = smp_sp_hyps
                 oo.smp_mk_hyps = smp_mk_hyps
 
+                #####  MODES  - find from the sampling
+                oo.sp_prmPstMd = _N.zeros(3*M_use)   # mode params
+                oo.mk_prmPstMd = [_N.zeros((M_use, K)),
+                                  _N.zeros((M_use, K, K))]
+                      # mode of params
+
+
                 #  list of freeClstrs
-                freeClstr = _N.empty(M, dtype=_N.bool)   #  Actual cluster
+                freeClstr = _N.empty(M_max, dtype=_N.bool)   #  Actual cluster
                 freeClstr[:] = False
 
-                l0, f, q2, u, Sg = gAMxMu.declare_params(M, K)   #  nzclstr not inited  # sized to include noise cluster if needed
-                l0_exp_px = _N.empty(M)
-                _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, \
-                    _Sg_PSI = gAMxMu.declare_prior_hyp_params(M, nHSclusters, K, x, mks, Asts, t0, priors, labS, labH)
-                fr = f.reshape((M, 1))
-                gAMxMu.init_params_hyps(oo, M, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, \
+                
+                l0_M, f_M, q2_M, u_M, Sg_M = gAMxMu.declare_params(M_max, K)   #  nzclstr not inited  # sized to include noise cluster if needed
+                l0_exp_px_M = _N.empty(M_max)
+                _l0_a_M, _l0_B_M, _f_u_M, _f_q2_M, _q2_a_M, _q2_B_M, _u_u_M, \
+                    _u_Sg_M, _Sg_nu_M, _Sg_PSI_M = gAMxMu.declare_prior_hyp_params(M_max, nHSclusters, K, x, mks, Asts, t0, priors, labS, labH)
+
+                l0, f, q2, u, Sg        = gAMxMu.copy_slice_params(M_use, l0_M, f_M, q2_M, u_M, Sg_M)
+                _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI        = gAMxMu.copy_slice_hyp_params(M_use, _l0_a_M, _l0_B_M, _f_u_M, _f_q2_M, _q2_a_M, _q2_B_M, _u_u_M, _u_Sg_M, _Sg_nu_M, _Sg_PSI_M)
+                l0_exp_px = _N.array(l0_exp_px_M[0:M_use], copy=True)
+
+                fr = f.reshape((M_use, 1))
+                gAMxMu.init_params_hyps(oo, M_use, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, \
                     _Sg_PSI, Asts, t0, x, mks, flatlabels, nHSclusters)
 
-                U   = _N.empty(M)
-                FQ2 = _N.empty(M)
+                U   = _N.empty(M_use)
 
                 ######  the hyperparameters for f, q2, u, Sg, l0 during Gibbs
                 #  f_u_, f_q2_, q2_a_, q2_B_, u_u_, u_Sg_, Sg_nu, Sg_PSI_, l0_a_, l0_B_
+            else:
+                #  later epochs
+                n_fClstrs = len(_N.where(freeClstr[0:M_use] == True)[0])
+                print "b4 M_use %d" % M_use
+                if n_fClstrs < oo.NExtrClstr:
+                    old_M = M_use
+                    M_use  = M_use + (oo.NExtrClstr - n_fClstrs)
+                    new_M = M_use
+
+                print "aft M_use %d" % M_use
+
+                l0, f, q2, u, Sg        = gAMxMu.copy_slice_params(M_use, l0_M, f_M, q2_M, u_M, Sg_M)
+                _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI        = gAMxMu.copy_slice_hyp_params(M_use, _l0_a_M, _l0_B_M, _f_u_M, _f_q2_M, _q2_a_M, _q2_B_M, _u_u_M, _u_Sg_M, _Sg_nu_M, _Sg_PSI_M)
+                l0_exp_px = _N.array(l0_exp_px_M[0:M_use], copy=True)
+
+                #  hyperparams of posterior. Not needed for all params
+                u_u_  = _N.empty((M_use, K))
+                u_Sg_ = _N.empty((M_use, K, K))
+                Sg_nu_ = _N.empty(M_use)
+                Sg_PSI_ = _N.empty((M_use, K, K))
+
+                smp_sp_prms = _N.zeros((3, ITERS, M_use))  
+                smp_mk_prms = [_N.zeros((K, ITERS, M_use)), 
+                               _N.zeros((K, K, ITERS, M_use))]
+                smp_mk_hyps = [_N.zeros((K, ITERS, M_use)),   
+                               _N.zeros((K, K, ITERS, M_use)),
+                               _N.zeros((1, ITERS, M_use)), 
+                               _N.zeros((K, K, ITERS, M_use))]
+
+                oo.smp_sp_prms = smp_sp_prms
+                oo.smp_mk_prms = smp_mk_prms
+                oo.smp_mk_hyps = smp_mk_hyps
+
+                #####  MODES  - find from the sampling
+                oo.sp_prmPstMd = _N.zeros(3*M_use)   # mode params
+                oo.mk_prmPstMd = [_N.zeros((M_use, K)),
+                                  _N.zeros((M_use, K, K))]
+
+                if n_fClstrs < oo.NExtrClstr:
+                    for m in xrange(old_M, new_M):
+                        gAMxMu.reset_cluster(epc, m, l0, f, q2, freeClstr, _q2_a, _q2_B, _f_u, _f_q2, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, oo, priors, m1stSignalClstr)
+                      # mode of params
+
+                    #  resize l0, f, q2, u, Sg
+                    #  initialize priors for new free clusters
+                    #  init to signal cluster _l0_a[M_prev:], _l0_B[M_prev:]
 
             NSexp   = t1-t0    #  length of position data  #  # of no spike positions to sum
             xt0t1 = _N.array(x[t0:t1])
 
             nSpks    = len(Asts)
-            gz   = _N.zeros((ITERS, nSpks, M), dtype=_N.bool)
+            gz   = _N.zeros((ITERS, nSpks, M_use), dtype=_N.bool)
             oo.gz=gz
 
             _cdfs.dSilenceX = (NSexp/float(oo.Nupx))*(oo.xHi-oo.xLo)
 
-            xAS  = x[Asts + t0]   #  position @ spikes
+            xAS  = x[Asts + t0]   #  position @ spikes.  creates new copy
             mAS  = mks[Asts + t0]   #  position @ spikes
             xASr = xAS.reshape((1, nSpks))
-            mASr = mAS.reshape((1, nSpks, K))
-            econt = _N.empty((M, nSpks))
-            rat   = _N.zeros((M+1, nSpks))
+            #mASr = mAS.reshape((1, nSpks, K))
+            econt = _N.empty((M_use, nSpks))
+            rat   = _N.zeros((M_use+1, nSpks))
 
-            qdrMKS = _N.empty((M, nSpks))
+            qdrMKS = _N.empty((M_use, nSpks))
             ################################  GIBBS ITERS ITERS ITERS
 
-            clstsz = _N.zeros(M, dtype=_N.int)
+            clstsz = _N.zeros(M_use, dtype=_N.int)
 
             _iu_Sg = _N.array(_u_Sg)
-            for m in xrange(M):
+            for m in xrange(M_use):
                 _iu_Sg[m] = _N.linalg.inv(_u_Sg[m])
 
             ttA = _tm.time()
 
             v_sts = _N.empty(len(Asts), dtype=_N.int)
-            cls_str_ind = _N.zeros(M+1, dtype=_N.int)
-            cls_len      = _N.zeros(M, dtype=_N.int)
+            cls_str_ind = _N.zeros(M_use+1, dtype=_N.int)
+            cls_len      = _N.zeros(M_use, dtype=_N.int)
 
             l0_a_is0    = _N.where(_l0_a == 0)[0]
             l0_a_Init   = _N.where(_l0_a >  0)[0]
@@ -267,24 +328,23 @@ class MarkAndRF:
             q2_a_Init   = _N.where(_q2_a > 0)[0]
             b_q2_a_is_m1= len(q2_a_is_m1) > 0
 
-            _Dl0_a = _N.empty(M);            _Dl0_B = _N.empty(M)
-            _Dq2_a = _N.empty(M);            _Dq2_B = _N.empty(M)
+            _Dl0_a = _N.empty(M_use);            _Dl0_B = _N.empty(M_use)
+            _Dq2_a = _N.empty(M_use);            _Dq2_B = _N.empty(M_use)
 
             iiq2 = 1./q2
-            iiq2r= iiq2.reshape((M, 1))
-            #sLLkPr      = _N.empty((M, oo.q2ss))
+            iiq2r= iiq2.reshape((M_use, 1))
 
             for itr in xrange(ITERS):
-                #tt1 = _tm.time()
+                tt1 = _tm.time()
                 iSg = _N.linalg.inv(Sg)
 
                 if (itr % 100) == 0:    
                     print "-------itr  %(i)d" % {"i" : itr}
 
-                _sA.stochasticAssignment(oo, epc, itr, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, ((epc > 0) and (itr == 0)), nthrds=oo.nThrds)
-                #tt2 = _tm.time()
+                _sA.stochasticAssignment(oo, epc, itr, M_use, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mAS, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, ((epc > 0) and (itr == 0)), nthrds=oo.nThrds)
+                tt2 = _tm.time()
                 ###############  FOR EACH CLUSTER
-                for m in xrange(M):   #  get the minds
+                for m in xrange(M_use):   #  get the minds
                     minds = _N.where(gz[itr, :, m] == 1)[0]  
                     sts  = Asts[minds] + t0   #  sts is in absolute time
                     L    = len(sts)
@@ -292,15 +352,15 @@ class MarkAndRF:
                     clstsz[m]        = L
                     v_sts[cls_str_ind[m]:cls_str_ind[m+1]] = sts
 
-                #tt3 = _tm.time()
-                mcs = _N.empty((M, K))   # cluster sample means
+                tt3 = _tm.time()
+                mcs = _N.empty((M_use, K))   # cluster sample means
 
-                #tt4 = _tm.time()
+                tt4 = _tm.time()
 
                 ###############
                 ###############     u
                 ###############
-                for m in xrange(M):
+                for m in xrange(M_use):
                     if clstsz[m] > 0:   # >= K causes Cholesky to fail at times.
                         u_Sg_[m] = _N.linalg.inv(_iu_Sg[m] + clstsz[m]*iSg[m])
                         clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
@@ -321,7 +381,7 @@ class MarkAndRF:
                         #     print "u_u_[%d]" % m
                         #     print u_u_[m]
 
-                ucmvnrms= _N.random.randn(M, K)
+                ucmvnrms= _N.random.randn(M_use, K)
                 try:
                     C       = _N.linalg.cholesky(u_Sg_)
                 except _N.linalg.linalg.LinAlgError:
@@ -341,7 +401,8 @@ class MarkAndRF:
                 smp_mk_hyps[oo.ky_h_u_u][:, itr] = u_u_.T
                 smp_mk_hyps[oo.ky_h_u_Sg][:, :, itr] = u_Sg_.T
 
-                #tt5 = _tm.time()
+
+                tt5 = _tm.time()
                 ###############
                 ###############  Conditional f
                 ###############
@@ -350,9 +411,9 @@ class MarkAndRF:
                 else:
                     q2pr = _f_q2
 
-                m_rnds = _N.random.rand(M)
+                m_rnds = _N.random.rand(M_use)
                 
-                _cdfs.smp_f(M, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _f_u, q2pr, m_rnds)
+                _cdfs.smp_f(M_use, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _f_u, q2pr, m_rnds)
                 # if epc == 1:
                 #     f[:] = -400
                 #     f[5] = 3
@@ -360,43 +421,57 @@ class MarkAndRF:
                 #f[0] = 0
                 smp_sp_prms[oo.ky_p_f, itr] = f
 
-                #tt6 = _tm.time()
+                tt6 = _tm.time()
                 ##############
                 ##############  VARIANCE, COVARIANCE
                 ##############
 
-                for m in xrange(M):
+                # tt6a = 0
+                # tt6b = 0
+                # tt6c = 0
+                for m in xrange(M_use):
+                    #infor = _tm.time()
                     #if clstsz[m] > K:
                     ##  dof of posterior distribution of cluster covariance
                     Sg_nu_[m] = _Sg_nu[m, 0] + clstsz[m]
                     ##  dof of posterior distribution of cluster covariance
                     ur = u[m].reshape((1, K))
                     clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
+                    #tt6a += (_tm.time()-infor)
+                    #infor = _tm.time()
                     #clstx    = l_sts[m]]
                     #  dot((clstx-ur).T, (clstx-ur))==ZERO(K) when clstsz ==0
                     Sg_PSI_[m] = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
+                    #tt6b += (_tm.time()-infor)
+                    #infor = _tm.time()
                     # else:
                     #     Sg_nu_ = _Sg_nu[m, 0] 
                     #     ##  dof of posterior distribution of cluster covariance
                     #     ur = u[m].reshape((1, K))
                     #     Sg_PSI_ = _Sg_PSI[m]
                     Sg[m] = _ss.invwishart.rvs(df=Sg_nu_[m], scale=Sg_PSI_[m])
+                    #tt6c += (_tm.time()-infor)
 
-                smp_mk_hyps[oo.ky_h_Sg_nu][0, itr] = Sg_nu_
-                smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, itr] = Sg_PSI_.T
+                # print "-----------"
+                # print tt6a      0.0008
+                # print tt6b      0.0009
+                # print tt6c      0.012    invwishart.rvs  very slow
+                # print "-----------"
                 #s_u.m_sample_invwishart(Sg_PSI_, Sg_nu_, K, uptriinds, Sg)
                 
                 ##  dof of posterior distribution of cluster covariance
 
                 smp_mk_prms[oo.ky_p_Sg][:, :, itr] = Sg.T
+                smp_mk_hyps[oo.ky_h_Sg_nu][0, itr] = Sg_nu_
+                smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, itr] = Sg_PSI_.T
 
-                #tt7 = _tm.time()
+                tt7 = _tm.time()
                 ##############
                 ##############  SAMPLE SPATIAL VARIANCE
                 ##############
                 #  B' / (a' - 1) = MODE   #keep mode the same after discount
 
-                m_rnds = _N.random.rand(M)
+                m_rnds = _N.random.rand(M_use)
                 #  B' = MODE * (a' - 1)
                 if (epc > 0) and oo.adapt:
                     _md_nd= _q2_B / (_q2_a + 1)
@@ -406,9 +481,9 @@ class MarkAndRF:
                     _Dq2_a = _q2_a
                     _Dq2_B = _q2_B
 
-                #tt8 = _tm.time()
+                tt8 = _tm.time()
 
-                _cdfs.smp_q2(M, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _Dq2_a, _Dq2_B, m_rnds, epc)
+                _cdfs.smp_q2(M_use, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _Dq2_a, _Dq2_B, m_rnds, epc)
                 # if epc == 1:
                 #     #q2[:] = 0.0001
                 #     q2[5] = 0.5
@@ -417,7 +492,7 @@ class MarkAndRF:
                 # print "-----------------"
                 # print q2
 
-                #tt9 = _tm.time()
+                tt9 = _tm.time()
 
 
 
@@ -425,7 +500,7 @@ class MarkAndRF:
                 ###############  CONDITIONAL l0
                 ###############
                 #  _ss.gamma.rvs.  uses k, theta  k is 1/B (B is our thing)
-                _cdfs.l0_spatial(M, oo.dt, f, q2, l0_exp_px)
+                _cdfs.l0_spatial(M_use, oo.dt, f, q2, l0_exp_px)
 
                 #iiq2 = 1./q2
                 #iiq2r= iiq2.reshape((M, 1))
@@ -457,7 +532,7 @@ class MarkAndRF:
                 # _ss.gamma.rvs(20+ 0, scale=(1/(50+50.))) ~ 0.2
                 #  if no spikes observed, sampled l0 is smaller.  
                 try:   #  if there is no prior, if a cluster 
-                    l0 = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_), size=M)  #  check
+                    l0 = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_), size=M_use)  #  check
                     # if epc == 1:
                     #     l0[:] = 1e-200
                     #     l0[5] = 300.
@@ -473,31 +548,32 @@ class MarkAndRF:
                     raise
 
                 smp_sp_prms[oo.ky_p_l0, itr] = l0
-                smp_sp_hyps[oo.ky_h_l0_a, itr] = l0_a_
-                smp_sp_hyps[oo.ky_h_l0_B, itr] = l0_B_
 
-                #tt10 = _tm.time()
-                # print "#timing start"
-                # print "nt+= 1"
-                # print "t2t1+=%.4e" % (tt2-tt1)
-                # print "t3t2+=%.4e" % (tt3-tt2)
-                # print "t4t3+=%.4e" % (tt4-tt3)
-                # print "t5t4+=%.4e" % (tt5-tt4)
-                # print "t6t5+=%.4e" % (tt6-tt5)
-                # print "t7t6+=%.4e" % (tt7-tt6)  # slow
-                # print "t8t7+=%.4e" % (tt8-tt7)
-                # print "t9t8+=%.4e" % (tt9-tt8)
-                # print "t10t9+=%.4e" % (tt10-tt9)
-                # print "#timing end"
+                tt10 = _tm.time()
+                print "#timing start"
+                print "nt+= 1"
+                print "t2t1+=%.4e" % (tt2-tt1)
+                print "t3t2+=%.4e" % (tt3-tt2)
+                print "t4t3+=%.4e" % (tt4-tt3)
+                print "t5t4+=%.4e" % (tt5-tt4)
+                print "t6t5+=%.4e" % (tt6-tt5)
+                print "t7t6+=%.4e" % (tt7-tt6)  # slow
+                print "t8t7+=%.4e" % (tt8-tt7)
+                print "t9t8+=%.4e" % (tt9-tt8)
+                print "t10t9+=%.4e" % (tt10-tt9)
+                print "#timing end"
+                print (tt10-tt1)
 
 
             ttB = _tm.time()
             print (ttB-ttA)
             
-            gAMxMu.finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_hyps, smp_sp_prms, smp_mk_hyps, smp_mk_prms, freeClstr, M, K, priors, m1stSignalClstr)
+            gAMxMu.finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_prms, smp_mk_prms, smp_mk_hyps, freeClstr, M_use, K, priors, m1stSignalClstr)
+            #  _l0_a is a copy of a subset of _l0_a_M
+            #  we need to copy back the values _l0_a back into _l0_a_M
+            gAMxMu.copy_back_params(M_use, l0, f, q2, u, Sg, M_max, l0_M, f_M, q2_M, u_M, Sg_M)
+            gAMxMu.copy_back_hyp_params(M_use, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, M_max, _l0_a_M, _l0_B_M, _f_u_M, _f_q2_M, _q2_a_M, _q2_B_M, _u_u_M, _u_Sg_M, _Sg_nu_M, _Sg_PSI_M)
             #  MAP of nzclstr
-            #pcklme["smp_sp_hyps"] = smp_sp_hyps
-            #pcklme["smp_mk_hyps"] = smp_mk_hyps
             pcklme["smp_sp_prms"] = smp_sp_prms
             pcklme["smp_mk_prms"] = smp_mk_prms
             pcklme["sp_prmPstMd"] = oo.sp_prmPstMd
@@ -505,7 +581,7 @@ class MarkAndRF:
             pcklme["intvs"]       = oo.intvs
             pcklme["occ"]         = c_gz.gz2cgz(gz)
             pcklme["nz_pth"]         = nz_pth
-            pcklme["M"]           = M
+            pcklme["M"]           = M_use
                 
             dmp = open(resFN("posteriors_%d.dmp" % epc, dir=oo.outdir), "wb")
             pickle.dump(pcklme, dmp, -1)

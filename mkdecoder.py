@@ -213,9 +213,9 @@ class mkdecoder:
         i2pidcovsr = []
 
         for nt in xrange(oo.nTets):
-            l0s.append(prms[nt][0][uFE])
-            us.append(prms[nt][1][uFE])
-            covs.append(prms[nt][2][uFE])
+            l0s.append(prms[nt][uFE][0])
+            us.append(prms[nt][uFE][1])
+            covs.append(prms[nt][uFE][2])
             M.append(covs[nt].shape[0])
 
             iSgs.append(_N.linalg.inv(covs[nt]))
@@ -341,9 +341,9 @@ class mkdecoder:
                 oo.Lam_MoMks[:, nt] = _ku.Lambda(oo.xpr, oo.tr_pos[nt], oo.pos[enc_t0:enc_t1], oo.Bx, oo.bx, oo.dxp, occ)
         else:  #####  fit mix gaussian
             for nt in xrange(oo.nTets):
-                l0s   = prms[nt][0][uFE]    #  M x 1
-                us    = prms[nt][1][uFE]
-                covs  = prms[nt][2][uFE]
+                l0s   = prms[nt][uFE][0]    #  M x 1
+                us    = prms[nt][uFE][1]
+                covs  = prms[nt][uFE][2]
                 M     = covs.shape[0]
 
                 cmps   = _N.zeros((M, oo.Nx))
