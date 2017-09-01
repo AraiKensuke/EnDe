@@ -110,7 +110,7 @@ def initClusters(oo, M_max, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=
         MS     = int(clstrs[1]) 
         #MS = MS + 2 if (MS < 3) else int(_N.ceil(MS*1.1)+1)
         #MS = MS + 3
-        MS = MS + 10
+        MS = MS + 15
         M_use      = clstrs[0] + MS
         print "------------"
         print "hash clusters %d" % clstrs[0]
@@ -247,7 +247,7 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
 
     blksz= 20
     initBlk = 10
-    pvs, frms = _pU.smpling_from_stationary(smp_sp_prms)
+    frms = _pU.stationary_from_Z(smp_sp_prms)
     frms[0:2] = ITERS-500  #  just last 500 samples
 
     occ = None

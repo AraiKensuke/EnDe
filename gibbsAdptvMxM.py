@@ -245,12 +245,15 @@ class MarkAndRF:
                 #  f_u_, f_q2_, q2_a_, q2_B_, u_u_, u_Sg_, Sg_nu, Sg_PSI_, l0_a_, l0_B_
             else:
                 #  later epochs
-                n_fClstrs = len(_N.where(freeClstr[0:M_use] == True)[0])
+                freeInds = _N.where(freeClstr[0:M_use] == True)[0]
+                n_fClstrs = len(freeInds)
                 print "b4 M_use %d" % M_use
                 if n_fClstrs < oo.NExtrClstr:
                     old_M = M_use
                     M_use  = M_use + (oo.NExtrClstr - n_fClstrs)
                     new_M = M_use
+                #elif n_fClstrs > oo.NExtrClstr:
+                    #  
 
                 print "aft M_use %d" % M_use
 
@@ -335,14 +338,14 @@ class MarkAndRF:
             iiq2r= iiq2.reshape((M_use, 1))
 
             for itr in xrange(ITERS):
-                tt1 = _tm.time()
+                #tt1 = _tm.time()
                 iSg = _N.linalg.inv(Sg)
 
                 if (itr % 100) == 0:    
                     print "-------itr  %(i)d" % {"i" : itr}
 
                 _sA.stochasticAssignment(oo, epc, itr, M_use, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mAS, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, ((epc > 0) and (itr == 0)), nthrds=oo.nThrds)
-                tt2 = _tm.time()
+                #tt2 = _tm.time()
                 ###############  FOR EACH CLUSTER
                 for m in xrange(M_use):   #  get the minds
                     minds = _N.where(gz[itr, :, m] == 1)[0]  
@@ -352,10 +355,10 @@ class MarkAndRF:
                     clstsz[m]        = L
                     v_sts[cls_str_ind[m]:cls_str_ind[m+1]] = sts
 
-                tt3 = _tm.time()
+                #tt3 = _tm.time()
                 mcs = _N.empty((M_use, K))   # cluster sample means
 
-                tt4 = _tm.time()
+                #tt4 = _tm.time()
 
                 ###############
                 ###############     u
@@ -402,7 +405,7 @@ class MarkAndRF:
                 smp_mk_hyps[oo.ky_h_u_Sg][:, :, itr] = u_Sg_.T
 
 
-                tt5 = _tm.time()
+                #tt5 = _tm.time()
                 ###############
                 ###############  Conditional f
                 ###############
@@ -421,7 +424,7 @@ class MarkAndRF:
                 #f[0] = 0
                 smp_sp_prms[oo.ky_p_f, itr] = f
 
-                tt6 = _tm.time()
+                #tt6 = _tm.time()
                 ##############
                 ##############  VARIANCE, COVARIANCE
                 ##############
@@ -465,7 +468,7 @@ class MarkAndRF:
                 smp_mk_hyps[oo.ky_h_Sg_nu][0, itr] = Sg_nu_
                 smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, itr] = Sg_PSI_.T
 
-                tt7 = _tm.time()
+                #tt7 = _tm.time()
                 ##############
                 ##############  SAMPLE SPATIAL VARIANCE
                 ##############
@@ -481,7 +484,7 @@ class MarkAndRF:
                     _Dq2_a = _q2_a
                     _Dq2_B = _q2_B
 
-                tt8 = _tm.time()
+                #tt8 = _tm.time()
 
                 _cdfs.smp_q2(M_use, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _Dq2_a, _Dq2_B, m_rnds, epc)
                 # if epc == 1:
@@ -492,7 +495,7 @@ class MarkAndRF:
                 # print "-----------------"
                 # print q2
 
-                tt9 = _tm.time()
+                #tt9 = _tm.time()
 
 
 
@@ -549,20 +552,20 @@ class MarkAndRF:
 
                 smp_sp_prms[oo.ky_p_l0, itr] = l0
 
-                tt10 = _tm.time()
-                print "#timing start"
-                print "nt+= 1"
-                print "t2t1+=%.4e" % (tt2-tt1)
-                print "t3t2+=%.4e" % (tt3-tt2)
-                print "t4t3+=%.4e" % (tt4-tt3)
-                print "t5t4+=%.4e" % (tt5-tt4)
-                print "t6t5+=%.4e" % (tt6-tt5)
-                print "t7t6+=%.4e" % (tt7-tt6)  # slow
-                print "t8t7+=%.4e" % (tt8-tt7)
-                print "t9t8+=%.4e" % (tt9-tt8)
-                print "t10t9+=%.4e" % (tt10-tt9)
-                print "#timing end"
-                print (tt10-tt1)
+                # tt10 = _tm.time()
+                # print "#timing start"
+                # print "nt+= 1"
+                # print "t2t1+=%.4e" % (tt2-tt1)
+                # print "t3t2+=%.4e" % (tt3-tt2)
+                # print "t4t3+=%.4e" % (tt4-tt3)
+                # print "t5t4+=%.4e" % (tt5-tt4)
+                # print "t6t5+=%.4e" % (tt6-tt5)
+                # print "t7t6+=%.4e" % (tt7-tt6)  # slow
+                # print "t8t7+=%.4e" % (tt8-tt7)
+                # print "t9t8+=%.4e" % (tt9-tt8)
+                # print "t10t9+=%.4e" % (tt10-tt9)
+                # print "#timing end"
+                # print (tt10-tt1)
 
 
             ttB = _tm.time()

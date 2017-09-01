@@ -8,94 +8,97 @@ import scipy.stats as _ss
 _GAMMA         = 0
 _INV_GAMMA     = 1
 
-def smpling_from_stationary(smps, blksz=200):
+def sampling_from_stationary_KS(smps, blksz=200):
     SMPS, M   = smps.shape[1:]
 
     wins      = SMPS/blksz - 1
 
-    pvs       = _N.empty((M, 3, wins))
-    ds        = _N.empty((M, 3, wins))
+    pvs       = _N.empty((M, 2, wins))
+    ds        = _N.empty((M, 2, wins))
     frms      = _N.empty(M, dtype=_N.int)
 
     for m in xrange(2, M):
         diffDist = 0
         i = wins
-        while (diffDist <= 1) and (i > 0):
+        win1stDffrnt      = wins - 1
+        lastWinDffrnt     = wins - 1
+        thisWinDffrnt     = False
+        while (diffDist <= 6) and (i > 0):
             i -= 1
             it0 = i*blksz
             it1 = (i+1)*blksz
 
-            for d in xrange(3):
-                kss, pv = _ss.ks_2samp(smps[d, SMPS-blksz:SMPS, m], smps[d, it0:it1, m])
+            for d in xrange(2):
+                kss, pv = _ss.ks_2samp(smps[d, SMPS-blksz:SMPS:5, m], smps[d, it0:it1:5, m])
+                # if d == 0:
+                #     fig = _plt.figure()
+                #     _plt.plot(smps[d, SMPS-blksz:SMPS, m], color="black")
+                #     _plt.plot(smps[d, it0:it1, m], color="blue")
+                #     _plt.suptitle("%(w1)d  %(w2)d    %(pv).3e" % {"w1" : SMPS-blksz, "w2" : it0, "pv" : pv})
+
                 pvs[m, d, i] = pv
 
-                if pv < 0.01:
+                if pv < 5e-3:
+                    if diffDist == 0:
+                        win1stFound = it0
+
+                    lastWinDffrnt     = i                    
                     diffDist += 1
-            frms[m] = it1
+            if lastWinDffrnt - i > 1:
+                diffDist = 0   #  reset
 
-    return pvs, frms
+        frms[m] = win1stFound
 
-def findstat(smp_sp_prms, blksz, initBlk):
-    """
-    find stationary region of samples
-    """
-    smps   = _N.array(smp_sp_prms)    #  make a copy
-    ITRS   = smps.shape[1]
-    ITRSa  = ITRS/blksz
-    M      = smps.shape[2]
-    smps[2:] = _N.sqrt(smps[2:])
-    fsmps  = _N.empty((6, ITRSa, M))
-    fsmps[0:3] = _N.mean(smps.reshape((3, ITRSa, blksz, M)), axis=2)
-    fsmps[3:6] = _N.log(_N.std(smps.reshape((3, ITRSa, blksz, M)), axis=2))
+    return pvs, frms+blksz
 
-    big1      = 9
-    big2      = 3
 
-    #  ITRSa = 10, initBlk = 3, last 3 used to mn    (7,8,9)   0,1,2,3,4,5,6
-    z_scrs = _N.zeros((6, M, ITRSa-initBlk))
-    pc_mn   = _N.zeros((6, M, ITRSa-initBlk))
-    pz_mn   = _N.zeros((6, M, ITRSa-initBlk))
-    pc_sd   = _N.zeros((6, M, ITRSa-initBlk))
-    pz_sd   = _N.zeros((6, M, ITRSa-initBlk))
-    iblks   = _N.arange(ITRSa)
+def stationary_from_Z(smps, blksz=200):
+    SMPS, M   = smps.shape[1:]
 
-    #  ITRSa=9, initBlk=3
-    #  n=0.    1: (8 blocks used to calculate STD)
-    #  n=1.    2: (7 blocks used to calculate STD)
-    #  ...
-    #  n=5     6: (3 blocks used to calculate STD)
-    
-    for n in xrange(0, ITRSa-initBlk):  #  n is
-    #for n in xrange(ITRSa-initBlk - 30, ITRSa-initBlk-29):  #  n is
-        sd = _N.std( fsmps[:, n+1:, :], axis=1)  #  
-        mn = _N.mean(fsmps[:, n+1:, :], axis=1)
-        z_scrs[:, :, n] = (fsmps[:, n] - mn)/sd
-        # for m in xrange(M):
-        #     for ip in xrange(6):
-        #         pc_mn[ip, m, n], pz_mn[ip, m, n] = _ss.pearsonr(iblks[n+1:], fsmps[ip, n+1:, m])
-        #         fig = _plt.figure()
-        #         _plt.plot(iblks[n+1:], fsmps[ip, n+1:, m])
-        #         print "%(pc).4f  %(pz).4f" % {"pc" : pc_mn[ip, m, n], "pz" : pz_mn[ip, m, n]}
-        #         #if pz_mn[ip, m, n] < 0.05:
-        #         #    print pc_mn[ip, m, n]
+    wins      = SMPS/blksz - 1
 
-    #  sd, mn   are 6 x M,   dsts     is  6 x M x (ITRSa-initBlk)
+    pvs       = _N.empty((M, 2, wins))
+    ds        = _N.empty((M, 2, wins))
+    frms      = _N.empty(M, dtype=_N.int)
 
-    # stat_frm_here = _N.empty(M, dtype=_N.int)
+    rshpd     = smps.reshape((3, wins+1, blksz, M))
+    mrshpd    = _N.mean(rshpd, axis=2)
+    sdrshpd   = _N.std(rshpd, axis=2)
 
-    for m in xrange(M):
-        iLast = 0
-        for ip in xrange(6):   # parameters
-            fig = _plt.figure()
-            _plt.plot(z_scrs[ip, m])
-    #         zscrH = _N.where(_N.abs(z_scrs[ip, m]) > 10)[0]
-    #         if len(zscrH) > 0:
-    #             mx_izscrH = _N.max(zscrH)+1
-    #             iLast = mx_izscrH if iLast < mx_izscrH else iLast
+    mLst                =         mrshpd[:, wins].reshape(3, 1, M)
+    sdLst               =         sdrshpd[:, wins].reshape(3, 1, M)
+    sdNLst               =         sdrshpd[:, wins-1].reshape(3, 1, M)
 
-    #     stat_frm_here[m] = iLast
-    # stat_frm_here *= blksz
-    # return stat_frm_here
+    zL                =         (mrshpd[:, 0:-1] - mLst)/sdLst
+    zNL               =         (mrshpd[:, 0:-1] - mLst)/sdNLst
+
+    for m in xrange(2, M):
+        win1stFound=0
+        diffDist = 0
+        i = wins
+        win1stDffrnt      = wins - 1
+        lastWinDffrnt     = wins - 1
+        thisWinDffrnt     = False
+
+        while (diffDist <= 6) and (i > 0):
+            i -= 1
+            it0 = i*blksz
+            it1 = (i+1)*blksz
+
+            for d in xrange(2):
+                if ((zL[d, i, m] > 0.75) or (zL[d, i, m] < -0.75)) or \
+                   ((zNL[d, i, m] > 0.75) or (zNL[d, i, m] < -0.75)):
+                    if diffDist == 0:
+                        win1stFound = it0
+
+                    lastWinDffrnt     = i                    
+                    diffDist += 1
+            if lastWinDffrnt - i > 1:
+                diffDist = 0   #  reset
+
+        frms[m] = win1stFound
+
+    return frms+blksz
 
 def MAPvalues2(epc, smp_prms, postMode, frms, ITERS, M, nprms, occ, l_trlsNearMAP, alltrials=False):
 
