@@ -190,7 +190,7 @@ def declare_prior_hyp_params(M, clstrs, K, x, mks, Asts, t0, priors, labS, labH)
         _u_u    = _N.tile(_N.zeros(K), M).T.reshape((M, K))
 
     #_u_Sg   = _N.tile(_N.identity(K), M).T.reshape((M, K, K))  #  this 
-    priors._u_u = _N.array(_u_u[0])
+    priors._u_u = _N.array(_u_u)
     _u_Sg = _N.array(_N.tile(allSg*2*2, M).T.reshape((M, K, K)))  #  I want to visit most of the possible space
     priors._u_Sg = _N.array(_u_Sg)
     _u_iSg  = _N.linalg.inv(_u_Sg)
@@ -363,7 +363,10 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
                 else:
                     print "cluster who's posterior difficult to estimate found.   occupancy was nan"
             if bBad or ((occ[m] < minAss) and (l0[m] / _N.sqrt(twpi*q2[m]) < 0.1)) or \
-               (f[m] < oo.xLo-sq25[m]) or (f[m] > oo.xHi+sq25[m]):
+               (f[m] < oo.xLo-sq25[m]) or (f[m] > oo.xHi+sq25[m]) or \
+               ((_f_q2[m] > 4) and q2[m] < 2) or (q2[m] < 0.001):
+                # last 2 conditions:  uncertainty of center high relative to width of cluster
+                #  cluster TOO narrow
                              
                 reset_cluster(epc, m, l0, f, q2, freeClstr, _q2_a, _q2_B, _f_u, _f_q2, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, oo, priors, m1stSignalClstr)
                 # print "resetting  cluster %(m)d   %(l0).3f  %(f).3f" % {"m" : m, "l0" : (l0[m] / _N.sqrt(twpi*q2[m])), "f" : f[m]}
@@ -388,6 +391,9 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
 
     
     rsmp_sp_prms = smp_sp_prms.swapaxes(1, 0).reshape(ITERS, 3*M_use, order="F")
+
+    print "freeClstr---------------"
+    print freeClstr
 
     _N.savetxt(resFN("posParams_%d.dat" % epc, dir=oo.outdir), rsmp_sp_prms, fmt=("%.4f %.4f %.4f " * M_use))   #  the params for the non-noise
     #_N.savetxt(resFN("posHypParams.dat", dir=oo.outdir), smp_sp_hyps[:, :, 0].T, fmt="%.4f %.4f %.4f %.4f %.4f %.4f")
@@ -426,7 +432,7 @@ def reset_cluster(epc, m, l0, f, q2, freeClstr, _q2_a, _q2_B, _f_u, _f_q2, _l0_a
     _f_q2[m] = priors._f_q2[iclstr]
     _l0_a[m] = priors._l0_a[iclstr]
     _l0_B[m] = priors._l0_B[iclstr]
-    _u_u[m]  = priors._u_u
+    _u_u[m]  = priors._u_u[0]
     _u_Sg[m]  = priors._u_Sg[0]
     _Sg_nu[m]  = priors._Sg_nu
     _Sg_PSI[m]  = priors._Sg_PSI
@@ -437,6 +443,7 @@ def reset_cluster(epc, m, l0, f, q2, freeClstr, _q2_a, _q2_B, _f_u, _f_q2, _l0_a
     freeClstr[m] = True
     
 def copy_back_params(M_use, l0, f, q2, u, Sg, M_max, l0_M, f_M, q2_M, u_M, Sg_M):
+    #  re-copy working (small) parameters to the master (big) parameters 
     l0_M[0:M_use] = l0
     f_M[0:M_use]  = f
     q2_M[0:M_use] = q2
@@ -444,6 +451,7 @@ def copy_back_params(M_use, l0, f, q2, u, Sg, M_max, l0_M, f_M, q2_M, u_M, Sg_M)
     Sg_M[0:M_use] = Sg
 
 def copy_back_hyp_params(M_use, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, M_max, _l0_a_M, _l0_B_M, _f_u_M, _f_q2_M, _q2_a_M, _q2_B_M, _u_u_M, _u_Sg_M, _Sg_nu_M, _Sg_PSI_M):
+    #  re-copy working (small) hyperparameters to master (big) hyperparameters 
     _l0_a_M[0:M_use] = _l0_a
     _l0_B_M[0:M_use] = _l0_B
     _f_u_M[0:M_use]  = _f_u
@@ -451,8 +459,113 @@ def copy_back_hyp_params(M_use, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _
     _q2_a_M[0:M_use] = _q2_a
     _q2_B_M[0:M_use] = _q2_B
 
-    _u_u_M[0:M_use]  = _u_u
-    _u_Sg_M[0:M_use] = _u_Sg
+    _u_u_M[0:M_use]  = _u_u[0]
+    _u_Sg_M[0:M_use] = _u_Sg[0]
 
     _Sg_nu_M[0:M_use]  = _Sg_nu
     _Sg_PSI_M[0:M_use] = _Sg_PSI
+
+def contiguous_inuse(M_use, M_max, K, freeClstr, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_prms, smp_mk_prms, sp_prmPstMd, mk_prmPstMd, gz, priors):
+    #  method called after Gibbs iters are completed
+    #  work only with small parameter array, not Master.
+    #  _l0_a  (for example) are posterior (to become prior) hyp params calculated from l0s
+    #  We do this after finishEpoch2.  smp_sp_prms are filled during Gibbs
+    #  iter, so they must also be made contiguous.  
+
+    freeIDs = _N.where(freeClstr[0:M_use] == True)[0]
+    mf = freeIDs[0]   #  1st free cluster.  Only do stuff after mf
+
+    inuseIDs = _N.where(freeClstr[mf+1:M_use] == False)[0] + mf + 1
+
+    if len(inuseIDs > 0):  #  free cluster between clusters in use.
+        freeIDsM = _N.where(freeIDs < inuseIDs[-1])[0]
+        Lu     =  len(inuseIDs)
+        Lf     = len(freeIDsM)
+
+        imf    = -1
+
+        #iclstr = 1 if m >= m1stSignalClstr else 0
+
+        print "b4 cont"
+        print freeClstr[0:M_use]
+        for imu in xrange(Lu-1, -1, -1):
+            imf += 1
+
+            if imf < Lf:
+                #  inuseIDs[imu] -> freeClstr[imf]
+                print "%(1)d  --> %(2)d" % {"1" : inuseIDs[imu], "2" : freeIDs[imf]}
+                #freeClstr[imf] = inuseIDs[imu]
+                if freeIDs[imf] < inuseIDs[imu]:
+                    l0[freeIDs[imf]]        = l0[inuseIDs[imu]]
+                    l0[inuseIDs[imu]]        = 0.1
+                    f[freeIDs[imf]]        = f[inuseIDs[imu]]
+                    f[inuseIDs[imu]]        = 0
+                    q2[freeIDs[imf]]        = q2[inuseIDs[imu]]
+                    q2[inuseIDs[imu]]        = 1
+                    u[freeIDs[imf]]        = u[inuseIDs[imu]]
+                    u[inuseIDs[imu]]        = 0
+                    Sg[freeIDs[imf]]        = Sg[inuseIDs[imu]]
+                    Sg[inuseIDs[imu]]        = _N.eye(K)
+
+                    #  hyper params
+                    _l0_a[freeIDs[imf]]        = _l0_a[inuseIDs[imu]]
+                    _l0_a[inuseIDs[imu]]        = priors._l0_a[1]
+                    _l0_B[freeIDs[imf]]        = _l0_B[inuseIDs[imu]]
+                    _l0_B[inuseIDs[imu]]        = priors._l0_B[1]
+
+                    _f_u[freeIDs[imf]]        = _f_u[inuseIDs[imu]]
+                    _f_u[inuseIDs[imu]]        = priors._f_u[1]
+                    _f_q2[freeIDs[imf]]        = _f_q2[inuseIDs[imu]]
+                    _f_q2[inuseIDs[imu]]        = priors._f_q2[1]
+
+                    _q2_a[freeIDs[imf]]        = _q2_a[inuseIDs[imu]]
+                    _q2_a[inuseIDs[imu]]        = priors._q2_a[1]
+                    _q2_B[freeIDs[imf]]        = _q2_B[inuseIDs[imu]]
+                    _q2_B[inuseIDs[imu]]        = priors._q2_B[1]
+
+                    _u_u[freeIDs[imf]]        = _u_u[inuseIDs[imu]]
+                    _u_u[inuseIDs[imu]]        = priors._u_u[0]
+                    _u_Sg[freeIDs[imf]]        = _u_Sg[inuseIDs[imu]]
+                    _u_Sg[inuseIDs[imu]]        = priors._u_Sg[0]
+
+                    _Sg_nu[freeIDs[imf]]        = _Sg_nu[inuseIDs[imu]]
+                    _Sg_nu[inuseIDs[imu]]        = priors._Sg_nu
+                    _Sg_PSI[freeIDs[imf]]        = _Sg_PSI[inuseIDs[imu]]
+                    _Sg_PSI[inuseIDs[imu]]        = priors._Sg_PSI
+
+
+                    #  smp_sp_prms  is 3 x ITERS x M
+                    smp_sp_prms[:, :, freeIDs[imf]] = smp_sp_prms[:, :, inuseIDs[imu]]
+                    #  smp_mk_prms  is K x ITERS x M
+                    smp_mk_prms[0][:, :, freeIDs[imf]] = smp_mk_prms[0][:, :, inuseIDs[imu]]
+                    smp_mk_prms[1][:, :, freeIDs[imf]] = smp_mk_prms[1][:, :, inuseIDs[imu]]
+
+                    #oo.sp_prmPstMd = _N.zeros(3*M_use)   # mode params
+                    sp_prmPstMd[3*freeIDs[imf]:3*(freeIDs[imf]+1)]        = sp_prmPstMd[3*inuseIDs[imu]:3*(inuseIDs[imu]+1)]
+                    mk_prmPstMd[0][freeIDs[imf]]        = mk_prmPstMd[0][inuseIDs[imu]]
+                    mk_prmPstMd[1][freeIDs[imf]]        = mk_prmPstMd[1][inuseIDs[imu]]
+
+                    freeClstr[inuseIDs[imu]] = True
+                    freeClstr[freeIDs[imf]] = False
+
+                    #  in each gibbs Iter, which spks are assigned to cluster 0
+                    gibbsIter_old, spkIDs_old   = _N.where(gz[:, :, inuseIDs[imu]] == True)
+                    #  in each gibbs Iter, which spks are assigned to cluster 1
+                    gibbsIter_new, spkIDs_new   = _N.where(gz[:, :, freeIDs[imf]] == True)
+
+                    gz[gibbsIter_old, spkIDs_old, 0]  = False
+                    gz[gibbsIter_new, spkIDs_new, 0]  = True
+
+                    gz[gibbsIter_old, spkIDs_old, 1]  = True
+                    gz[gibbsIter_new, spkIDs_new, 1]  = False
+            
+    else:
+        freeIDs = _N.where(freeClstr[0:M_use] == True)[0]
+        inuseIDs = _N.where(freeClstr[0:M_use] == False)[0]
+        print "didn't need to do anything, inuse are all contiguous"
+        print "M_use is %(Mu)d   len(freeIDs) %(fI)d    len(inuseIDs) %(iI)d" % {"Mu" : M_use, "fI" : len(freeIDs), "iI" : len(inuseIDs)}
+        
+
+
+    print "after cont"
+    print freeClstr[0:M_use]

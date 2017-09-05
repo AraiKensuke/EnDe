@@ -1,5 +1,5 @@
 import numpy as _N
-from filter import gauKer
+from filter import gauKer#, contiguous_pack2
 import matplotlib.pyplot as _plt
 import scipy.special as _ssp
 import scipy.stats as _ss
@@ -67,7 +67,7 @@ def stationary_from_Z(smps, blksz=200):
 
     mLst                =         mrshpd[:, wins].reshape(3, 1, M)
     sdLst               =         sdrshpd[:, wins].reshape(3, 1, M)
-    sdNLst               =         sdrshpd[:, wins-1].reshape(3, 1, M)
+    sdNLst               =         sdrshpd[:, 0:-1].reshape(3, wins, M)
 
     zL                =         (mrshpd[:, 0:-1] - mLst)/sdLst
     zNL               =         (mrshpd[:, 0:-1] - mLst)/sdNLst
@@ -85,7 +85,7 @@ def stationary_from_Z(smps, blksz=200):
             it0 = i*blksz
             it1 = (i+1)*blksz
 
-            for d in xrange(2):
+            for d in xrange(3):
                 if ((zL[d, i, m] > 0.75) or (zL[d, i, m] < -0.75)) or \
                    ((zNL[d, i, m] > 0.75) or (zNL[d, i, m] < -0.75)):
                     if diffDist == 0:
@@ -93,7 +93,10 @@ def stationary_from_Z(smps, blksz=200):
 
                     lastWinDffrnt     = i                    
                     diffDist += 1
-            if lastWinDffrnt - i > 1:
+                    #print "%(i)d stats of block different than earlier  diffDist %(dD)d"  % {"i" : i, "dD" : diffDist}
+            #print "lastWinDffrnt - i  %d" % (lastWinDffrnt - i)
+            if (lastWinDffrnt - i > 1) and (diffDist <= 6):
+                #print "reset  %d" % i
                 diffDist = 0   #  reset
 
         frms[m] = win1stFound
@@ -161,6 +164,7 @@ def gam_inv_gam_dist_ML(smps, dist=_GAMMA, clstr=None):
     else:
         return None, None
 
+    
 """
 smps  = _ss.invgamma.rvs(a, scale=B, size=N)
 ismps = smps.argsort()

@@ -247,13 +247,18 @@ class MarkAndRF:
                 #  later epochs
                 freeInds = _N.where(freeClstr[0:M_use] == True)[0]
                 n_fClstrs = len(freeInds)
-                print "b4 M_use %d" % M_use
+
+                print "!!!!!!  %d" % n_fClstrs
+                print "bef M_use %d" % M_use
+                #  
                 if n_fClstrs < oo.NExtrClstr:
                     old_M = M_use
                     M_use  = M_use + (oo.NExtrClstr - n_fClstrs)
                     new_M = M_use
-                #elif n_fClstrs > oo.NExtrClstr:
-                    #  
+                elif n_fClstrs > oo.NExtrClstr:
+                    old_M = M_use
+                    M_use  = M_use + (oo.NExtrClstr - n_fClstrs)
+                    new_M = M_use
 
                 print "aft M_use %d" % M_use
 
@@ -284,7 +289,8 @@ class MarkAndRF:
                 oo.mk_prmPstMd = [_N.zeros((M_use, K)),
                                   _N.zeros((M_use, K, K))]
 
-                if n_fClstrs < oo.NExtrClstr:
+                ###  pack cluster
+                if n_fClstrs < oo.NExtrClstr:  #  adding clusters
                     for m in xrange(old_M, new_M):
                         gAMxMu.reset_cluster(epc, m, l0, f, q2, freeClstr, _q2_a, _q2_B, _f_u, _f_q2, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, oo, priors, m1stSignalClstr)
                       # mode of params
@@ -292,6 +298,7 @@ class MarkAndRF:
                     #  resize l0, f, q2, u, Sg
                     #  initialize priors for new free clusters
                     #  init to signal cluster _l0_a[M_prev:], _l0_B[M_prev:]
+
 
             NSexp   = t1-t0    #  length of position data  #  # of no spike positions to sum
             xt0t1 = _N.array(x[t0:t1])
@@ -388,9 +395,6 @@ class MarkAndRF:
                 try:
                     C       = _N.linalg.cholesky(u_Sg_)
                 except _N.linalg.linalg.LinAlgError:
-                    print "linalg error in u_Sg_, itr %d" % itr
-                    print u_Sg_
-
                     dmp = open("cholesky.dmp", "wb")
                     pickle.dump([u_Sg_, _iu_Sg, clstsz, iSg, _u_Sg, _u_u], dmp, -1)
                     dmp.close()
@@ -574,6 +578,7 @@ class MarkAndRF:
             gAMxMu.finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_prms, smp_mk_prms, smp_mk_hyps, freeClstr, M_use, K, priors, m1stSignalClstr)
             #  _l0_a is a copy of a subset of _l0_a_M
             #  we need to copy back the values _l0_a back into _l0_a_M
+            gAMxMu.contiguous_inuse(M_use, M_max, K, freeClstr, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_prms, smp_mk_prms, oo.sp_prmPstMd, oo.mk_prmPstMd, gz, priors)
             gAMxMu.copy_back_params(M_use, l0, f, q2, u, Sg, M_max, l0_M, f_M, q2_M, u_M, Sg_M)
             gAMxMu.copy_back_hyp_params(M_use, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, M_max, _l0_a_M, _l0_B_M, _f_u_M, _f_q2_M, _q2_a_M, _q2_B_M, _u_u_M, _u_Sg_M, _Sg_nu_M, _Sg_PSI_M)
             #  MAP of nzclstr
