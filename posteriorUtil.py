@@ -8,49 +8,90 @@ import scipy.stats as _ss
 _GAMMA         = 0
 _INV_GAMMA     = 1
 
-def sampling_from_stationary_KS(smps, blksz=200):
+def find_good_clstrs_and_stationary_from(M, smps):
+    frm_narrow = stationary_from_Z_bckwd(smps, blksz=200)
+    frm_wide   = stationary_from_Z_bckwd(smps, blksz=500)
+    ITERS      = smps.shape[1]
+
+    frms       = _N.empty(M, dtype=_N.int)
+
+    q2_mdn     = _N.median(smps[2, ITERS-1000:], axis=0)
+
+    wd_clstrs  = _N.where(q2_mdn > 9)[0]
+    nrw_clstrs  = _N.where(q2_mdn <= 9)[0]    
+
+    frms[nrw_clstrs] = frm_narrow[nrw_clstrs]
+    frms[wd_clstrs] = frm_wide[wd_clstrs]
+
+    return frms
+    
+def stationary_from_Z_bckwd(smps, blksz=200):
+    #  Detect when stationarity reached in Gibbs sampling
+    #  Also, detect whether cluster is switching between local extremas
+    #
     SMPS, M   = smps.shape[1:]
 
-    wins      = SMPS/blksz - 1
+    wins         = SMPS/blksz
+    wins_m1      = wins - 1
 
-    pvs       = _N.empty((M, 2, wins))
-    ds        = _N.empty((M, 2, wins))
+    pvs       = _N.empty((M, 2, wins_m1))
+    ds        = _N.empty((M, 2, wins_m1))
     frms      = _N.empty(M, dtype=_N.int)
 
-    for m in xrange(2, M):
-        diffDist = 0
-        i = wins
-        win1stDffrnt      = wins - 1
-        lastWinDffrnt     = wins - 1
-        thisWinDffrnt     = False
-        while (diffDist <= 6) and (i > 0):
-            i -= 1
+    rshpd     = smps.reshape((3, wins, blksz, M))
+    mrshpd    = _N.mean(rshpd, axis=2)   #  3 x wins_m1+1 x M
+    sdrshpd   = _N.std(rshpd, axis=2)
+
+    mLst                =         mrshpd[:, wins_m1].reshape(3, 1, M)
+    sdLst               =         sdrshpd[:, wins_m1].reshape(3, 1, M)
+    sdNLst               =         sdrshpd[:, 0:-1].reshape(3, wins_m1, M)
+
+    zL                =         (mrshpd[:, 0:-1] - mLst)/sdLst
+    zNL               =         (mrshpd[:, 0:-1] - mLst)/sdNLst
+
+    #  mn, std in each win
+    #  u1=0.3, sd1=0.9      u2=0.4, sd2=0.8
+    #  (u2-u1)/sd1  
+
+    #  detect sudden changes
+
+    for m in xrange(M):
+        win1stFound=(wins_m1-1)*blksz
+        sameDist = 0
+        i = 0
+
+        thisWinSame     = False
+        lastWinSame     = 0#wins_m1
+
+        #  want 3 consecutive windows where distribution looks different
+        while (sameDist <= 3) and (i < wins_m1-1):
+            i += 1
             it0 = i*blksz
             it1 = (i+1)*blksz
 
-            for d in xrange(2):
-                kss, pv = _ss.ks_2samp(smps[d, SMPS-blksz:SMPS:5, m], smps[d, it0:it1:5, m])
-                # if d == 0:
-                #     fig = _plt.figure()
-                #     _plt.plot(smps[d, SMPS-blksz:SMPS, m], color="black")
-                #     _plt.plot(smps[d, it0:it1, m], color="blue")
-                #     _plt.suptitle("%(w1)d  %(w2)d    %(pv).3e" % {"w1" : SMPS-blksz, "w2" : it0, "pv" : pv})
+            thisWinSame = 0
 
-                pvs[m, d, i] = pv
+            for d in xrange(3):
+                if ((zL[d, i, m] < 0.75) and (zL[d, i, m] > -0.75)) and \
+                   ((zNL[d, i, m] < 0.75) and (zNL[d, i, m] > -0.75)):
+                    
+                    thisWinSame += 1
 
-                if pv < 5e-3:
-                    if diffDist == 0:
-                        win1stFound = it0
+            if thisWinSame == 3:
+                if sameDist == 0:
+                    win1stFound = it0
+                lastWinSame = i
 
-                    lastWinDffrnt     = i                    
-                    diffDist += 1
-            if lastWinDffrnt - i > 1:
-                diffDist = 0   #  reset
+                sameDist += 1
+
+            if (i - lastWinSame > 1) and (sameDist <= 3):
+                #print "reset  %d" % i
+                sameDist = 0   #  reset
+                win1stFound = (wins_m1-1)*blksz
 
         frms[m] = win1stFound
 
-    return pvs, frms+blksz
-
+    return frms+blksz
 
 def stationary_from_Z(smps, blksz=200):
     SMPS, M   = smps.shape[1:]
@@ -72,7 +113,13 @@ def stationary_from_Z(smps, blksz=200):
     zL                =         (mrshpd[:, 0:-1] - mLst)/sdLst
     zNL               =         (mrshpd[:, 0:-1] - mLst)/sdNLst
 
-    for m in xrange(2, M):
+    
+    for m in xrange(M):
+        print "mmmmmmmmmmmmmmmmmmm  %d" % m
+        for d in xrange(3):
+            diff_dist          =         _N.where((zL[d, :, m] > 0.75) | (zL[d, :, m] < -0.75))[0]
+            print diff_dist
+                                           
         win1stFound=0
         diffDist = 0
         i = wins
@@ -217,3 +264,5 @@ def geometric_median(X, eps=1e-5):
 
         y = y1
 """
+
+                                        

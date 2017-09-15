@@ -245,6 +245,7 @@ class MarkAndRF:
                 #  f_u_, f_q2_, q2_a_, q2_B_, u_u_, u_Sg_, Sg_nu, Sg_PSI_, l0_a_, l0_B_
             else:
                 #  later epochs
+
                 freeInds = _N.where(freeClstr[0:M_use] == True)[0]
                 n_fClstrs = len(freeInds)
 
@@ -264,6 +265,7 @@ class MarkAndRF:
 
                 l0, f, q2, u, Sg        = gAMxMu.copy_slice_params(M_use, l0_M, f_M, q2_M, u_M, Sg_M)
                 _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI        = gAMxMu.copy_slice_hyp_params(M_use, _l0_a_M, _l0_B_M, _f_u_M, _f_q2_M, _q2_a_M, _q2_B_M, _u_u_M, _u_Sg_M, _Sg_nu_M, _Sg_PSI_M)
+
                 l0_exp_px = _N.array(l0_exp_px_M[0:M_use], copy=True)
 
                 #  hyperparams of posterior. Not needed for all params
@@ -290,6 +292,7 @@ class MarkAndRF:
                                   _N.zeros((M_use, K, K))]
 
                 ###  pack cluster
+                """
                 if n_fClstrs < oo.NExtrClstr:  #  adding clusters
                     for m in xrange(old_M, new_M):
                         gAMxMu.reset_cluster(epc, m, l0, f, q2, freeClstr, _q2_a, _q2_B, _f_u, _f_q2, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, oo, priors, m1stSignalClstr)
@@ -298,7 +301,7 @@ class MarkAndRF:
                     #  resize l0, f, q2, u, Sg
                     #  initialize priors for new free clusters
                     #  init to signal cluster _l0_a[M_prev:], _l0_B[M_prev:]
-
+                """
 
             NSexp   = t1-t0    #  length of position data  #  # of no spike positions to sum
             xt0t1 = _N.array(x[t0:t1])
@@ -590,6 +593,7 @@ class MarkAndRF:
             pcklme["occ"]         = c_gz.gz2cgz(gz)
             pcklme["nz_pth"]         = nz_pth
             pcklme["M"]           = M_use
+            pcklme["freeClstr"]           = freeClstr
                 
             dmp = open(resFN("posteriors_%d.dmp" % epc, dir=oo.outdir), "wb")
             pickle.dump(pcklme, dmp, -1)

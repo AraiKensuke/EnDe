@@ -3,6 +3,7 @@ import cPickle as _pkl
 import numpy as _N
 from sklearn import mixture
 import EnDedirs as _edd
+import matplotlib.pyplot as _plt
 
 _all_, _motion_, _rest_ = 0, 1, 2
 
@@ -83,9 +84,9 @@ def openTets(fn, tets, t0=None, t1=None, lm=None, detectHash=True, chooseSpikes=
     else:
         return allmarks, lm
 
-def EMwfBICs(mks, TR=5, minK=2, maxK=15):
-    """
-    """
+def EMwfBICs(mks, TR=5, minK=2, maxK=15, onlypositivecorr=False):
+    #  onlypositivecorr    If we're working with spike height, we expect
+    #  
     bics = _N.empty(((maxK-minK), TR))
     labs = _N.empty((maxK-minK, TR, mks.shape[0]))
 
@@ -101,6 +102,21 @@ def EMwfBICs(mks, TR=5, minK=2, maxK=15):
     bestLab = labs[coords[0][0], coords[1][0]]   #  indices in 2-D array
 
     nClstrs = coords[0][0] + minK   #  best # of clusters
+
+    for m in xrange(nClstrs):
+        ths = _N.where(bestLab == m)[0]
+        covs=  _N.cov(mks[ths, 1:], rowvar=0)
+        fig = _plt.figure(figsize=(10, 10))
+        ax  = fig.add_subplot(2, 2, 1)
+        _plt.scatter(mks[ths, 1], mks[ths, 2])
+        ax  = fig.add_subplot(2, 2, 2)
+        _plt.scatter(mks[ths, 1], mks[ths, 3])
+        ax  = fig.add_subplot(2, 2, 3)
+        _plt.scatter(mks[ths, 1], mks[ths, 4])
+        ax  = fig.add_subplot(2, 2, 4)
+        _plt.scatter(mks[ths, 2], mks[ths, 3])
+
+        _plt.suptitle("m is %d" % m)
 
     return labs, bics, bestLab, nClstrs
 

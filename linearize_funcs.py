@@ -1,3 +1,5 @@
+import EnDedirs as _edd
+
 __HW = 0   # home well
 __CP = 1   # choice point
 
@@ -202,7 +204,7 @@ def rm_lindist_jumps(N, lindist, seg_ts):
             lindist[bj1[0]:bj2[0]] = _N.interp(xs, xp, yp)
 
             
-def build_lin_lr_inout(N, lin_lr_inout, lindist, lr, inout):
+def build_lin_lr_inout(N, lin_lr_inout, lindist, lr, inout, gkEND):
     #  lindist is 0 to 3
 
     for n in xrange(N):
@@ -214,37 +216,72 @@ def build_lin_lr_inout(N, lin_lr_inout, lindist, lr, inout):
             lin_lr_inout[n] = -6+lindist[n]   # -6+3  (rwd)  -6+0  HW
         elif (inout[n] == -1) and (lr[n] == 1):  # right
             lin_lr_inout[n] = 6-lindist[n]   # -6+3  (rwd)  -6+0  HW
-    
+
+    f_lin_lr_inout = _N.array(lin_lr_inout)
+    f_lin_lr_inout = _N.convolve(lin_lr_inout, gkEND, mode="same")
+
+    #  near 3 and -3, sometimes weird jumps
+    jmps = _N.where((lin_lr_inout[0:-1] < 3) & (lin_lr_inout[1:] > 3))[0]
+    for j in jmps:
+        if (j > 30) and (j < N-30):
+            lin_lr_inout[j-20:j+20] = f_lin_lr_inout[j-20:j+20]
+    jmps = _N.where((lin_lr_inout[0:-1] > -3) & (lin_lr_inout[1:] < -3))[0]
+    for j in jmps:
+        if (j > 30) and (j < N-30):
+            lin_lr_inout[j-20:j+20] = f_lin_lr_inout[j-20:j+20]
+
+    #  near 3 and -3, sometimes weird jumps
+    jmps = _N.where(((lin_lr_inout[0:-1] < 0) & (lin_lr_inout[0:-1] > -0.5)) & ((lin_lr_inout[1:] > 0) & (lin_lr_inout[1:] < 0.5)))[0]
+    for j in jmps:
+        if (j > 30) and (j < N-30):
+            lin_lr_inout[j-20:j+20] = f_lin_lr_inout[j-20:j+20]
+    jmps = _N.where(((lin_lr_inout[0:-1] > 0) & (lin_lr_inout[0:-1] < 0.5)) & ((lin_lr_inout[1:] < 0) & (lin_lr_inout[1:] > -0.5)))[0]
+    for j in jmps:
+        if (j > 30) and (j < N-30):
+            lin_lr_inout[j-20:j+20] = f_lin_lr_inout[j-20:j+20]
 
 
-def btwnfigs(anim, day, ep, t0, t1, someplt1, lims1, someplt2, lims2, r, x, y, scxMin, scxMax, scyMin, scyMax):
+def btwnfigs(anim, day, ep, t0, t1, someplt1, label1, lims1, someplt2, label2, lims2, someplt3, label3, lims3, r, x, y, scxMin, scxMax, scyMin, scyMax):
     print "btwnfigs   %(ep)d  %(1)d %(2)d" % {"ep" : ep, "1" : t0, "2" : t1}
-    fig = _plt.figure(figsize=(13, 4))
-    fig.add_subplot(1, 3, 1)
+    fig = _plt.figure(figsize=(13, 10))
+    fig.add_subplot(2, 2, 1)
     _plt.scatter(r[::10, x], r[::10, y], s=5, color="grey")
     _plt.scatter(r[t0:t1:2, x], r[t0:t1:2, y], s=9, color="black")
     _plt.plot(r[t0, x], r[t0, y], ms=40, color="blue", marker=".")
     _plt.plot(r[t1, x], r[t1, y], ms=40, color="red", marker=".")
     _plt.xlim(scxMin, scxMax)
     _plt.ylim(scyMin, scyMax)
-    fig.add_subplot(1, 3, 2)
+    fig.add_subplot(2, 2, 2)
 
     _plt.plot(range(t0, t1), someplt1[t0:t1], color="black", lw=4)
     _plt.xlim(t0, t1)
     _plt.xticks(_N.arange(t0, t1, (t1-t0)/5))
+    _plt.ylabel(label1)
     _plt.ylim(lims1[0], lims1[1])
     _plt.grid()
-    fig.add_subplot(1, 3, 3)
+    fig.add_subplot(2, 2, 3)
     _plt.plot(range(t0, t1), someplt2[t0:t1], color="black", lw=4)
     _plt.xlim(t0, t1)
     _plt.ylim(lims2[0], lims2[1])
+    _plt.ylabel(label2)
+    _plt.xticks(_N.arange(t0, t1, (t1-t0)/5))
+    _plt.grid()
+    fig.add_subplot(2, 2, 4)
+    _plt.plot(range(t0, t1), someplt3[t0:t1], color="black", lw=4)
+    _plt.xlim(t0, t1)
+    _plt.ylim(lims3[0], lims3[1])
+    _plt.ylabel(label3)
     _plt.xticks(_N.arange(t0, t1, (t1-t0)/5))
     _plt.grid()
     
 
-    fig.subplots_adjust(left=0.04, bottom=0.1, top=0.95, right=0.99)
+    fig.subplots_adjust(left=0.1, bottom=0.1, top=0.95, right=0.99)
 
-    _plt.savefig("btwn_%(an)s%(dy)d%(ep)d_%(1)d_%(2)d" % {"dy" : day, "ep" : (ep+1), "1" : t0, "2" : t1, "an" : anim})
+    sday = ("0%d" % day) if (day < 10) else ("%d" % day)
+    #print _edd.datFN("btwn_%(dy)d%(ep)d_%(1)d_%(2)d" % {"dy" : day, "ep" : (ep+1), "1" : t0, "2" : t1}, create=True)
+    #_edd.datFN("lindist.dat", dir="linearize/%(an)s%(dy)s0%(ep)d" % {"dy" : sday, "ep" : (ep+1), "an" : anim2}, create=True)
+    _plt.savefig(_edd.datFN("btwn_%(dy)d%(ep)d_%(1)d_%(2)d" % {"dy" : day, "ep" : (ep+1), "1" : t0, "2" : t1}, dir="linearize/%(an)s%(dy)s0%(ep)d" % {"dy" : sday, "ep" : (ep+1), "an" : anim2}, create=True))
+    #_plt.savefig("btwn_%(an)s%(dy)d%(ep)d_%(1)d_%(2)d" % {"dy" : day, "ep" : (ep+1), "1" : t0, "2" : t1, "an" : anim})
     _plt.close()
 
 def get_boundaries(rawpos):
@@ -297,6 +334,8 @@ def make_lin_lr(N, lr, lindist, seg_ts, r):
             iv1 = cp_visits[isv+1]
         else:
             iv1 = N-1
+
+        print "%(0)d  %(1)d" % {"0" : iv0, "1" : iv1}
 
         #  seg_ts goes from 0 to 4
         left  = _N.where((seg_ts[iv0:iv1] == 1) | (seg_ts[iv0:iv1] == 2) )[0]

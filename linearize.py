@@ -18,7 +18,8 @@ import utilities as _U
 animals = [["bon", "bond", "Bon"], ["fra", "frank", "Fra"], ["gov", "GovernmentData", "Gov"]]
 #basedir = "/Volumes/Seagate Expansion Drive"
 #basedir = "/Volumes/ExtraDisk/LorenData"
-basedir = "/Users/arai/TEMP/LorenData"
+#basedir = "/Users/arai/TEMP/LorenData"
+basedir = "/Users/arai/usb/nctc/Workspace/EnDe/LORENDATA"
 
 exf("linearize_funcs.py")
 
@@ -28,6 +29,9 @@ Nsgs      = 5
 segs      = _N.empty((Nsgs, 2, 2))  
 length    = _N.empty(Nsgs)
 offset    = _N.array([0, 1, 2, 1, 2])
+
+gkRWD  = gauKer(5)
+gkRWD  /= _N.sum(gkRWD)
 
 #  regular lindist     #  0 to 3
 #  lin_inout           #  inbound outbound  0 to 6
@@ -183,7 +187,7 @@ def done():
 
     make_lin_inout(N, lindist, inout, lin_inout)
     make_lin_lr(N, lr, lindist, seg_ts, r)
-    build_lin_lr_inout(N, lin_lr_inout, lindist, lr, inout)
+    build_lin_lr_inout(N, lin_lr_inout, lindist, lr, inout, gkRWD)
 
     #  inout 
     cp_lr, cp_inout = cpify_LR_inout(lr, inout)
@@ -209,7 +213,7 @@ def done():
         t0 = iw*winsz
         t1 = (iw+1)*winsz if (iw+1)*winsz < N else N-1
         #btwnfigs(anim2, day, ep, t0, t1, inout, [-1.1, 1.1], seg_ts+1, [0.9, 5.1], r, 1, 2, scxMin, scxMax, scyMin, scyMax)
-        btwnfigs(anim2, day, ep, t0, t1, inout, [-1.1, 1.1], lin_lr_inout, [-6.1, 6.1], r, 1, 2, scxMin, scxMax, scyMin, scyMax)
+        btwnfigs(anim2, day, ep, t0, t1, inout, "INOUT", [-1.1, 1.1], lr, "LR", [-1.1, 1.1], lin_lr_inout, "lin_lr_inout", [-6.1, 6.1], r, 1, 2, scxMin, scxMax, scyMin, scyMax)
         #btwnfigs(anim2, day, ep, t0, t1, lindist, [-0.1, 3.1], seg_ts+1, [0.9, 5.1], r, 1, 2, scxMin, scxMax, scyMin, scyMax)
 
 
@@ -222,7 +226,7 @@ for an in animals[0:1]:
 
     #for day in xrange(0, 12):
     #for day in xrange(10, 11):
-    for day in xrange(3, 4):
+    for day in xrange(5, 6):
         sdy    = ("0%d" % day) if (day < 10) else "%d" % day
 
         frip = "%(bd)s/%(s3)s/%(s1)sripplescons%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3, "bd" : basedir}
@@ -235,11 +239,10 @@ for an in animals[0:1]:
             mRp = _sio.loadmat(frwp)
 
             ex   = rip["ripplescons"].shape[1] - 1
-            _pts=mLp["linpos"][0,ex]
-
+            _pts = mLp["linpos"][0,ex]
 
             #for epc in range(0, _pts.shape[1], 2):
-            for epc in range(0, 1):
+            for epc in range(4, 5):
                 ep=epc+1;
 
             #  experimental data mark, position container

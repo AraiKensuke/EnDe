@@ -80,6 +80,8 @@ def initClusters(oo, M_max, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=
             contiguous_pack2(labH, startAt=0)
             clstrs[0] = len(_N.unique(labH))
             clstrs[0] = 2 if clstrs[0] == 1 else clstrs[0]  # at least 2 hash clstrs
+
+            print "clstrs[0]:  %d" % clstrs[0]
             contiguous_pack2(labS, startAt=clstrs[0])
             clstrs[1] = len(_N.unique(labS)) 
 
@@ -110,7 +112,7 @@ def initClusters(oo, M_max, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=
         MS     = int(clstrs[1]) 
         #MS = MS + 2 if (MS < 3) else int(_N.ceil(MS*1.1)+1)
         #MS = MS + 3
-        MS = MS + 15
+        MS = MS + 9
         M_use      = clstrs[0] + MS
         print "------------"
         print "hash clusters %d" % clstrs[0]
@@ -177,7 +179,8 @@ def declare_prior_hyp_params(M, clstrs, K, x, mks, Asts, t0, priors, labS, labH)
         ctr = sd[int(0.05*len(sd))] + 0.5*(Wdth)
         _u_u    = _N.tile(ctr, M).T.reshape((M, K))
 
-        _N.fill_diagonal(allSg, (0.4*Wdth)**2)
+        #_N.fill_diagonal(allSg, (0.4*Wdth)**2)
+        _N.fill_diagonal(allSg, (0.6*Wdth)**2)
 
         #  xcorr(1, 2)**2 / var1 var2
         for ix in xrange(K):
@@ -201,6 +204,7 @@ def declare_prior_hyp_params(M, clstrs, K, x, mks, Asts, t0, priors, labS, labH)
     print "prior ---------  Sg"
     print allSg
     _Sg_PSI = _N.tile(allSg/(K*2.01), M).T.reshape((M, K, K))
+    
     priors._Sg_nu = _N.array(_Sg_nu[0])
     priors._Sg_PSI = _N.array(_Sg_PSI[0])
 
@@ -245,17 +249,19 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
     #  finish epoch doesn't deal with noise cluster
     tt2 = _tm.time()
 
-    blksz= 20
-    initBlk = 10
-    frms = _pU.stationary_from_Z(smp_sp_prms)
-    frms[0:2] = ITERS-500  #  just last 500 samples
+    #frms = _pU.stationary_from_Z(smp_sp_prms)
+    frms = _pU.find_good_clstrs_and_stationary_from(M_use, smp_sp_prms)
 
+    print "frms------------------"
+    print frms
     occ = None
     if nSpks > 0:
         #  gz is ITERS x nSpks x M
         occ   = _N.empty(M_use)
         for m in xrange(M_use):
-           occ[m]   = _N.mean(_N.mean(gz[frms[m]:ITERS-1, :, m], axis=0), axis=0)
+           #occ[m]   = _N.mean(_N.sum(gz[frms[m]:ITERS-1:10, :, m], axis=1), axis=0)
+            occ[m]   = _N.mean(_N.sum(gz[frms[m]:, :, m], axis=1), axis=0)
+            print "occupation for m=%(m)d   %(o)d" % {"m" : m, "o" : occ[m]}
 
     ##  
     oo.smp_sp_prms = smp_sp_prms
@@ -312,16 +318,22 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
 
     for m in xrange(M_use):
         frm  = frms[m]
-        u[m] = _N.mean(smp_mk_prms[0][:, frm:, m], axis=1)
+        #u[m] = _N.mean(smp_mk_prms[0][:, frm:, m], axis=1)
+        u[m] = _N.median(smp_mk_prms[0][:, frm:, m], axis=1)
 
-        Sg[m] = _N.mean(smp_mk_prms[1][:, :, frm:, m], axis=2)
+        #Sg[m] = _N.mean(smp_mk_prms[1][:, :, frm:, m], axis=2)
+        Sg[m] = _N.median(smp_mk_prms[1][:, :, frm:, m], axis=2)
         oo.mk_prmPstMd[oo.ky_p_u][m] = u[m]
         oo.mk_prmPstMd[oo.ky_p_Sg][m]= Sg[m]
-        _u_u[m]    = _N.mean(smp_mk_hyps[oo.ky_h_u_u][:, frm:, m], axis=1)
-        _u_Sg[m]   = _N.mean(smp_mk_hyps[oo.ky_h_u_Sg][:, :, frm:, m], axis=2)
+        #_u_u[m]    = _N.mean(smp_mk_hyps[oo.ky_h_u_u][:, frm:, m], axis=1)
+        _u_u[m]    = _N.median(smp_mk_hyps[oo.ky_h_u_u][:, frm:, m], axis=1)
+        #_u_Sg[m]   = _N.mean(smp_mk_hyps[oo.ky_h_u_Sg][:, :, frm:, m], axis=2)
+        _u_Sg[m]   = _N.median(smp_mk_hyps[oo.ky_h_u_Sg][:, :, frm:, m], axis=2)
 
-        _Sg_nu[m]  = _N.mean(smp_mk_hyps[oo.ky_h_Sg_nu][0, frm:, m], axis=0)
-        _Sg_PSI[m] = _N.mean(smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, frm:, m], axis=2)
+        #_Sg_nu[m]  = _N.mean(smp_mk_hyps[oo.ky_h_Sg_nu][0, frm:, m], axis=0)
+        _Sg_nu[m]  = _N.median(smp_mk_hyps[oo.ky_h_Sg_nu][0, frm:, m], axis=0)
+        #_Sg_PSI[m] = _N.mean(smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, frm:, m], axis=2)
+        _Sg_PSI[m] = _N.median(smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, frm:, m], axis=2)
         # oo.mk_hypPstMd[oo.ky_h_u_u][epc, m]   = _u_u[m]
         # oo.mk_hypPstMd[oo.ky_h_u_Sg][epc, m]  = _u_Sg[m]
         # oo.mk_hypPstMd[oo.ky_h_Sg_nu][epc, m] = _Sg_nu[m]
@@ -343,8 +355,8 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
 
     if M_use > 1:
         #occ = _N.mean(_N.sum(gz[frm:], axis=1), axis=0)  # avg. # of marks assigned to this cluster
-        socc = _N.sort(occ)
-        minAss = (0.5*(socc[-2]+socc[-1])*0.01)  #  if we're 100 times smaller than the average of the top 2, let's consider it empty
+        #socc = _N.sort(occ)
+        minAss = K    #(0.5*(socc[-2]+socc[-1])*0.01)  #  if we're 100 times smaller than the average of the top 2, let's consider it empty
 
     if oo.resetClus and (M_use > 1):
         for m in xrange(M_use):
@@ -362,12 +374,16 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
                     print "cluster who's posterior difficult to estimate found.   occupancy %.3f" % occ[m]
                 else:
                     print "cluster who's posterior difficult to estimate found.   occupancy was nan"
-            if bBad or ((occ[m] < minAss) and (l0[m] / _N.sqrt(twpi*q2[m]) < 0.1)) or \
-               (f[m] < oo.xLo-sq25[m]) or (f[m] > oo.xHi+sq25[m]) or \
-               ((_f_q2[m] > 4) and q2[m] < 2) or (q2[m] < 0.001):
+            # if bBad or ((occ[m] < minAss) and (l0[m] / _N.sqrt(twpi*q2[m]) < 0.5)) or \
+            #    (f[m] < oo.xLo-sq25[m]) or (f[m] > oo.xHi+sq25[m]) or \
+            #    ((_f_q2[m] > 4) and q2[m] < 2) or (q2[m] < 0.001):
+
+            if (occ[m] < 4*K) and (bBad or (f[m] < oo.xLo-sq25[m]) or (f[m] > oo.xHi+sq25[m]) or \
+               ((_f_q2[m] > 4) and (q2[m] < 2)) or (ITERS - frms[m] < 3000)):
                 # last 2 conditions:  uncertainty of center high relative to width of cluster
                 #  cluster TOO narrow
                              
+                print "resetting cluster %(m)d  with o %(o)d" % {"m" : m, "o" : occ[m]}
                 reset_cluster(epc, m, l0, f, q2, freeClstr, _q2_a, _q2_B, _f_u, _f_q2, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, oo, priors, m1stSignalClstr)
                 # print "resetting  cluster %(m)d   %(l0).3f  %(f).3f" % {"m" : m, "l0" : (l0[m] / _N.sqrt(twpi*q2[m])), "f" : f[m]}
                 # iclstr = 1 if m >= m1stSignalClstr else 0
@@ -424,7 +440,7 @@ def copy_slice_hyp_params(M_use, _l0_a_M, _l0_B_M, _f_u_M, _f_q2_M, _q2_a_M, _q2
     return _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI
 
 def reset_cluster(epc, m, l0, f, q2, freeClstr, _q2_a, _q2_B, _f_u, _f_q2, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, oo, priors, m1stSignalClstr):
-    print "resetting  cluster %(m)d   %(l0).3f  %(f).3f" % {"m" : m, "l0" : (l0[m] / _N.sqrt(twpi*q2[m])), "f" : f[m]}
+    #print "resetting  cluster %(m)d   %(l0).3f  %(f).3f" % {"m" : m, "l0" : (l0[m] / _N.sqrt(twpi*q2[m])), "f" : f[m]}
     iclstr = 1 if m >= m1stSignalClstr else 0
     _q2_a[m] = priors._q2_a[iclstr]
     _q2_B[m] = priors._q2_B[iclstr]
@@ -459,8 +475,8 @@ def copy_back_hyp_params(M_use, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _
     _q2_a_M[0:M_use] = _q2_a
     _q2_B_M[0:M_use] = _q2_B
 
-    _u_u_M[0:M_use]  = _u_u[0]
-    _u_Sg_M[0:M_use] = _u_Sg[0]
+    _u_u_M[0:M_use]  = _u_u
+    _u_Sg_M[0:M_use] = _u_Sg
 
     _Sg_nu_M[0:M_use]  = _Sg_nu
     _Sg_PSI_M[0:M_use] = _Sg_PSI
@@ -469,12 +485,15 @@ def contiguous_inuse(M_use, M_max, K, freeClstr, l0, f, q2, u, Sg, _l0_a, _l0_B,
     #  method called after Gibbs iters are completed
     #  work only with small parameter array, not Master.
     #  _l0_a  (for example) are posterior (to become prior) hyp params calculated from l0s
+
     #  We do this after finishEpoch2.  smp_sp_prms are filled during Gibbs
     #  iter, so they must also be made contiguous.  
-
     freeIDs = _N.where(freeClstr[0:M_use] == True)[0]
     mf = freeIDs[0]   #  1st free cluster.  Only do stuff after mf
 
+    temp3   = _N.empty((3, smp_sp_prms.shape[1]))
+    tempK   = _N.empty((K, smp_sp_prms.shape[1]))
+    tempKxK = _N.empty((K, K, smp_sp_prms.shape[1]))
     inuseIDs = _N.where(freeClstr[mf+1:M_use] == False)[0] + mf + 1
 
     if len(inuseIDs > 0):  #  free cluster between clusters in use.
@@ -535,10 +554,16 @@ def contiguous_inuse(M_use, M_max, K, freeClstr, l0, f, q2, u, Sg, _l0_a, _l0_B,
 
 
                     #  smp_sp_prms  is 3 x ITERS x M
+                    temp3[:, :]    = smp_sp_prms[:, :, freeIDs[imf]]
                     smp_sp_prms[:, :, freeIDs[imf]] = smp_sp_prms[:, :, inuseIDs[imu]]
+                    smp_sp_prms[:, :, inuseIDs[imu]] = temp3
                     #  smp_mk_prms  is K x ITERS x M
+                    tempK[:, :]    = smp_mk_prms[0][:, :, freeIDs[imf]]
                     smp_mk_prms[0][:, :, freeIDs[imf]] = smp_mk_prms[0][:, :, inuseIDs[imu]]
-                    smp_mk_prms[1][:, :, freeIDs[imf]] = smp_mk_prms[1][:, :, inuseIDs[imu]]
+                    smp_mk_prms[0][:, :, inuseIDs[imu]] = tempK
+                    tempKxK[:, :, :]    = smp_mk_prms[1][:, :, :, freeIDs[imf]]
+                    smp_mk_prms[1][:, :, :, freeIDs[imf]] = smp_mk_prms[1][:, :, :, inuseIDs[imu]]
+                    smp_mk_prms[1][:, :, :, inuseIDs[imu]] = tempKxK
 
                     #oo.sp_prmPstMd = _N.zeros(3*M_use)   # mode params
                     sp_prmPstMd[3*freeIDs[imf]:3*(freeIDs[imf]+1)]        = sp_prmPstMd[3*inuseIDs[imu]:3*(inuseIDs[imu]+1)]
@@ -549,15 +574,16 @@ def contiguous_inuse(M_use, M_max, K, freeClstr, l0, f, q2, u, Sg, _l0_a, _l0_B,
                     freeClstr[freeIDs[imf]] = False
 
                     #  in each gibbs Iter, which spks are assigned to cluster 0
-                    gibbsIter_old, spkIDs_old   = _N.where(gz[:, :, inuseIDs[imu]] == True)
+                    gibbsIter_old, spkIDs_old   = _N.where(gz[:, :, inuseIDs[imu]] == True)   
                     #  in each gibbs Iter, which spks are assigned to cluster 1
                     gibbsIter_new, spkIDs_new   = _N.where(gz[:, :, freeIDs[imf]] == True)
 
-                    gz[gibbsIter_old, spkIDs_old, 0]  = False
-                    gz[gibbsIter_new, spkIDs_new, 0]  = True
+                    gz[gibbsIter_old, spkIDs_old, inuseIDs[imu]]  = False
+                    gz[gibbsIter_old, spkIDs_old, freeIDs[imf]]  = True
 
-                    gz[gibbsIter_old, spkIDs_old, 1]  = True
-                    gz[gibbsIter_new, spkIDs_new, 1]  = False
+                    gz[gibbsIter_new, spkIDs_new, freeIDs[imf]]  = False
+                    gz[gibbsIter_new, spkIDs_new, inuseIDs[imu]]  = True
+
             
     else:
         freeIDs = _N.where(freeClstr[0:M_use] == True)[0]
