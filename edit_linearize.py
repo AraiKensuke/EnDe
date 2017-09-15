@@ -18,7 +18,8 @@ import utilities as _U
 animals = [["bon", "bond", "Bon"], ["fra", "frank", "Fra"], ["gov", "GovernmentData", "Gov"]]
 #basedir = "/Volumes/Seagate Expansion Drive"
 #basedir = "/Volumes/ExtraDisk/LorenData"
-basedir = "/Users/arai/TEMP/LorenData"
+#basedir = "/Users/arai/TEMP/LorenData"
+basedir = "/Users/arai/usb/nctc/Workspace/EnDe/LORENDATA"
 
 exf("linearize_funcs.py")
 
@@ -29,12 +30,17 @@ segs      = _N.empty((Nsgs, 2, 2))
 length    = _N.empty(Nsgs)
 offset    = _N.array([0, 1, 2, 1, 2])
 
+minINOUT  = 100
+
 #  regular lindist     #  0 to 3
 #  lin_inout           #  inbound outbound  0 to 6
 #  lin_lr              #  -3 to 3
 #  lin_lr_inout        #  -3 to 3
 
 ii     = 0
+
+gkRWD  = gauKer(5)
+gkRWD  /= _N.sum(gkRWD)
 
 anim1     = None
 anim2     = None
@@ -69,12 +75,36 @@ for an in animals[0:1]:
 
     #for day in xrange(0, 12):
     #for day in xrange(10, 11):
-    for day in xrange(3, 4):
+    #for day in xrange(3, 4):
+    for day in xrange(5, 6):
         sdy    = ("0%d" % day) if (day < 10) else "%d" % day
 
+        frip = "%(bd)s/%(s3)s/%(s1)sripplescons%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3, "bd" : basedir}
+        frwp = "%(bd)s/%(s3)s/%(s1)srawpos%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3, "bd" : basedir}
+        flnp = "%(bd)s/%(s3)s/%(s1)slinpos%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3, "bd" : basedir}
+
+        if os.access("%s" % frip, os.F_OK):
+            rip = _sio.loadmat(frip)    #  load matlab .mat files
+            mLp = _sio.loadmat(flnp)
+            mRp = _sio.loadmat(frwp)
+
+            ex   = rip["ripplescons"].shape[1] - 1
+
+
+
         #for epc in range(0, _pts.shape[1], 2):
-        for epc in range(0, 1):
+        for epc in range(4, 5):
             ep=epc+1;
+
+            _pts=mLp["linpos"][0,ex][0,ep] 
+            if (_pts.shape[1] > 0):     #  might be empty epoch
+                pts = _pts["statematrix"][0][0]["time"][0,0].T[0]
+                a = mLp["linpos"][0,ex][0,ep]["statematrix"][0,0]["segmentIndex"]
+                r = mRp["rawpos"][0,ex][0,ep]["data"][0,0]
+
+                fillin_unobsvd(r)
+
+                scxMin, scxMax, scyMin, scyMax = get_boundaries(r)
 
             sday = ("0%d" % day) if (day < 10) else ("%d" % day)
 
@@ -90,4 +120,14 @@ for an in animals[0:1]:
 
             N  = len(lindist)
             lin_lr_inout = _N.empty(N)
-            build_lin_lr_inout(N, lin_lr_inout, lindist, lr, inout)
+            build_lin_lr_inout(N, lin_lr_inout, lindist, lr, inout, gkRWD)
+
+            t0 = 0
+            winsz = 1000
+            t1 = 0
+            iw    = -1
+            while t1 < N:
+                iw += 1
+                t0 = iw*winsz
+                t1 = (iw+1)*winsz if (iw+1)*winsz < N else N-1
+                btwnfigs(anim2, day, ep, t0, t1, inout, "INOUT", [-1.1, 1.1], lr, "LR", [-1.1, 1.1], lin_lr_inout, "lin_lr_inout", [-6.1, 6.1], r, 1, 2, scxMin, scxMax, scyMin, scyMax)

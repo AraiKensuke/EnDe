@@ -29,6 +29,46 @@ def hc_bcast1(double[:, ::1] fr, double [:, ::1] xASr, double[:, ::1] iq2r, doub
             p_qdrSPC[mN+n] = (pfrm - p_xASr[n])*(pfrm - p_xASr[n])*piq2rm
             #p_qdrSPC[mN+n] = (p_fr[m] - p_xASr[n])*(p_fr[m] - p_xASr[n])*p_iq2r[m]
 
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def hc_sub_2_vec_K4(double[:, ::1] mAS, double [:, ::1] u, double [:, :, ::1] out, int M, int N):
+    #  mAS - u.  mAS: K-dim marks from N spikes, u: M K-dim cluster centers
+    #  mAS   N x K
+    #  u     M x K
+
+    cdef int K  = 4   # hardcoded
+    #  output is M x N x K
+    
+    cdef int m, n, mK, mKN, nK, mKN_nK
+
+    cdef double *p_mAS   = &mAS[0, 0]
+    cdef double *p_u     = &u[0, 0]
+    cdef double *p_out   = &out[0, 0, 0]
+
+    cdef double u_m_0, u_m_1, u_m_2, u_m_3  # u[m, 0] to u[m, 3]
+    for 0 <= m < M:
+        mK = m*K
+        mKN= m*K*N
+
+        u_m_0 = p_u[mK]
+        u_m_1 = p_u[mK + 1]
+        u_m_2 = p_u[mK + 2]
+        u_m_3 = p_u[mK + 3]
+        for 0 <= n < N:
+            nK = n*K
+            #mKN_nK = mKN+nK
+
+            #  mAS[n, k] = p_mAS[n*K + k]
+            #  u[m, k]   = p_u[m*K + k]
+            #  out[m, n, k]   = p_out[m*K*N + n*K + k]
+            p_out[mKN+nK]     = p_mAS[nK]   - u_m_0
+            p_out[mKN+nK + 1] = p_mAS[nK+1] - u_m_1
+            p_out[mKN+nK + 2] = p_mAS[nK+2] - u_m_2
+            p_out[mKN+nK + 3] = p_mAS[nK+3] - u_m_3
+
+        #out[m, n, k] = mAS[n, k] - u[m, k]
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def hc_bcast1_par(double[:, ::1] fr, double [:, ::1] xASr, double[:, ::1] iq2r, double [:, ::1] qdrSPC, int M, int N, int nthrds=4):
@@ -66,15 +106,16 @@ def hc_qdr_sum(double[:, ::1] pkFRr, double [:, ::1] mkNrms, double[:, ::1] qdrS
     cdef double pkFRr_m, mkNrms_m
     cdef double norm
 
-    for 0 <= m < M:
-        mN = m*N
-        pkFRr_m = p_pkFRr[m]
-        mkNrms_m = p_mkNrms[m]
-        #norm    = p_pkFRr[m] + p_mkNrms[m]
-        for 0 <= n < N:
-            #mNn = mN+n
-            #p_cont[mNn] = norm - 0.5*(p_qdrSpc[mNn] + p_qdrMKS[mNn])
-            p_cont[mN+n] = pkFRr_m + mkNrms_m - 0.5*(p_qdrSpc[mN+n] + p_qdrMKS[mN+n])
+    with nogil:
+        for 0 <= m < M:
+            mN = m*N
+            pkFRr_m = p_pkFRr[m]
+            mkNrms_m = p_mkNrms[m]
+            #norm    = p_pkFRr[m] + p_mkNrms[m]
+            for 0 <= n < N:
+                #mNn = mN+n
+                #p_cont[mNn] = norm - 0.5*(p_qdrSpc[mNn] + p_qdrMKS[mNn])
+                p_cont[mN+n] = pkFRr_m + mkNrms_m - 0.5*(p_qdrSpc[mN+n] + p_qdrMKS[mN+n])
 
 @cython.boundscheck(False)
 @cython.wraparound(False)

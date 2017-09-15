@@ -79,6 +79,7 @@ def colorclusters(smkpos, labs, MS, name="", xLo=0, xHi=3):
             fig.add_subplot(2, 2, k+1)
             _plt.scatter(smkpos[inds, 0], smkpos[inds, k+1], color=myclrs[m], s=9)
             _plt.xlim(xLo-(xHi-xLo)*0.1, xHi+(xHi-xLo)*0.1)
+
         _plt.savefig("cc%(n)s-%(m)d" % {"n" : name, "m" : m})
         _plt.close()
 
@@ -159,7 +160,7 @@ def kmBIC(ctrs, labs, X):
 
     return(BIC), m
 
-def emMKPOS_sep1A(nhmks, hmks, TR=5, wfNClstrs=[[1, 4], [1, 8]], spNClstrs=[[1, 2], [1, 7]], K=4):
+def emMKPOS_sep1A(nhmks, hmks, TR=5, wfNClstrs=[[1, 7], [1, 10]], spNClstrs=[[1, 2], [1, 7]], K=4):
     #  wfNClstrs   [ non-hash(min, max), hash(min, max)  by waveform clustering
     TR = 2
 

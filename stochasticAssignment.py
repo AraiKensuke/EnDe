@@ -17,7 +17,7 @@ import pickle
 twpi = 2*_N.pi
 wdSpc = 1
 
-def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mASr, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, cmp2Existing, nthrds=1):
+def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mAS, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, cmp2Existing, nthrds=1):
     #  Msc   Msc signal clusters
     #  M     all clusters, including nz clstr.  M == Msc when not using nzclstr
     #  Gibbs sampling
@@ -47,11 +47,16 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     rnds       = _N.random.rand(nSpks)
     #tt3       = _tm.time()
     pkFRr      = pkFR.reshape((M, 1))
-    dmu        = (mASr - ur)     # mASr 1 x N x K,     ur  is M x 1 x K
-    N          = mASr.shape[1]
+    #dmu        = (mASr - ur)     # mASr 1 x N x K,     ur  is M x 1 x K
+    N          = mAS.shape[0]
+    dmu        = _N.empty((M, N, K))     # mASr 1 x N x K,     ur  is M x 1 x K
+    _hcb.hc_sub_2_vec_K4(mAS, u, dmu, M, N)
     #tt4       = _tm.time()
-    _fm.multi_qdrtcs_par_func_sym(dmu, iSg, qdrMKS, M, N, K, nthrds=nthrds)
+    #_fm.multi_qdrtcs_par_func_sym(dmu, iSg, qdrMKS, M, N, K, nthrds=1)
+
+    _fm.multi_qdrtcs_hard_code_4_v2(dmu, iSg, qdrMKS, M, N, K)
     #tt5       = _tm.time()
+
     #  fr is    M x 1, xASr is 1 x N, iq2r is M x 1
     #qdrSPC     = (fr - xASr)*(fr - xASr)*iq2r  #  M x nSpks   # 0.01s
     qdrSPC     = _N.empty((M, N))
@@ -71,10 +76,10 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
         # print realCl.shape
 
         #print "largest mark obs."
-        maxMKS = _N.max(mASr[0], axis=0)  # mASr:  1 x N x K, mASr[0]:  N x K
+        maxMKS = _N.max(mAS, axis=0)  # mASr:  1 x N x K, mASr[0]:  N x K
 
         print hashthresh
-        abvthrEachCh     = mASr[0] > hashthresh    #  should be NxK of T,F
+        abvthrEachCh     = mAS > hashthresh    #  should be NxK of T,F
         abvthrAtLeast1Ch = _N.sum(abvthrEachCh, axis=1) > 0   # N x K
         belowthrAllCh    = _N.sum(abvthrEachCh, axis=1) == 0   # N x K
         newNonHashSpks   = _N.where(abvthrAtLeast1Ch)[0]
@@ -99,7 +104,6 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
         freeClstrs      = _N.where(freeClstr == True)[0]     # clstr indices 
         knownClstrs       = _N.where(freeClstr == False)[0]  # clstr indices 
         freeNonHclstrs  = _N.where((freeClstr == True) & (allClstrs >= m1stSignalClstr))[0]
-
 
         newNonHashSpksMemClstr = _N.zeros(len(newNonHashSpks), dtype=_N.int)   #  initially, assign all of them to noise cluster
 
@@ -144,7 +148,7 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
         alls[:, 1] = nNrstMKS_d[newNonHashSpks]
         alls[:, 2] = nNrstSPC_d[newNonHashSpks]
         alls[:, 3] = xASr[0, newNonHashSpks]
-        alls[:, 4:4+K] = mASr[0, newNonHashSpks]
+        alls[:, 4:4+K] = mAS[newNonHashSpks]
         xmkPrt = "%.3e " * (1+K)
         _N.savetxt(resFN("allnewspks%d" % epc, dir=oo.outdir), alls, fmt=("%d %.3e %.3e " + xmkPrt))
         #  looking for non-hash spikes whose closest cluster d
@@ -154,7 +158,7 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
         clsnhs[:, 1] = nNrstMKS_d[newNonHashSpks_r]
         clsnhs[:, 2] = nNrstSPC_d[newNonHashSpks_r]
         clsnhs[:, 3] = xASr[0, newNonHashSpks_r]
-        clsnhs[:, 4:4+K] = mASr[0, newNonHashSpks_r]
+        clsnhs[:, 4:4+K] = mAS[newNonHashSpks_r]
         xmkPrt = "%.3e " * (1+K)
         _N.savetxt(resFN("allnewspks_cls2nonhash%d" % epc, dir=oo.outdir), clsnhs, fmt=("%d %.3e %.3e " + xmkPrt))
 
@@ -183,7 +187,7 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
         clsnhs[:, 1] = nNrstMKS_d[newNonHashSpks_r[farSPinds]]
         clsnhs[:, 2] = nNrstSPC_d[newNonHashSpks_r[farSPinds]]
         clsnhs[:, 3] = xASr[0, newNonHashSpks_r[farSPinds]]
-        clsnhs[:, 4:4+K] = mASr[0, newNonHashSpks_r[farSPinds]]
+        clsnhs[:, 4:4+K] = mAS[newNonHashSpks_r[farSPinds]]
         xmkPrt = "%.3e " * (1+K)
         _N.savetxt(resFN("farSPinds%d" % epc, dir=oo.outdir), clsnhs, fmt=("%d %.3e %.3e " + xmkPrt))
 
@@ -193,7 +197,7 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
         clsnhs[:, 1] = nNrstMKS_d[newNonHashSpks_r[farMKinds]]
         clsnhs[:, 2] = nNrstSPC_d[newNonHashSpks_r[farMKinds]]
         clsnhs[:, 3] = xASr[0, newNonHashSpks_r[farMKinds]]
-        clsnhs[:, 4:4+K] = mASr[0, newNonHashSpks_r[farMKinds]]
+        clsnhs[:, 4:4+K] = mAS[newNonHashSpks_r[farMKinds]]
         xmkPrt = "%.3e " * (1+K)
         _N.savetxt(resFN("farMKinds%d" % epc, dir=oo.outdir), clsnhs, fmt=("%d %.3e %.3e " + xmkPrt))
 
@@ -262,21 +266,21 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
                     ths = newNonHashSpks_r[farInSpcOnly]
             
             if len(ths) > 2:  # more than 2 spikes
-                fp.write("setting priors for cluster %d\n" % im)
+                fp.write("se#tting priors for cluster %d\n" % im)
                 #_u_u[im]  = _N.mean(mASr[0, ths], axis=0)
-                u[im]     = _N.mean(mASr[0, ths], axis=0)
-                Sg[im]     = _N.cov(mASr[0, ths], rowvar=0)
-                fp.write("setting u to %s\n" % str(u[im]))
+                u[im]     = _N.mean(mAS[ths], axis=0)
+                Sg[im]     = _N.cov(mAS[ths], rowvar=0)
+                fp.write("se#tting u to %s\n" % str(u[im]))
                 xmk = _N.empty((len(ths), K+1))
                 xmk[:, 0] = xASr[0, ths]
-                xmk[:, 1:] = mASr[0, ths]
+                xmk[:, 1:] = mAS[ths]
                 #print "ii is %(ii)d     len farclusts %(l)d" % {"ii" : ii, "l" : len(farClusts)}
                 farClusts[ii-1].append(xmk)   #  ii-1 becaus ii incremented
 
                 #_f_u[im]  = 3#_N.mean(xASr[0, ths])
                 _f_u[im]  = _N.median(xASr[0, ths])
                 f[im]     = _N.median(xASr[0, ths])
-                fp.write("setting f to %s\n" % str(f[im]))
+                fp.write("se#tting f to %s\n" % str(f[im]))
                 #q2[im]     = _N.std(xASr[0, ths])**2/10  #  bound to contain noise
                 q2[im]     = (_N.std(xASr[0, ths])**2)  #  bound to contain noise
                 l0[im]     = 10*_N.sqrt(q2[im])
@@ -311,11 +315,12 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     #cont       = pkFRr + mkNrms - 0.5*(qdrSPC + qdrMKS)
     cont = _N.empty((M, N))
     _hcb.hc_qdr_sum(pkFRr, mkNrms, qdrSPC, qdrMKS, cont, M, N)
-    #tt8       = _tm.time()
-    mcontr     = _N.max(cont, axis=0).reshape((1, nSpks))  
-    cont       -= mcontr
-    _N.exp(cont, out=econt)
-
+    #tt8       = _tm.time()   
+    mcontr     = _N.max(cont, axis=0).reshape((1, nSpks))  #  1 x N
+    cont       -= mcontr   
+    #tt9       = _tm.time()
+    _N.exp(cont, out=econt)     
+    #tt10       = _tm.time()
     for m in xrange(M):
         rat[m+1] = rat[m] + econt[m]
 
@@ -336,7 +341,7 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     """
 
     # print rat
-    #tt9       = _tm.time()
+    #tt11       = _tm.time()
     M1 = rat[1:] >= rnds
     M2 = rat[0:-1] <= rnds
 
@@ -348,19 +353,21 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
         # print rat[:, 158]
         # print gz[it, 158]
 
-    #tt10       = _tm.time()
+    #tt12       = _tm.time()
 
 
     # print "#st timing start"
-    # print "it2t1+=%.4e" % (tt2-tt1)
-    # print "it3t2+=%.4e" % (tt3-tt2)
-    # print "it4t3+=%.4e" % (tt4-tt3)
-    # print "it5t4+=%.4e" % (tt5-tt4)
-    # print "it6t5+=%.4e" % (tt6-tt5)
-    # print "it7t6+=%.4e" % (tt7-tt6)  # slow
-    # print "it8t7+=%.4e" % (tt8-tt7)  # slow
-    # print "it9t8+=%.4e" % (tt9-tt8)  # slow
-    # print "it10t9+=%.4e" % (tt10-tt9)  # slow
+    # print "it2t1+=%.4e" % (#tt2-#tt1)
+    # print "it3t2+=%.4e" % (#tt3-#tt2) 
+    # print "it4t3+=%.4e" % (#tt4-#tt3) # slowest 0.12
+    # print "it5t4+=%.4e" % (#tt5-#tt4) # slow  0.03
+    # print "it6t5+=%.4e" % (#tt6-#tt5)
+    # print "it7t6+=%.4e" % (#tt7-#tt6)  
+    # print "it8t7+=%.4e" % (#tt8-#tt7)  
+    # print "it9t8+=%.4e" % (#tt9-#tt8)  # slow 0.02
+    # print "it10t9+=%.4e" % (#tt10-#tt9)  # slow 0.08
+    # print "it11t10+=%.4e" % (#tt11-#tt10)  # slow 0.02
+    # print "it12t11+=%.4e" % (#tt12-#tt11)  # slow 0.02
     # print "#st timing end"
 
     if cmp2Existing and (M > 1):
