@@ -112,7 +112,8 @@ def initClusters(oo, M_max, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=
         MS     = int(clstrs[1]) 
         #MS = MS + 2 if (MS < 3) else int(_N.ceil(MS*1.1)+1)
         #MS = MS + 3
-        MS = MS + 9
+        #MS = MS + 9
+        MS = MS + 5
         M_use      = clstrs[0] + MS
         print "------------"
         print "hash clusters %d" % clstrs[0]
@@ -489,12 +490,17 @@ def contiguous_inuse(M_use, M_max, K, freeClstr, l0, f, q2, u, Sg, _l0_a, _l0_B,
     #  We do this after finishEpoch2.  smp_sp_prms are filled during Gibbs
     #  iter, so they must also be made contiguous.  
     freeIDs = _N.where(freeClstr[0:M_use] == True)[0]
-    mf = freeIDs[0]   #  1st free cluster.  Only do stuff after mf
+    if len(freeIDs > 0):
+        mf = freeIDs[0]   #  1st free cluster.  Only do stuff after mf
 
-    temp3   = _N.empty((3, smp_sp_prms.shape[1]))
-    tempK   = _N.empty((K, smp_sp_prms.shape[1]))
-    tempKxK = _N.empty((K, K, smp_sp_prms.shape[1]))
-    inuseIDs = _N.where(freeClstr[mf+1:M_use] == False)[0] + mf + 1
+        temp3   = _N.empty((3, smp_sp_prms.shape[1]))
+        tempK   = _N.empty((K, smp_sp_prms.shape[1]))
+        tempKxK = _N.empty((K, K, smp_sp_prms.shape[1]))
+        #  IDs in use past the 
+        inuseIDs = _N.where(freeClstr[mf+1:M_use] == False)[0] + mf + 1
+    else:
+        mf = M_use
+        inuseIDs = _N.array([], dtype=_N.int)
 
     if len(inuseIDs > 0):  #  free cluster between clusters in use.
         freeIDsM = _N.where(freeIDs < inuseIDs[-1])[0]

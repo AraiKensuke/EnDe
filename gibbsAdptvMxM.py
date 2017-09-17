@@ -156,7 +156,7 @@ class MarkAndRF:
         _cdfs.init(oo.dt, oo.f_L, oo.f_H, oo.q2_L, oo.q2_H, f_STEPS, q2_STEPS, f_SMALL, q2_SMALL, f_cldz, q2_cldz, minSmps)
         _cdfs.init_occ_resolutions(oo.xLo, oo.xHi, oo.q2_lvls, oo.Nupx_lvls)
 
-        M_max   = 100   #  100 clusters, max
+        M_max   = 50   #  100 clusters, max
         M_use    = 0     #  number of non-free + 5 free clusters
 
         for epc in xrange(ep1, ep2):
@@ -252,14 +252,15 @@ class MarkAndRF:
                 print "!!!!!!  %d" % n_fClstrs
                 print "bef M_use %d" % M_use
                 #  
-                if n_fClstrs < oo.NExtrClstr:
+                if n_fClstrs < oo.NExtrClstr:  #  
                     old_M = M_use
                     M_use  = M_use + (oo.NExtrClstr - n_fClstrs)
-                    new_M = M_use
+                    M_use = M_use if M_use < M_max else M_max
+                    #new_M = M_use
                 elif n_fClstrs > oo.NExtrClstr:
                     old_M = M_use
                     M_use  = M_use + (oo.NExtrClstr - n_fClstrs)
-                    new_M = M_use
+                    #new_M = M_use
 
                 print "aft M_use %d" % M_use
 
