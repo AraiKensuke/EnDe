@@ -103,20 +103,20 @@ def EMwfBICs(mks, TR=5, minK=2, maxK=15, onlypositivecorr=False):
 
     nClstrs = coords[0][0] + minK   #  best # of clusters
 
-    for m in xrange(nClstrs):
-        ths = _N.where(bestLab == m)[0]
-        covs=  _N.cov(mks[ths, 1:], rowvar=0)
-        fig = _plt.figure(figsize=(10, 10))
-        ax  = fig.add_subplot(2, 2, 1)
-        _plt.scatter(mks[ths, 1], mks[ths, 2])
-        ax  = fig.add_subplot(2, 2, 2)
-        _plt.scatter(mks[ths, 1], mks[ths, 3])
-        ax  = fig.add_subplot(2, 2, 3)
-        _plt.scatter(mks[ths, 1], mks[ths, 4])
-        ax  = fig.add_subplot(2, 2, 4)
-        _plt.scatter(mks[ths, 2], mks[ths, 3])
+    # for m in xrange(nClstrs):
+    #     ths = _N.where(bestLab == m)[0]
+    #     covs=  _N.cov(mks[ths, 1:], rowvar=0)
+    #     fig = _plt.figure(figsize=(10, 10))
+    #     ax  = fig.add_subplot(2, 2, 1)
+    #     _plt.scatter(mks[ths, 1], mks[ths, 2])
+    #     ax  = fig.add_subplot(2, 2, 2)
+    #     _plt.scatter(mks[ths, 1], mks[ths, 3])
+    #     ax  = fig.add_subplot(2, 2, 3)
+    #     _plt.scatter(mks[ths, 1], mks[ths, 4])
+    #     ax  = fig.add_subplot(2, 2, 4)
+    #     _plt.scatter(mks[ths, 2], mks[ths, 3])
 
-        _plt.suptitle("m is %d" % m)
+    #     _plt.suptitle("m is %d" % m)
 
     return labs, bics, bestLab, nClstrs
 

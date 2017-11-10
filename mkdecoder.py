@@ -53,18 +53,24 @@ class mkdecoder:
     xHi      = 3
     mLo      = -2
     mHi      = 8
+    chmins   = None
 
     sts_per_tet = None
     _sts_per_tet = None
     svMkIntnsty = None   #  save just the mark intensities
 
     ##  X_   and _X
-    def __init__(self, kde=False, bx=None, Bx=None, Bm=None, mkfns=None, encfns=None, K=None, nTets=None, xLo=0, xHi=3, maze=mz_CRCL, spdMult=0.1, ignorespks=False):
+    def __init__(self, Nx=61, kde=False, bx=None, Bx=None, Bm=None, mkfns=None, encfns=None, K=None, nTets=None, xLo=0, xHi=3, maze=mz_CRCL, spdMult=0.1, ignorespks=False, chmins=None):
         """
         """
         oo = self
+        oo.Nx = Nx
         oo.maze = maze
         oo.kde = kde
+        if chmins is not None:
+            oo.chmins = chmins
+        else:
+            oo.chmins = _N.ones(K)*-10000
 
         oo.spdMult = spdMult
         oo.ignorespks = ignorespks
@@ -74,13 +80,13 @@ class mkdecoder:
         _sts   = []#  a mark on one of the several tetrodes
         oo._sts_per_tet = []
         for fn in mkfns:   #  for each tetrode filename
-
             _dat = _N.loadtxt(datFN("%s.dat" % fn))
             if K is None:
                 K   = _dat.shape[1] - 2
                 dat = _dat
             else:
                 dat = _dat[:, 0:2+K]
+
             oo.mkpos.append(dat)
             spkts = _N.where(dat[:, 1] == 1)[0]
             oo._sts_per_tet.append(spkts)
@@ -223,6 +229,8 @@ class mkdecoder:
             #i2pidcovsr.append(i2pidcovs.reshape((M, 1)))
             oo.svMkIntnsty.append([])
 
+        print M
+
         oo.init_pX_Nm(t0)   #  flat pX_Nm  init cond at start of decode
         tt1 = _tm.time()
         oo.LmdMargOvrMrks(0, t0, prms=prms, uFE=uFE)
@@ -245,7 +253,7 @@ class mkdecoder:
             for nt in xrange(oo.nTets):
                 oo.Lklhd[nt, t] = pNkmk0[:, nt]
 
-                if (oo.mkpos[nt][t, 1] == 1):
+                if (oo.mkpos[nt][t, 1] == 1) and _N.sum(oo.mkpos[nt][t, 2:] > oo.chmins) > 0:
                     fxdMks[:, 1:] = oo.mkpos[nt][t, 2:]
                     if not oo.ignorespks:
                         #mkint = _ku.evalAtFxdMks_new(fxdMks, l0s, us, covs, iSgs, i2pidcovsr)*oo.dt
@@ -404,7 +412,7 @@ class mkdecoder:
             for nt in xrange(oo.nTets):
                 oo.Lklhd[nt, t] = pNkmk0[:, nt]
 
-                if (oo.mkpos[nt][t, 1] == 1):
+                if (oo.mkpos[nt][t, 1] == 1) and _N.sum(oo.mkpos[nt][t, 2:] > oo.chmins) > 0:
                     fxdMks[:, 1:] = oo.mkpos[nt][t, 2:]
                         #(atMark, fld_x, tr_pos, tr_mks, all_pos, mdim, Bx, cBm, bx)
                     #tt1 = _tm.time()
@@ -462,3 +470,70 @@ class mkdecoder:
         return _N.where(self.mkpos[nt][t0:t1, 1] == 1)[0] + t0
 
 
+
+def scores(pX_Nm):
+    ps    = _N.sum(pX_Nm, axis=1)   #  sums to 0 for location not decoded
+    uset  = _N.where(ps > 0)[0]   
+    pX_Nm[uset] /= _N.sum(pX_Nm[uset], axis=1).reshape((len(uset), 1)) #nrmlz
+    decded= pX_Nm[uset]
+
+    sdecded = _N.sort(decded, axis=1)  #  low to high prob
+    cdecded = _N.cumsum(sdecded, axis=1)  # cumulative
+    x, y    = _N.where(cdecded > pctm1)
+
+    t0   = uset[0]
+    #for t in xrange(1, len(uset)):
+
+    xp = _N.linspace(-6, 6, 61)
+
+    #for t in xrange(20000, 20010):
+
+    in5 = _N.zeros(len(uset), dtype=_N.bool)
+    t0  = uset[0]
+    sz95= _N.zeros(len(uset))
+
+    for t in xrange(len(uset)):
+        li5p = _N.where((cdecded[t, 1:] >= pctm1) & (cdecded[t, 0:-1] <= pctm1))[0]
+        if len(li5p) == 0:
+            i5p = 0
+        else:
+            i5p = li5p[0]
+
+
+        thrP=  sdecded[t, i5p+1]   # threshold prob/bin for 95%
+
+        binsGT5 = _N.where(decded[t] > thrP)[0]
+        if len(binsGT5) == 0:
+            thrP=  sdecded[t, i5p]   # threshold prob/bin for 95%
+            binsGT5 = _N.where(decded[t] > thrP)[0]
+            if len(binsGT5) == 0:
+                print "binsGT5 0 at %(t)d" % {"t" : t}
+
+        ib = _N.where((pos[t+t0] >= xp[0:-1]) & (pos[t+t0] <= xp[1:]))[0][0]
+
+        in5[t] = len(_N.where(binsGT5 == ib)[0])
+        sz95[t] = len(binsGT5) / 61.
+
+
+    #epts = _N.array(pX_Nm.shape[0]*itvs, dtype=_N.int)
+    epts  = lm[4]
+
+    ignr=200
+    scrs = _N.empty((epts.shape[0]-2, 3))
+    maxV = _N.max(pX_Nm, axis=1)
+    maxInds = _N.empty(len(uset), dtype=_N.int)
+
+    for epc in xrange(lagfit, epts.shape[0]-1):
+        et0 = epts[epc]
+        et1 = epts[epc+1]
+        scrs[epc-1, 0] = float(_N.sum(in5[et0+ignr-t0:et1-t0])) / (et1-et0-ignr)
+
+        print (et0+ignr-t0)
+        print (et1-t0)
+        print sz95[et0+ignr-t0:et1-t0]
+        scrs[epc-1, 1] = _N.mean(sz95[et0+ignr-t0:et1-t0])
+
+        maxInds = _N.empty(et1-et0-ignr, dtype=_N.int)
+        for t in xrange(et0+ignr, et1):
+            maxInds[t-et0-ignr] = _N.where(pX_Nm[t] == maxV[t])[0][0]
+        scrs[epc-1, 2] = _N.mean(_N.abs(xp[maxInds] - pos[et0+ignr:et1]) % PD)

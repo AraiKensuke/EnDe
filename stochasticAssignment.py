@@ -25,7 +25,7 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     #  mASr, xASr   just the mark, position of spikes btwn t0 and t1
     #  qdrMKS   quadratic distance from all marks to the M cluster centers
 
-    #tt1       = _tm.time()
+    #ttt1       = _tm.time()
     nSpks = len(Asts)
 
     Kp1      = K+1
@@ -43,19 +43,19 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
 
     #if epc == 1:
     #    print pkFR
-    #tt2       = _tm.time()
+    #ttt2       = _tm.time()
     rnds       = _N.random.rand(nSpks)
-    #tt3       = _tm.time()
+    #ttt3       = _tm.time()
     pkFRr      = pkFR.reshape((M, 1))
     #dmu        = (mASr - ur)     # mASr 1 x N x K,     ur  is M x 1 x K
     N          = mAS.shape[0]
     dmu        = _N.empty((M, N, K))     # mASr 1 x N x K,     ur  is M x 1 x K
     _hcb.hc_sub_2_vec_K4(mAS, u, dmu, M, N)
-    #tt4       = _tm.time()
+    #ttt4       = _tm.time()
     #_fm.multi_qdrtcs_par_func_sym(dmu, iSg, qdrMKS, M, N, K, nthrds=1)
 
     _fm.multi_qdrtcs_hard_code_4_v2(dmu, iSg, qdrMKS, M, N, K)
-    #tt5       = _tm.time()
+    #ttt5       = _tm.time()
 
     #  fr is    M x 1, xASr is 1 x N, iq2r is M x 1
     #qdrSPC     = (fr - xASr)*(fr - xASr)*iq2r  #  M x nSpks   # 0.01s
@@ -67,7 +67,7 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
 
     #  mAS = mks[Asts+t0] 
     #  xAS = x[Asts + t0]   #  position @ spikes
-    #tt6       = _tm.time()
+    #ttt6       = _tm.time()
     
     cmp2Existing = False
     if cmp2Existing and (M > 1):   #  compare only non-hash spikes and non-hash clusters
@@ -309,18 +309,18 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
         dmp.close()
         fp.close()
 
-    #tt7       = _tm.time()
+    #ttt7       = _tm.time()
     ####  outside cmp2Existing here
     #   (Mx1) + (Mx1) - (MxN + MxN)
     #cont       = pkFRr + mkNrms - 0.5*(qdrSPC + qdrMKS)
     cont = _N.empty((M, N))
     _hcb.hc_qdr_sum(pkFRr, mkNrms, qdrSPC, qdrMKS, cont, M, N)
-    #tt8       = _tm.time()   
+    #ttt8       = _tm.time()   
     mcontr     = _N.max(cont, axis=0).reshape((1, nSpks))  #  1 x N
     cont       -= mcontr   
-    #tt9       = _tm.time()
+    #ttt9       = _tm.time()
     _N.exp(cont, out=econt)     
-    #tt10       = _tm.time()
+    #ttt10       = _tm.time()
     for m in xrange(M):
         rat[m+1] = rat[m] + econt[m]
 
@@ -341,7 +341,7 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     """
 
     # print rat
-    #tt11       = _tm.time()
+    #ttt11       = _tm.time()
     M1 = rat[1:] >= rnds
     M2 = rat[0:-1] <= rnds
 
@@ -353,21 +353,21 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
         # print rat[:, 158]
         # print gz[it, 158]
 
-    #tt12       = _tm.time()
+    #ttt12       = _tm.time()
 
 
     # print "#st timing start"
-    # print "it2t1+=%.4e" % (#tt2-#tt1)
-    # print "it3t2+=%.4e" % (#tt3-#tt2) 
-    # print "it4t3+=%.4e" % (#tt4-#tt3) # slowest 0.12
-    # print "it5t4+=%.4e" % (#tt5-#tt4) # slow  0.03
-    # print "it6t5+=%.4e" % (#tt6-#tt5)
-    # print "it7t6+=%.4e" % (#tt7-#tt6)  
-    # print "it8t7+=%.4e" % (#tt8-#tt7)  
-    # print "it9t8+=%.4e" % (#tt9-#tt8)  # slow 0.02
-    # print "it10t9+=%.4e" % (#tt10-#tt9)  # slow 0.08
-    # print "it11t10+=%.4e" % (#tt11-#tt10)  # slow 0.02
-    # print "it12t11+=%.4e" % (#tt12-#tt11)  # slow 0.02
+    # print "it2t1+=%.4e" % (#ttt2-#ttt1)
+    # print "it3t2+=%.4e" % (#ttt3-#ttt2) 
+    # print "it4t3+=%.4e" % (#ttt4-#ttt3) # slowest 0.12
+    # print "it5t4+=%.4e" % (#ttt5-#ttt4) # slow  0.03
+    # print "it6t5+=%.4e" % (#ttt6-#ttt5)
+    # print "it7t6+=%.4e" % (#ttt7-#ttt6)  
+    # print "it8t7+=%.4e" % (#ttt8-#ttt7)  
+    # print "it9t8+=%.4e" % (#ttt9-#ttt8)  # slow 0.02
+    # print "it10t9+=%.4e" % (#ttt10-#ttt9)  # slow 0.08
+    # print "it11t10+=%.4e" % (#ttt11-#ttt10)  # slow 0.02
+    # print "it12t11+=%.4e" % (#ttt12-#ttt11)  # slow 0.02
     # print "#st timing end"
 
     if cmp2Existing and (M > 1):

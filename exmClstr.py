@@ -5,6 +5,7 @@ import numpy as _N
 import matplotlib.pyplot as _plt
 import scipy.cluster.vq as scv
 import mcmcFigs as mF
+from fitutil import  sepHash, channelMins
 
 def show_posmarks(dec, setname, ylim=None, win=None, singles=False, baseFN=None):
     MTHR = 0.001   #  how much smaller is mixture compared to maximum
@@ -193,22 +194,66 @@ def showTrajectory(dec, t0, t1, ep, setname, dir):
     _plt.close()
 
 
-def timeline(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1, xL=0, xH=3, yticks=[0, 1, 2, 3], thin=1):
+def timeline(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1, xL=0, xH=3, yticks=[0, 1, 2, 3], thin=1, allFR=None):   #  25Hz
     d = _N.loadtxt(datFN("%s.dat" % datfn))   #  marks
     itv = _N.loadtxt(datFN("%s.dat" % itvfn))
-    N = d.shape[0]
+    N = d.shape[0]          #  ALL spikes
     epochs = itv.shape[0]-1
     ch1 += 2   #  because this is data col
     ch2 += 2
 
-    _sts = _N.where(d[:, 1] == 1)[0]
-    if thin == 1:
-        sts = _sts
-    else:
-        sts = _sts[::thin]
-
     wvfmMin = _N.min(d[:, 2:], axis=0)
     wvfmMax = _N.max(d[:, 2:], axis=0)
+
+    Aint    = _N.array(itv*N, dtype=_N.int)
+    Asts = _N.where(d[Aint[0]:Aint[1], 1] == 1)[0]
+    N1      = len(Asts)   # num spikes in 1st epoch
+
+    _x = _N.empty((N1, 5))
+    _x[:, 0] = d[Asts, 0]
+    _x[:, 1:] = d[Asts, 2:]
+    T1  = Aint[1] - Aint[0]
+    hz = _x.shape[0] / float(T1*0.001)
+
+
+    if allFR is not None:
+        unonhash, hashsp, hashthresh = sepHash(_x, BINS=20, blksz=5, xlo=xL, xhi=xH)
+
+        rh  = len(hashsp) / float(N1)
+        rnh = len(unonhash) / float(N1)
+
+        #(m x rh + rnh)*hz = allFR
+        #allFR  - rnh x hz = m x rh x hz
+        #  m = (rnh x hz - allFR) / (rh x hz)
+
+        m = (allFR - rnh * hz) / (rh * hz)
+
+        #  ((m*len(hashsp) + len(unonhash)) / (T1*0.001))  == allFR  (target FR)
+        #  how much of hashsp should we remove?
+        #  Find lowest (1 - m)
+
+        _x[:, 1:].sort(axis=0)
+
+        chmins  = channelMins(_x, 100, 4, int((1-m)*len(hashsp)))
+
+        #spk_n, chs = _N.where(_x[:, 1:] > chmins)
+        #unique, counts = _N.unique(spk_n, return_counts=True)
+
+        #print len(_N.where(counts > 0)[0])  # at least 1 channel above
+        #print (len(_N.where(counts > 0)[0]) / float(T1*0.001))
+
+        _sts = _N.where(d[:, 1] == 1)[0]   #  ALL spikes in ALL epochs
+        spk_n, chs = _N.where(d[_sts, 2:] > chmins)
+
+        unique_spk_IDs, counts = _N.unique(spk_n, return_counts=True)
+        sts  = _sts[unique_spk_IDs[_N.where(counts > 0)[0]]]
+
+    if allFR is None:
+        _sts = _N.where(d[:, 1] == 1)[0]
+        if thin == 1:
+            sts = _sts
+        else:
+            sts = _sts[::thin]
 
     fig = _plt.figure(figsize=(10, 12))
     #######################
@@ -220,6 +265,7 @@ def timeline(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1, xL=0, xH=3, ytic
         _plt.axvline(x=(itv[ep+1]*N/1000.), color="red", ls="--")
     #######################
     ax = _plt.subplot2grid((4, 3), (1, 0), colspan=3)
+    print len(sts)
     _plt.scatter(sts/1000., d[sts, ch1], s=2, color="black")
     mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
     mF.setTicksAndLims(xlabel="time (s)", ylabel=("mk elctrd %d" % (ch1-1)), xticks=None, yticks=[0, 3, 6], xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[wvfmMin[0], wvfmMax[0]], tickFS=15, labelFS=18)
@@ -256,6 +302,114 @@ def timeline(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1, xL=0, xH=3, ytic
     _plt.close()
 
 
+def timeline_v2(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1, xL=0, xH=3, yticks=[0, 1, 2, 3], thin=1, allFR=None):   #  25Hz
+    d = _N.loadtxt(datFN("%s.dat" % datfn))   #  marks
+    itv = _N.loadtxt(datFN("%s.dat" % itvfn))
+    N = d.shape[0]          #  ALL spikes
+    epochs = itv.shape[0]-1
+    ch1 += 2   #  because this is data col
+    ch2 += 2
+
+    wvfmMin = _N.min(d[:, 2:], axis=0)
+    wvfmMax = _N.max(d[:, 2:], axis=0)
+
+    Aint    = _N.array(itv*N, dtype=_N.int)
+    Asts = _N.where(d[Aint[0]:Aint[1], 1] == 1)[0]
+    N1      = len(Asts)   # num spikes in 1st epoch
+
+    _x = _N.empty((N1, 5))
+    _x[:, 0] = d[Asts, 0]
+    _x[:, 1:] = d[Asts, 2:]
+    T1  = Aint[1] - Aint[0]
+    hz = _x.shape[0] / float(T1*0.001)
+
+
+    if allFR is not None:
+        unonhash, hashsp, hashthresh = sepHash(_x, BINS=20, blksz=5, xlo=xL, xhi=xH)
+
+        rh  = len(hashsp) / float(N1)
+        rnh = len(unonhash) / float(N1)
+
+        #(m x rh + rnh)*hz = allFR
+        #allFR  - rnh x hz = m x rh x hz
+        #  m = (rnh x hz - allFR) / (rh x hz)
+
+        m = (allFR - rnh * hz) / (rh * hz)
+
+        #  ((m*len(hashsp) + len(unonhash)) / (T1*0.001))  == allFR  (target FR)
+        #  how much of hashsp should we remove?
+        #  Find lowest (1 - m)
+
+        _x[:, 1:].sort(axis=0)
+
+        chmins  = channelMins(_x, 100, 4, int((1-m)*len(hashsp)))
+
+        #spk_n, chs = _N.where(_x[:, 1:] > chmins)
+        #unique, counts = _N.unique(spk_n, return_counts=True)
+
+        #print len(_N.where(counts > 0)[0])  # at least 1 channel above
+        #print (len(_N.where(counts > 0)[0]) / float(T1*0.001))
+
+        _sts = _N.where(d[:, 1] == 1)[0]   #  ALL spikes in ALL epochs
+        spk_n, chs = _N.where(d[_sts, 2:] > chmins)
+
+        unique_spk_IDs, counts = _N.unique(spk_n, return_counts=True)
+        sts  = _sts[unique_spk_IDs[_N.where(counts > 0)[0]]]
+
+    if allFR is None:
+        _sts = _N.where(d[:, 1] == 1)[0]
+        if thin == 1:
+            sts = _sts
+        else:
+            sts = _sts[::thin]
+
+    fig = _plt.figure(figsize=(10, 10))
+    #######################
+    ax =_plt.subplot2grid((5, 3), (0, 0), colspan=3)
+    _plt.scatter(sts/1000., d[sts, 0], s=2, color="black")
+    mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
+    mF.setTicksAndLims(xlabel=None, ylabel="position", xticks=None, yticks=yticks, xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[xL-0.3, xH+0.3], tickFS=15, labelFS=18)
+    for ep in xrange(epochs):
+        _plt.axvline(x=(itv[ep+1]*N/1000.), color="red", ls="--")
+    #######################
+    ax = _plt.subplot2grid((5, 3), (1, 0), colspan=3)
+    print len(sts)
+    _plt.scatter(sts/1000., d[sts, 2], s=2, color="black")
+    mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
+    mF.setTicksAndLims(xlabel=None, ylabel="mk elctrd 1", xticks=None, yticks=[0, 3, 6], xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[wvfmMin[0], wvfmMax[0]], tickFS=15, labelFS=18)
+    for ep in xrange(epochs):
+        _plt.axvline(x=(itv[ep+1]*N/1000.), color="red", ls="--")
+    #######################
+    ax = _plt.subplot2grid((5, 3), (2, 0), colspan=3)
+    _plt.scatter(sts/1000., d[sts, 3], s=2, color="black")
+    mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
+    mF.setTicksAndLims(xlabel=None, ylabel="mk elctrd 2", xticks=None, yticks=[0, 3, 6], xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[wvfmMin[1], wvfmMax[1]], tickFS=15, labelFS=18)
+    for ep in xrange(epochs):
+        _plt.axvline(x=(itv[ep+1]*N/1000.), color="red", ls="--")
+    #######################
+    ax = _plt.subplot2grid((5, 3), (3, 0), colspan=3)
+    print len(sts)
+    _plt.scatter(sts/1000., d[sts, 4], s=2, color="black")
+    mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
+    mF.setTicksAndLims(xlabel=None, ylabel="mk elctrd 3", xticks=None, yticks=[0, 3, 6], xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[wvfmMin[0], wvfmMax[0]], tickFS=15, labelFS=18)
+    for ep in xrange(epochs):
+        _plt.axvline(x=(itv[ep+1]*N/1000.), color="red", ls="--")
+    #######################
+    ax = _plt.subplot2grid((5, 3), (4, 0), colspan=3)
+    _plt.scatter(sts/1000., d[sts, 5], s=2, color="black")
+    mF.arbitraryAxes(ax, axesVis=[5, True, False, False], xtpos="bottom", ytpos="left")
+    mF.setTicksAndLims(xlabel="time (s)", ylabel="mk elctrd 4", xticks=None, yticks=[0, 3, 6], xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[wvfmMin[1], wvfmMax[1]], tickFS=15, labelFS=18)
+    for ep in xrange(epochs):
+        _plt.axvline(x=(itv[ep+1]*N/1000.), color="red", ls="--")
+
+
+
+
+    fig.subplots_adjust(left=0.15, bottom=0.15, wspace=0.38, hspace=0.38)
+    epochs = len(itv)-1
+    choutfn = "%(of)s_%(1)d,%(2)d.pdf" % {"of" : outfn, "1" : (ch1-1), "2" : (ch2-1)}
+    _plt.savefig(resFN(choutfn, dir=bfn), transparent=True)
+    _plt.close()
 
 
 def pos_timeline(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1, xL=0, xH=3, yticks=[0, 1, 2, 3], yticksD=[0, 1, 2, 3], thin=1, t0=None, t1=None, skp=1, maze=_mkd.mz_CRCL):
@@ -300,3 +454,4 @@ def pos_timeline(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1, xL=0, xH=3, 
     fig.subplots_adjust(bottom=0.28, left=0.1, top=0.96, right=0.99)
     _plt.savefig(resFN("%s.pdf" % choutfn, dir=bfn), transparent=True)
     _plt.close()
+

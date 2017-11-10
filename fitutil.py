@@ -34,6 +34,25 @@ def contiguous_pack2(arr, startAt=0):
     arr += (startAt - unqItms[0])
     return nUnqItms
 
+def channelMins(posmarks, steps, K, ignoreN):
+    mins = _N.min(posmarks[:, 1:], axis=0)
+    maxs = _N.max(posmarks[:, 1:], axis=0)
+
+    print "ignoreN   %d" % ignoreN
+    dm   = (maxs - mins) / steps
+
+    im = 0
+    bDone= False
+    while (not bDone) and (im < steps):
+        im += 1
+        spk_n, chs = _N.where(posmarks[:, 1:] < (mins + im*dm))
+        unique, counts = _N.unique(spk_n, return_counts=True)
+        if len(_N.where(counts == K)[0]) >= ignoreN:
+            bDone = True
+            print "done  %(im)d   %(n)d" % {"im" : im, "n" : len(_N.where(counts == K)[0])}
+
+    return mins + im*dm
+
 def resortLabelsByClusterSize(labarr):
     #  relabel cluster labels so that larger clusters have low labels
     ulabs = _N.unique(labarr)
@@ -222,3 +241,13 @@ def emMKPOS_sep1A(nhmks, hmks, TR=5, wfNClstrs=[[1, 7], [1, 10]], spNClstrs=[[1,
             bestLabs.append(_N.array(bestLabMP))
     return bestLabs[0], bestLabs[1], startClstrs
 
+
+def ignoreSmallMarks(marks, allFR):
+    #  return maximum values on each channel.  If a given spike has mark
+    #  that's smaller in every channel, ignore it.
+
+    marks.sort(axis=0)
+    print marks[:, 0]
+    print marks[:, 1]
+    print marks[:, 2]
+    print marks[:, 3]

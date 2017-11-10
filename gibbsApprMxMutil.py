@@ -110,10 +110,8 @@ def initClusters(oo, M_max, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=
         print flatlabels
 
         MS     = int(clstrs[1]) 
-        #MS = MS + 2 if (MS < 3) else int(_N.ceil(MS*1.1)+1)
-        #MS = MS + 3
-        #MS = MS + 9
         MS = MS + 5
+        #MS = MS + 15
         M_use      = clstrs[0] + MS
         print "------------"
         print "hash clusters %d" % clstrs[0]
@@ -379,8 +377,13 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
             #    (f[m] < oo.xLo-sq25[m]) or (f[m] > oo.xHi+sq25[m]) or \
             #    ((_f_q2[m] > 4) and q2[m] < 2) or (q2[m] < 0.001):
 
-            if (occ[m] < 4*K) and (bBad or (f[m] < oo.xLo-sq25[m]) or (f[m] > oo.xHi+sq25[m]) or \
-               ((_f_q2[m] > 4) and (q2[m] < 2)) or (ITERS - frms[m] < 3000)):
+            #if ((occ[m] < 4*K) and (bBad or (f[m] < oo.xLo-sq25[m]) or (f[m] > oo.xHi+sq25[m]) or \
+            #   ((_f_q2[m] > 4) and (q2[m] < 2)) or (ITERS - frms[m] < 3000))) or \
+            #    ((q2[m] < 1e-4) or (freeClstr[m] and occ[m] < K)):
+            if ((occ[m] < 4*K) and (bBad or (oo.sp_prmPstMd[oo.ky_p_f+3*m] < oo.xLo-sq25[m]) or (oo.sp_prmPstMd[oo.ky_p_f+3*m] > oo.xHi+sq25[m]) or \
+               ((_f_q2[m] > 4) and (oo.sp_prmPstMd[oo.ky_p_q2+3*m] < 2)) or (ITERS - frms[m] < 3000))) or \
+                (bBad or ((oo.sp_prmPstMd[oo.ky_p_q2+3*m] < 1e-4) or (freeClstr[m] and occ[m] < K))):
+
                 # last 2 conditions:  uncertainty of center high relative to width of cluster
                 #  cluster TOO narrow
                              
@@ -573,6 +576,9 @@ def contiguous_inuse(M_use, M_max, K, freeClstr, l0, f, q2, u, Sg, _l0_a, _l0_B,
 
                     #oo.sp_prmPstMd = _N.zeros(3*M_use)   # mode params
                     sp_prmPstMd[3*freeIDs[imf]:3*(freeIDs[imf]+1)]        = sp_prmPstMd[3*inuseIDs[imu]:3*(inuseIDs[imu]+1)]
+                    sp_prmPstMd[0 + 3*inuseIDs[imu]]        = 1e-15   #  neutralize this cluster
+                    sp_prmPstMd[2 + 3*inuseIDs[imu]]        = 10000   #  neutralize this cluster
+
                     mk_prmPstMd[0][freeIDs[imf]]        = mk_prmPstMd[0][inuseIDs[imu]]
                     mk_prmPstMd[1][freeIDs[imf]]        = mk_prmPstMd[1][inuseIDs[imu]]
 

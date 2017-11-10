@@ -34,9 +34,7 @@ def stationary_from_Z_bckwd(smps, blksz=200):
     wins         = SMPS/blksz
     wins_m1      = wins - 1
 
-    pvs       = _N.empty((M, 2, wins_m1))
-    ds        = _N.empty((M, 2, wins_m1))
-    frms      = _N.empty(M, dtype=_N.int)
+    frms      = _N.empty(M, dtype=_N.int)  # current start of stationarity
 
     rshpd     = smps.reshape((3, wins, blksz, M))
     mrshpd    = _N.mean(rshpd, axis=2)   #  3 x wins_m1+1 x M
