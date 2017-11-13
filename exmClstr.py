@@ -407,7 +407,7 @@ def timeline_v2(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1, xL=0, xH=3, y
 
     fig.subplots_adjust(left=0.15, bottom=0.15, wspace=0.38, hspace=0.38)
     epochs = len(itv)-1
-    choutfn = "%(of)s_%(1)d,%(2)d.pdf" % {"of" : outfn, "1" : (ch1-1), "2" : (ch2-1)}
+    choutfn = "%(of)s_%(1)d,%(2)d.png" % {"of" : outfn, "1" : (ch1-1), "2" : (ch2-1)}
     _plt.savefig(resFN(choutfn, dir=bfn), transparent=True)
     _plt.close()
 
