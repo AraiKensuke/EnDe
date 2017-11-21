@@ -175,27 +175,3 @@ def evalAtFxdMks_new(double[:, ::1] fxdMks, double[::1] l0, double[:, ::1] us, d
                 #p_zs[ix] += l0[m] * i2pidcovs[m] * _N.exp(-0.5*mxval[m, ix])
 
     return zs
-
-# def rolled_out_q2(int M):
-#     #  v_sts    int of size len(Asts)   all spikes in epoch
-#     cdef int SPKS, strt_ind_m
-#     for 0 <= m < M:
-#         strt_ind_m = cls_str_ind[m]
-#         SPKS = cls_str_ind[m+1]- strt_ind_m
-#         fm   = f[m]
-
-#         for 0 <= s < SPKS:
-#             sxI += (xt0t1[v_sts[s+strt_ind_m]-t0] - fm)*(xt0t1[v_sts[s+strt_ind_m]-t0] - fm)
-#         SL_B[m] = sxI*0.5
-#     return SL_B
-        
-        
-    # for m in xrange(M):
-    #     if clstsz[m] > 0:
-    #         sts = v_sts[cls_str_ind[m]:cls_str_ind[m+1]]
-    #         xI = (xt0t1[sts-t0]-f[m])*(xt0t1[sts-t0]-f[m])*0.5
-    #         SL_B = _N.sum(xI)  #  spiking part of likelihood
-    #         #  -S/2 (likelihood)  -(a+1)
-    #         sLLkPr[m] = -(0.5*clstsz[m] + _q2_a[m] + 1)*lq2x - iq2x*(_q2_B[m] + SL_B)   #  just (isig2)^{-S/2} x (isig2)^{-(_q2_a + 1)}   
-    #     else:
-    #         sLLkPr[m] = -(_q2_a[m] + 1)*lq2x - iq2x*_q2_B[m]

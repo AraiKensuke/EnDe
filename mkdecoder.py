@@ -191,6 +191,23 @@ class mkdecoder:
                 A = _N.trapz(oo.xTrs[:, i])*((oo.xHi-oo.xLo)/float(oo.Nx))
                 oo.xTrs[:, i] /= A
 
+    def mark_ranges(self, g_M):
+        oo = self
+        mk_ranges = _N.empty((oo.nTets, oo.mdim, g_M))
+
+        #mgrid     = _N.empty([oo.nTets] + [g_M]*oo.mdim)
+
+        for nt in xrange(oo.nTets):
+            for im in xrange(oo.mdim):
+                sts = _N.where(oo.mkpos[nt][:, 1] == 1)[0]
+
+                mL  = _N.min(oo.mkpos[nt][sts, 2+im])
+                mH  = _N.max(oo.mkpos[nt][sts, 2+im])
+                A   = mH - mL
+                mk_ranges[nt, im] = _N.linspace(mL - 0.01*A, mH + 0.01*A, g_M, endpoint=True)
+
+        return mk_ranges
+        
     def init_pX_Nm(self, t):
         oo = self
         oo.pX_Nm[t] = 1. / oo.Nx
@@ -470,70 +487,134 @@ class mkdecoder:
         return _N.where(self.mkpos[nt][t0:t1, 1] == 1)[0] + t0
 
 
+    def GoF(self, prms, uFE, t0, t1):
+        """
+        uFE    which epoch fit to use for encoding model
+        prms posterior params
+        use params to decode marks from t0 to t1
+        """
+        print "epoch used for encoding: %d" % uFE
+        oo = self
+        ##  each 
 
-def scores(pX_Nm):
-    ps    = _N.sum(pX_Nm, axis=1)   #  sums to 0 for location not decoded
-    uset  = _N.where(ps > 0)[0]   
-    pX_Nm[uset] /= _N.sum(pX_Nm[uset], axis=1).reshape((len(uset), 1)) #nrmlz
-    decded= pX_Nm[uset]
+        disc_pos = _N.array((oo.pos - oo.xLo) * (oo.Nx/(oo.xHi-oo.xLo)), dtype=_N.int)
+        oo.svMkIntnsty = []
+        l0s = []
+        us  = []
+        covs= []
+        M   = []
+        iSgs= []
+        i2pidcovs = []
+        i2pidcovsr = []
 
-    sdecded = _N.sort(decded, axis=1)  #  low to high prob
-    cdecded = _N.cumsum(sdecded, axis=1)  # cumulative
-    x, y    = _N.where(cdecded > pctm1)
+        for nt in xrange(oo.nTets):
+            l0s.append(prms[nt][uFE][0])
+            us.append(prms[nt][uFE][1])
+            covs.append(prms[nt][uFE][2])
+            M.append(covs[nt].shape[0])
 
-    t0   = uset[0]
-    #for t in xrange(1, len(uset)):
+            iSgs.append(_N.linalg.inv(covs[nt]))
+            i2pidcovs.append((1/_N.sqrt(2*_N.pi))**(oo.mdim+1)*(1./_N.sqrt(_N.linalg.det(covs[nt]))))
+            #i2pidcovsr.append(i2pidcovs.reshape((M, 1)))
+            oo.svMkIntnsty.append([])
 
-    xp = _N.linspace(-6, 6, 61)
+        fxdMks = _N.empty((oo.Nx, oo.mdim+1))  #  for each pos, a fixed mark
+        #fxdMks = _N.empty(oo.mdim)  #  for each pos, a fixed mark
+        fxdMks[:, 0] = oo.xp
 
-    #for t in xrange(20000, 20010):
+        dens = []
 
-    in5 = _N.zeros(len(uset), dtype=_N.bool)
-    t0  = uset[0]
-    sz95= _N.zeros(len(uset))
+        ones = _N.ones(oo.Nx)
 
-    for t in xrange(len(uset)):
-        li5p = _N.where((cdecded[t, 1:] >= pctm1) & (cdecded[t, 0:-1] <= pctm1))[0]
-        if len(li5p) == 0:
-            i5p = 0
-        else:
-            i5p = li5p[0]
+        #tspk = 0
+        nt    = 0
+        rscld = []
+        for t in xrange(t0+1, t1): # start at 1 because initial condition
+            if (oo.mkpos[nt][t, 1] == 1):
+                fxdMks[:, 1:] = oo.mkpos[nt][t, 2:]
+                l0sr = _N.array(l0s[nt][:, 0])
+                mkint = _hb.evalAtFxdMks_new(fxdMks, l0sr, us[nt], iSgs[nt], i2pidcovs[nt], M[nt], oo.Nx, oo.mdim + 1)*oo.dt
 
+                #rscld.append([_N.sum(mkint[disc_pos[t0+1:t]]), oo.mkpos[nt][t, 2]])
+                rscld.append([_N.sum(mkint[disc_pos[t0+1:t1]]), _N.sum(mkint[disc_pos[t0+1:t]]), oo.mkpos[nt][t, 2]])
 
-        thrP=  sdecded[t, i5p+1]   # threshold prob/bin for 95%
+            ttt1 =0
+            ttt2 =0
+            ttt3 =0
 
-        binsGT5 = _N.where(decded[t] > thrP)[0]
-        if len(binsGT5) == 0:
-            thrP=  sdecded[t, i5p]   # threshold prob/bin for 95%
-            binsGT5 = _N.where(decded[t] > thrP)[0]
-            if len(binsGT5) == 0:
-                print "binsGT5 0 at %(t)d" % {"t" : t}
+        return rscld
 
-        ib = _N.where((pos[t+t0] >= xp[0:-1]) & (pos[t+t0] <= xp[1:]))[0][0]
+    def max_rescaled_T_at_mark(self, mrngs, g_M, prms, uFE, t0, t1):
+        """
+        uFE    which epoch fit to use for encoding model
+        prms posterior params
+        use params to decode marks from t0 to t1
+        """
+        print "epoch used for encoding: %d" % uFE
+        oo = self
+        ##  each 
 
-        in5[t] = len(_N.where(binsGT5 == ib)[0])
-        sz95[t] = len(binsGT5) / 61.
+        disc_pos = _N.array((oo.pos - oo.xLo) * (oo.Nx/(oo.xHi-oo.xLo)), dtype=_N.int)
+        oo.svMkIntnsty = []
+        l0s = []
+        us  = []
+        covs= []
+        M   = []
+        iSgs= []
+        i2pidcovs = []
+        i2pidcovsr = []
 
+        for nt in xrange(oo.nTets):
+            l0s.append(prms[nt][uFE][0])
+            us.append(prms[nt][uFE][1])
+            covs.append(prms[nt][uFE][2])
+            M.append(covs[nt].shape[0])
 
-    #epts = _N.array(pX_Nm.shape[0]*itvs, dtype=_N.int)
-    epts  = lm[4]
+            iSgs.append(_N.linalg.inv(covs[nt]))
+            i2pidcovs.append((1/_N.sqrt(2*_N.pi))**(oo.mdim+1)*(1./_N.sqrt(_N.linalg.det(covs[nt]))))
+            #i2pidcovsr.append(i2pidcovs.reshape((M, 1)))
+            oo.svMkIntnsty.append([])
 
-    ignr=200
-    scrs = _N.empty((epts.shape[0]-2, 3))
-    maxV = _N.max(pX_Nm, axis=1)
-    maxInds = _N.empty(len(uset), dtype=_N.int)
+        
+        dens = []
 
-    for epc in xrange(lagfit, epts.shape[0]-1):
-        et0 = epts[epc]
-        et1 = epts[epc+1]
-        scrs[epc-1, 0] = float(_N.sum(in5[et0+ignr-t0:et1-t0])) / (et1-et0-ignr)
+        ones = _N.ones(oo.Nx)
 
-        print (et0+ignr-t0)
-        print (et1-t0)
-        print sz95[et0+ignr-t0:et1-t0]
-        scrs[epc-1, 1] = _N.mean(sz95[et0+ignr-t0:et1-t0])
+        #tspk = 0
+        nt    = 0
 
-        maxInds = _N.empty(et1-et0-ignr, dtype=_N.int)
-        for t in xrange(et0+ignr, et1):
-            maxInds[t-et0-ignr] = _N.where(pX_Nm[t] == maxV[t])[0][0]
-        scrs[epc-1, 2] = _N.mean(_N.abs(xp[maxInds] - pos[et0+ignr:et1]) % PD)
+        l0sr = _N.array(l0s[nt][:, 0])
+
+        if oo.mdim == 1:
+            lmdT = _N.empty(g_M)
+        elif oo.mdim == 2:
+            lmdT = _N.empty([g_M, g_M])
+        elif oo.mdim == 4:
+            lmdT = _N.empty([g_M, g_M, g_M, g_M])
+
+        mk = _N.empty((oo.Nx, oo.mdim+1))
+        mk[:, 0] = oo.xp
+        for im1 in xrange(g_M):
+            print "%d" % im1
+            if oo.mdim == 1:
+                #mk = _N.array([mrngs[nt, 0, im1]])
+                mk[:, 1:] = _N.array([mrngs[nt, 0, im1]])
+
+                mkint = _hb.evalAtFxdMks_new(mk, l0sr, us[nt], iSgs[nt], i2pidcovs[nt], M[nt], oo.Nx, oo.mdim + 1)*oo.dt
+                lmdT[im1] = _N.sum(mkint[disc_pos[t0+1:t1]])
+            else:
+                for im2 in xrange(g_M):
+                    if oo.mdim == 2:
+                        mk[:, 1:] = _N.array([mrngs[nt, 0, im1], mrngs[nt, 1, im2]])
+                        mkint = _hb.evalAtFxdMks_new(mk, l0sr, us[nt], iSgs[nt], i2pidcovs[nt], M[nt], oo.Nx, oo.mdim + 1)*oo.dt
+                        lmdT[im1, im2] = _N.sum(mkint[disc_pos[t0+1:t1]])
+                    else:
+                        for im3 in xrange(g_M):
+                            for im4 in xrange(g_M):
+                                #print "%(1)d %(2)d %(3)d %(4)d" % {"1" : im1, "2" : im2, "3" : im3, "4" : im4}
+                                mk[:, 1:] = _N.array([mrngs[nt, 0, im1], mrngs[nt, 1, im2], mrngs[nt, 2, im3], mrngs[nt, 3, im4]])
+
+                                mkint = _hb.evalAtFxdMks_new(mk, l0sr, us[nt], iSgs[nt], i2pidcovs[nt], M[nt], oo.Nx, oo.mdim + 1)*oo.dt
+                                lmdT[im1, im2, im3, im4] = _N.sum(mkint[disc_pos[t0+1:t1]])
+
+        return lmdT
