@@ -547,7 +547,7 @@ class mkdecoder:
 
         return rscld
 
-    def max_rescaled_T_at_mark(self, mrngs, g_M, prms, uFE, t0, t1):
+    def max_rescaled_T_at_mark(self, mrngs, g_M, prms, uFE, t0, t1, smpld_marks=None, rad=1):
         """
         uFE    which epoch fit to use for encoding model
         prms posterior params
@@ -589,11 +589,15 @@ class mkdecoder:
         l0sr = _N.array(l0s[nt][:, 0])
 
         if oo.mdim == 1:
-            lmdT = _N.empty(g_M)
+            lmdT = _N.zeros(g_M)   #  where lambda is near 0, so is lmdT
+            lmdT01 = _N.zeros(g_M, dtype=_N.bool)   #  where lambda is near 0, so is lmdT
         elif oo.mdim == 2:
-            lmdT = _N.empty([g_M, g_M])
+            lmdT = _N.zeros([g_M, g_M])
+            lmdT01 = _N.zeros([g_M, g_M], dtype=_N.bool)   #  where lambda is near 0, so is lmdT
         elif oo.mdim == 4:
-            lmdT = _N.empty([g_M, g_M, g_M, g_M])
+            lmdT = _N.zeros([g_M, g_M, g_M, g_M])
+            lmdT01 = _N.zeros([g_M, g_M, g_M, g_M], dtype=_N.bool)   #  where lambda is near 0, so is lmdT
+
 
         mk = _N.empty((oo.Nx, oo.mdim+1))
         mk[:, 0] = oo.xp
@@ -605,67 +609,85 @@ class mkdecoder:
         i2pidcovsnt   = _N.array(i2pidcovs[nt])
         Msnt          = _N.array(M[nt])
 
-        if oo.mdim == 2:
-            for im1 in xrange(g_M):
-                print "%d" % im1
-                tt0 = _tm.time()
-                for im2 in xrange(g_M):
-                    mk[:, 1:] = _N.array([mrngs[nt, 0, im1], mrngs[nt, 1, im2]])
+        LLcrnr = mrngs[nt, :, 0]   # lower left hand corner
 
-                    mkint = _hb.evalAtFxdMks_new(mk, l0sr, usnt, iSgsnt, i2pidcovsnt, Msnt, oo.Nx, oo.mdim + 1)*oo.dt
-                    lmdT[im1, im2] = _N.sum(mkint[disc_pos_t0t1])
-                tt1 = _tm.time()
-                print (tt1-tt0)
+        dm = _N.diff(mrngs[0])[:, 0]
+        
+        if smpld_marks is not None:
+            tt0 = _tm.time()
+            sN = smpld_marks.shape[0]
+            for s in xrange(sN):
+                inds = _N.array((smpld_marks[s] - LLcrnr) / dm, dtype=_N.int)
 
-        elif oo.mdim == 4:
-            for im1 in xrange(g_M):
-                print "%d" % im1
-                tt0 = _tm.time()
-                for im2 in xrange(g_M):
-                    for im3 in xrange(g_M):
-                        for im4 in xrange(g_M):
-                            #print "%(1)d %(2)d %(3)d %(4)d" % {"1" : im1, "2" : im2, "3" : im3, "4" : im4}
-                            mk[:, 1:] = _N.array([mrngs[nt, 0, im1], mrngs[nt, 1, im2], mrngs[nt, 2, im3], mrngs[nt, 3, im4]])
+                if oo.mdim == 2:
+                    i0 = inds[0]
+                    i1 = inds[1]
 
-                            #tt1a = _tm.time()
-                            mkint = _hb.evalAtFxdMks_new(mk, l0sr, usnt, iSgsnt, i2pidcovsnt, Msnt, oo.Nx, oo.mdim + 1)*oo.dt
-                            #tt1b = _tm.time()
-                            lmdT[im1, im2, im3, im4] = _N.sum(mkint[disc_pos_t0t1])
-                            # tt1c = _tm.time()
-                            # ttA  += (tt1b-tt1a)
-                            # ttB  += (tt1c-tt1b)
-                tt1 = _tm.time()
-                print (tt1-tt0)
-                #print ttA
-                #print ttB
+                    if lmdT01[i0, i1] == False:
+                        lmdT01[i0, i1] = True
+                        i0_l = i0 - rad if i0 >= rad else 0
+                        i0_h = i0 + rad+1 if i0 + rad < g_M else g_M
+                        i1_l = i1 - rad if i1 >= rad else 0
+                        i1_h = i1 + rad+1 if i1 + rad < g_M else g_M
 
-        # for im1 in xrange(g_M):
-        #     print "%d" % im1
-        #     tt0 = _tm.time()
-        #     if oo.mdim == 1:
-        #         mk[:, 1:] = _N.array([mrngs[nt, 0, im1]])
+                        for ii0 in xrange(i0_l, i0_h):
+                            for ii1 in xrange(i1_l, i1_h):
+                                if lmdT[ii0, ii1] == 0:
+                                    mk[:, 1:] = _N.array([mrngs[nt, 0, ii0], mrngs[nt, 1, ii1]])
+                                    mkint = _hb.evalAtFxdMks_new(mk, l0sr, usnt, iSgsnt, i2pidcovsnt, Msnt, oo.Nx, oo.mdim + 1)*oo.dt
+                                    lmdT[ii0, ii1] = _N.sum(mkint[disc_pos_t0t1])
+                elif oo.mdim == 4:
+                    i0 = inds[0]
+                    i1 = inds[1]
+                    i2 = inds[2]
+                    i3 = inds[3]
 
-        #         mkint = _hb.evalAtFxdMks_new(mk, l0sr, us[nt], iSgs[nt], i2pidcovs[nt], M[nt], oo.Nx, oo.mdim + 1)*oo.dt
-        #         #lmdT[im1] = _N.sum(mkint[disc_pos[t0+1:t1]])
-        #         lmdT[im1] = _N.sum(mkint[disc_pos_t0t1])
-        #     else:
-        #         for im2 in xrange(g_M):
-        #             if oo.mdim == 2:
-        #                 mk[:, 1:] = _N.array([mrngs[nt, 0, im1], mrngs[nt, 1, im2]])
-        #                 mkint = _hb.evalAtFxdMks_new(mk, l0sr, us[nt], iSgs[nt], i2pidcovs[nt], M[nt], oo.Nx, oo.mdim + 1)*oo.dt
-        #                 #lmdT[im1, im2] = _N.sum(mkint[disc_pos[t0+1:t1]])
-        #                 lmdT[im1, im2] = _N.sum(mkint[disc_pos_t0t1])
-        #             else:
-        #                 for im3 in xrange(g_M):
-        #                     for im4 in xrange(g_M):
-        #                         #print "%(1)d %(2)d %(3)d %(4)d" % {"1" : im1, "2" : im2, "3" : im3, "4" : im4}
-        #                         mk[:, 1:] = _N.array([mrngs[nt, 0, im1], mrngs[nt, 1, im2], mrngs[nt, 2, im3], mrngs[nt, 3, im4]])
+                    if lmdT01[i0, i1, i2, i3] == False:
+                        lmdT01[i0, i1, i2, i3] = True
+                        i0_l = i0 - rad if i0 >= rad else 0
+                        i0_h = i0 + rad+1 if i0 + rad < g_M else g_M
+                        i1_l = i1 - rad if i1 >= rad else 0
+                        i1_h = i1 + rad+1 if i1 + rad < g_M else g_M
+                        i2_l = i2 - rad if i2 >= rad else 0
+                        i2_h = i2 + rad+1 if i2 + rad < g_M else g_M
+                        i3_l = i3 - rad if i3  >= rad else 0
+                        i3_h = i3 + rad+1 if i3 + rad < g_M else g_M
 
-        #                         mkint = _hb.evalAtFxdMks_new(mk, l0sr, us[nt], iSgs[nt], i2pidcovs[nt], M[nt], oo.Nx, oo.mdim + 1)*oo.dt
-        #                         #lmdT[im1, im2, im3, im4] = _N.sum(mkint[disc_pos[t0+1:t1]])
-        #                         lmdT[im1, im2, im3, im4] = _N.sum(mkint[disc_pos_t0t1])
-        #     tt1 = _tm.time()
-        #     print (tt1-tt0)
+                        for ii0 in xrange(i0_l, i0_h):
+                            for ii1 in xrange(i1_l, i1_h):
+                                for ii2 in xrange(i2_l, i2_h):
+                                    for ii3 in xrange(i3_l, i3_h):
+                                        if lmdT[ii0, ii1, ii2, ii3] == 0:
+                                            mk[:, 1:] = _N.array([mrngs[nt, 0, ii0], mrngs[nt, 1, ii1], mrngs[nt, 2, ii2], mrngs[nt, 3, ii3]])
+                                            mkint = _hb.evalAtFxdMks_new(mk, l0sr, usnt, iSgsnt, i2pidcovsnt, Msnt, oo.Nx, oo.mdim + 1)*oo.dt
+                                            lmdT[ii0, ii1, ii2, ii3] = _N.sum(mkint[disc_pos_t0t1])
+            tt1 = _tm.time()
+            print "done   %.4f" % (tt1-tt0)
+        else:
+            if oo.mdim == 2:
+                for im1 in xrange(g_M):
+                    print "%d" % im1
+                    tt0 = _tm.time()
+                    for im2 in xrange(g_M):
+                        mk[:, 1:] = _N.array([mrngs[nt, 0, im1], mrngs[nt, 1, im2]])
 
+                        mkint = _hb.evalAtFxdMks_new(mk, l0sr, usnt, iSgsnt, i2pidcovsnt, Msnt, oo.Nx, oo.mdim + 1)*oo.dt
+                        lmdT[im1, im2] = _N.sum(mkint[disc_pos_t0t1])
+                    tt1 = _tm.time()
+                    print (tt1-tt0)
+
+            elif oo.mdim == 4:
+                for im1 in xrange(g_M):
+                    print "%d" % im1
+                    tt0 = _tm.time()
+                    for im2 in xrange(g_M):
+                        for im3 in xrange(g_M):
+                            for im4 in xrange(g_M):
+                                mk[:, 1:] = _N.array([mrngs[nt, 0, im1], mrngs[nt, 1, im2], mrngs[nt, 2, im3], mrngs[nt, 3, im4]])
+
+                                mkint = _hb.evalAtFxdMks_new(mk, l0sr, usnt, iSgsnt, i2pidcovsnt, Msnt, oo.Nx, oo.mdim + 1)*oo.dt
+                                lmdT[im1, im2, im3, im4] = _N.sum(mkint[disc_pos_t0t1])
+                    tt1 = _tm.time()
+                    print (tt1-tt0)
 
         return lmdT
