@@ -8,7 +8,7 @@ import hc_bcast as _hb
 mz_CRCL = 0
 mz_W    = 1
 
-class mkdecoder:
+class gof:
     nTets   = 1
     pX_Nm = None   #  p(X | Nm)
     Lklhd = None
@@ -190,6 +190,23 @@ class mkdecoder:
             for i in xrange(oo.Nx):
                 A = _N.trapz(oo.xTrs[:, i])*((oo.xHi-oo.xLo)/float(oo.Nx))
                 oo.xTrs[:, i] /= A
+
+    def mark_ranges(self, g_M):
+        oo = self
+        mk_ranges = _N.empty((oo.nTets, oo.mdim, g_M))
+
+        #mgrid     = _N.empty([oo.nTets] + [g_M]*oo.mdim)
+
+        for nt in xrange(oo.nTets):
+            for im in xrange(oo.mdim):
+                sts = _N.where(oo.mkpos[nt][:, 1] == 1)[0]
+
+                mL  = _N.min(oo.mkpos[nt][sts, 2+im])
+                mH  = _N.max(oo.mkpos[nt][sts, 2+im])
+                A   = mH - mL
+                mk_ranges[nt, im] = _N.linspace(mL - 0.01*A, mH + 0.01*A, g_M, endpoint=True)
+
+        return mk_ranges
         
     def init_pX_Nm(self, t):
         oo = self
@@ -470,87 +487,7 @@ class mkdecoder:
         return _N.where(self.mkpos[nt][t0:t1, 1] == 1)[0] + t0
 
 
-
-
-    #####################   GoF tools
-    def mark_ranges(self, g_M):
-        oo = self
-        mk_ranges = _N.empty((oo.nTets, oo.mdim, g_M))
-
-        #mgrid     = _N.empty([oo.nTets] + [g_M]*oo.mdim)
-
-        for nt in xrange(oo.nTets):
-            for im in xrange(oo.mdim):
-                sts = _N.where(oo.mkpos[nt][:, 1] == 1)[0]
-
-                mL  = _N.min(oo.mkpos[nt][sts, 2+im])
-                mH  = _N.max(oo.mkpos[nt][sts, 2+im])
-                A   = mH - mL
-                mk_ranges[nt, im] = _N.linspace(mL - 0.03*A, mH + 0.03*A, g_M, endpoint=True)
-
-        return mk_ranges
-
-    def rescale_spikes(self, prms, uFE, t0, t1, kde=False):
-        """
-        uFE    which epoch fit to use for encoding model
-        prms posterior params
-        use params to decode marks from t0 to t1
-        """
-        print "epoch used for encoding: %d" % uFE
-        oo = self
-        ##  each 
-
-        disc_pos = _N.array((oo.pos - oo.xLo) * (oo.Nx/(oo.xHi-oo.xLo)), dtype=_N.int)
-        oo.svMkIntnsty = []
-        l0s = []
-        us  = []
-        covs= []
-        M   = []
-        iSgs= []
-        i2pidcovs  = []
-        i2pidcovsr = []
-        sptl= []
-
-        if not kde:
-            for nt in xrange(oo.nTets):
-                l0s.append(prms[nt][uFE][0])
-                us.append(prms[nt][uFE][1])
-                covs.append(prms[nt][uFE][2])
-                M.append(covs[nt].shape[0])
-
-                iSgs.append(_N.linalg.inv(covs[nt]))
-                i2pidcovs.append((1/_N.sqrt(2*_N.pi))**(oo.mdim+1)*(1./_N.sqrt(_N.linalg.det(covs[nt]))))
-                #i2pidcovsr.append(i2pidcovs.reshape((M, 1)))
-                oo.svMkIntnsty.append([])
-        else:
-            ibx2   = 1. / (oo.bx * oo.bx)
-            for nt in xrange(oo.nTets):
-                sptl.append(-0.5*ibx2*(oo.xpr - oo.tr_pos[nt])**2)  #  this piece doesn't need to be evalu
-
-
-        fxdMks = _N.empty((oo.Nx, oo.mdim+1))  #  for each pos, a fixed mark
-        fxdMks[:, 0] = oo.xp
-
-        nt    = 0
-        rscld = []
-
-        for t in xrange(t0+1, t1): # start at 1 because initial condition
-            if (oo.mkpos[nt][t, 1] == 1):
-                fxdMks[:, 1:] = oo.mkpos[nt][t, 2:]
-                if kde:
-                    mkint = _ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx, oo.dxp, oo.occ)
-                else:
-                    l0sr = _N.array(l0s[nt][:, 0])
-                    mkint = _hb.evalAtFxdMks_new(fxdMks, l0sr, us[nt], iSgs[nt], i2pidcovs[nt], M[nt], oo.Nx, oo.mdim + 1)*oo.dt
-
-
-                lst = [_N.sum(mkint[disc_pos[t0+1:t1]]), _N.sum(mkint[disc_pos[t0+1:t]])]
-                lst.extend(oo.mkpos[nt][t, 2:].tolist())
-                rscld.append(lst)
-
-        return rscld
-
-    def max_rescaled_T_at_mark(self, mrngs, g_M, prms, uFE, t0, t1, smpld_marks=None, rad=1, kde=False):
+    def GoF(self, prms, uFE, t0, t1):
         """
         uFE    which epoch fit to use for encoding model
         prms posterior params
@@ -569,24 +506,84 @@ class mkdecoder:
         iSgs= []
         i2pidcovs = []
         i2pidcovsr = []
-        sptl= []
 
-        if not kde:
-            for nt in xrange(oo.nTets):
-                l0s.append(prms[nt][uFE][0])
-                us.append(prms[nt][uFE][1])
-                covs.append(prms[nt][uFE][2])
-                M.append(covs[nt].shape[0])
+        for nt in xrange(oo.nTets):
+            l0s.append(prms[nt][uFE][0])
+            us.append(prms[nt][uFE][1])
+            covs.append(prms[nt][uFE][2])
+            M.append(covs[nt].shape[0])
 
-                iSgs.append(_N.linalg.inv(covs[nt]))
-                i2pidcovs.append((1/_N.sqrt(2*_N.pi))**(oo.mdim+1)*(1./_N.sqrt(_N.linalg.det(covs[nt]))))
-                #i2pidcovsr.append(i2pidcovs.reshape((M, 1)))
-                oo.svMkIntnsty.append([])
-        else:
-            ibx2   = 1. / (oo.bx * oo.bx)
-            for nt in xrange(oo.nTets):
-                sptl.append(-0.5*ibx2*(oo.xpr - oo.tr_pos[nt])**2)  #  this piece doesn't need to be evalu
+            iSgs.append(_N.linalg.inv(covs[nt]))
+            i2pidcovs.append((1/_N.sqrt(2*_N.pi))**(oo.mdim+1)*(1./_N.sqrt(_N.linalg.det(covs[nt]))))
+            #i2pidcovsr.append(i2pidcovs.reshape((M, 1)))
+            oo.svMkIntnsty.append([])
 
+        fxdMks = _N.empty((oo.Nx, oo.mdim+1))  #  for each pos, a fixed mark
+        #fxdMks = _N.empty(oo.mdim)  #  for each pos, a fixed mark
+        fxdMks[:, 0] = oo.xp
+
+        dens = []
+
+        ones = _N.ones(oo.Nx)
+
+        #tspk = 0
+        nt    = 0
+        rscld = []
+        for t in xrange(t0+1, t1): # start at 1 because initial condition
+            if (oo.mkpos[nt][t, 1] == 1):
+                fxdMks[:, 1:] = oo.mkpos[nt][t, 2:]
+                l0sr = _N.array(l0s[nt][:, 0])
+                mkint = _hb.evalAtFxdMks_new(fxdMks, l0sr, us[nt], iSgs[nt], i2pidcovs[nt], M[nt], oo.Nx, oo.mdim + 1)*oo.dt
+
+                #rscld.append([_N.sum(mkint[disc_pos[t0+1:t]]), oo.mkpos[nt][t, 2]])
+                #rscld.append([_N.sum(mkint[disc_pos[t0+1:t1]]), _N.sum(mkint[disc_pos[t0+1:t]]), oo.mkpos[nt][t, 2:]])
+                lst = [_N.sum(mkint[disc_pos[t0+1:t1]]), _N.sum(mkint[disc_pos[t0+1:t]])]
+                lst.extend(oo.mkpos[nt][t, 2:].tolist())
+                rscld.append(lst)
+
+            ttt1 =0
+            ttt2 =0
+            ttt3 =0
+
+        return rscld
+
+    def max_rescaled_T_at_mark(self, mrngs, g_M, prms, uFE, t0, t1, smpld_marks=None, rad=1):
+        """
+        uFE    which epoch fit to use for encoding model
+        prms posterior params
+        use params to decode marks from t0 to t1
+        """
+        print "epoch used for encoding: %d" % uFE
+        oo = self
+        ##  each 
+
+        disc_pos = _N.array((oo.pos - oo.xLo) * (oo.Nx/(oo.xHi-oo.xLo)), dtype=_N.int)
+        oo.svMkIntnsty = []
+        l0s = []
+        us  = []
+        covs= []
+        M   = []
+        iSgs= []
+        i2pidcovs = []
+        i2pidcovsr = []
+
+        for nt in xrange(oo.nTets):
+            l0s.append(prms[nt][uFE][0])
+            us.append(prms[nt][uFE][1])
+            covs.append(prms[nt][uFE][2])
+            M.append(covs[nt].shape[0])
+
+            iSgs.append(_N.linalg.inv(covs[nt]))
+            i2pidcovs.append((1/_N.sqrt(2*_N.pi))**(oo.mdim+1)*(1./_N.sqrt(_N.linalg.det(covs[nt]))))
+            #i2pidcovsr.append(i2pidcovs.reshape((M, 1)))
+            oo.svMkIntnsty.append([])
+
+        
+        dens = []
+
+        ones = _N.ones(oo.Nx)
+
+        #tspk = 0
         nt    = 0
 
         l0sr = _N.array(l0s[nt][:, 0])
