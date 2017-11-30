@@ -1,6 +1,6 @@
 import numpy as _N
 
-def scores(pctm1, lagfit, epts, ignr, scrs, xp, pX_Nm, pos, PD):
+def scores(pctm1, lagfit, epts, ignr, scrs, xp, pX_Nm, pos, usemaze):
     """
     xp    grid on which posterior position is defined on
     """
@@ -54,4 +54,8 @@ def scores(pctm1, lagfit, epts, ignr, scrs, xp, pX_Nm, pos, PD):
         maxInds = _N.empty(et1-et0-ignr, dtype=_N.int)
         for t in xrange(et0+ignr, et1):
             maxInds[t-et0-ignr] = _N.where(pX_Nm[t] == maxV[t])[0][0]
-        scrs[epc-1, 2] = _N.mean(_N.abs(xp[maxInds] - pos[et0+ignr:et1]) % PD)
+
+        dist = _N.abs(xp[maxInds] - pos[et0+ignr:et1])
+        otherside_dist = _N.where(dist > 6)[0]    #  CORRECT FOR CRCL
+        dist[otherside_dist] = 12 - dist[otherside_dist]
+        scrs[epc-1, 2] = _N.mean(dist)

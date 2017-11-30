@@ -49,7 +49,7 @@ def initClusters(oo, M_max, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=
             # labH = _N.array([], dtype=_N.int)
             # clstrs = _N.array([0, 1])
         else:
-            unonhash, hashsp, hashthresh = sepHash(_x, BINS=20, blksz=5, xlo=oo.xLo, xhi=oo.xHi)
+            unonhash, hashsp, hashthresh = sepHash(_x, BINS=20, blksz=5, xlo=oo.xLo, xhi=oo.xHi, K=K)
             #  hashthresh is dim 2
 
             # print len(unonhash)
