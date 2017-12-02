@@ -29,10 +29,10 @@ def calc_volrat(double[:, ::1] O, int g_M, int g_Mf, int g_Tf, double fg_Mf, dou
 
     cdef int inboundary 
 
-    # for im1f in xrange(g_Mfm1):
-    #     for im2f in xrange(g_Mfm1):
-    #         for itf in xrange(g_Tfm1):
-    #             p_vlr_z[im1f*g_Mfm1*g_Tfm1 + im2f*g_Tfm1 + itf] = 0
+    for im1f in xrange(g_Mfm1):
+        for im2f in xrange(g_Mfm1):
+            for itf in xrange(g_Tfm1):
+                p_vlr_z[im1f*g_Mfm1*g_Tfm1 + im2f*g_Tfm1 + itf] = 0
                 
     for im1f in xrange(g_Mf):
         for im2f in xrange(g_Mf):
@@ -40,10 +40,10 @@ def calc_volrat(double[:, ::1] O, int g_M, int g_Mf, int g_Tf, double fg_Mf, dou
 
     for im1f in xrange(g_Mf-1):
         for im2f in xrange(g_Mf-1):
-            #inboundary = 1
+            inboundary = 1
             #for itf in xrange(g_Tf-1):
             itf = -1
-            while (itf < g_Tfm1):#and inboundary:
+            while (itf < g_Tfm1) and inboundary:
                 itf += 1
                 tL = t + itf * dtf
                 tH = t + (itf+1) * dtf 
