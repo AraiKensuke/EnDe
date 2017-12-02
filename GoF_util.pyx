@@ -8,14 +8,27 @@ def calc_volrat(double[:, ::1] O, int g_M, int g_Mf, int g_Tf, double fg_Mf, dou
     #  changes in rescaled-time direction is abrupt, while over marks may not be so abrupt.  Cut box in mark direction in 4 
 
     #  assumption O[m1+1, m2+1] = O[m1, m2] + dO_m1
-    dO_m1 = O[m1+1, m2] - O[m1, m2]
-    dO_m2 = O[m1, m2+1] - O[m1, m2]
+    cdef double dO_m1 = O[m1+1, m2] - O[m1, m2]
+    cdef double dO_m2 = O[m1, m2+1] - O[m1, m2]
+
+    cdef int im1f, im2f, itf
+
+    cdef double *p_O     = &O[0, 0]
+    cdef double *p_O_z   = &O_z[0, 0]
+    cdef double *p_vlr_z = &vlr_z[0, 0, 0]
+    cdef double idtf     = 1./ dtf
 
     #  make a finer grid for O_z
+
+    cdef int m1m2 = g_M*m1 + m2
+    cdef double tL, tH
+    cdef double d1h, d2h, d3h, d4h, d1l, d2l, d3l, d4l
+
+    cdef double ifg_Mfm1 = 1./(fg_Mf-1)
+
     for im1f in xrange(g_Mf):
         for im2f in xrange(g_Mf):
-            O_z[im1f, im2f] = O[m1, m2] + (im1f/(fg_Mf-1))*dO_m1 + (im2f/(fg_Mf-1))*dO_m2
-    #O_z[g_Mf-1, g_Mf-1] = O[m1+1, m2+1]
+            p_O_z[im1f*g_Mf + im2f] = p_O[m1m2] + (im1f/(fg_Mf-1))*dO_m1 + (im2f/(fg_Mf-1))*dO_m2
 
     for im1f in xrange(g_Mf-1):
         for im2f in xrange(g_Mf-1):
