@@ -27,13 +27,24 @@ def calc_volrat(double[:, ::1] O, int g_M, int g_Mf, int g_Tf, double fg_Mf, dou
     cdef int    g_Mfm1 = g_Mf-1
     cdef int    g_Tfm1 = g_Tf-1
 
+    cdef int inboundary 
+
+    # for im1f in xrange(g_Mfm1):
+    #     for im2f in xrange(g_Mfm1):
+    #         for itf in xrange(g_Tfm1):
+    #             p_vlr_z[im1f*g_Mfm1*g_Tfm1 + im2f*g_Tfm1 + itf] = 0
+                
     for im1f in xrange(g_Mf):
         for im2f in xrange(g_Mf):
             p_O_z[im1f*g_Mf + im2f] = p_O[m1m2] + im1f*ifg_Mfm1*dO_m1 + im2f*ifg_Mfm1*dO_m2
 
     for im1f in xrange(g_Mf-1):
         for im2f in xrange(g_Mf-1):
-            for itf in xrange(g_Tf-1):
+            #inboundary = 1
+            #for itf in xrange(g_Tf-1):
+            itf = -1
+            while (itf < g_Tfm1):#and inboundary:
+                itf += 1
                 tL = t + itf * dtf
                 tH = t + (itf+1) * dtf 
 
@@ -68,8 +79,6 @@ def calc_volrat(double[:, ::1] O, int g_M, int g_Mf, int g_Tf, double fg_Mf, dou
                     else:
                         r4h = 0.01  #  don't set to 0
 
-
-
                     p_vlr_z[im1f*g_Mfm1*g_Tfm1+ im2f*g_Tfm1+ itf] = r1h*r2h*r3h*r4h
                 else:  #  not a border
                     if ((d1h < 0) and (d2h < 0) and \
@@ -77,6 +86,7 @@ def calc_volrat(double[:, ::1] O, int g_M, int g_Mf, int g_Tf, double fg_Mf, dou
                         p_vlr_z[im1f*g_Mfm1*g_Tfm1 + im2f*g_Tfm1 + itf] = 1
                     else:
                         p_vlr_z[im1f*g_Mfm1*g_Tfm1 + im2f*g_Tfm1 + itf] = 0
+                        inboundary = 0
 
     return _N.mean(vlr_z)
 
