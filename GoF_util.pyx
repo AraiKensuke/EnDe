@@ -46,15 +46,6 @@ def calc_volrat(double[:, ::1] O, int g_M, int g_Mf, int g_Tf, double fg_Mf, dou
                 d3l = p_O_z[im1f*g_Mf+ im2f+1] - tL
                 d4l = p_O_z[(im1f+1)*g_Mf+ im2f+1] - tL
 
-                # d1h = tH - O_z[im1f, im2f] 
-                # d2h = tH - O_z[im1f+1, im2f] 
-                # d3h = tH - O_z[im1f, im2f+1] 
-                # d4h = tH - O_z[im1f+1, im2f+1]
-                # d1l = O_z[im1f, im2f] - tL
-                # d2l = O_z[im1f+1, im2f] - tL
-                # d3l = O_z[im1f, im2f+1] - tL
-                # d4l = O_z[im1f+1, im2f+1] - tL
-
                 if (((d1h > 0) or (d2h > 0) or \
                      (d3h > 0) or (d4h > 0)) and \
                     ((d1l > 0) or (d2l > 0) or \
