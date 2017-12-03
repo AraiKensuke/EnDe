@@ -3,47 +3,65 @@ import numpy as _N
 cimport numpy as _N
 
 
-# def calc_volrat2(int g_T, int g_M, double[:, ::1] O, double[::1] trngs, double[:, :, ::1] volrat, int g_Mf, int g_Tf, double[:, ::1] O_zoom, double[:, :, ::1] volrat_zoom):
-#     cdef double tL, tH
-#     cdef int ti, inside_t, outside_t, border_t, inside, outside, border
-#     cdef int m1, m2
-#     cdef double dtf          = (trngs[1] - trngs[0]) / g_Tf
+def calc_volrat2(int g_T, int g_M, double[:, ::1] O, double[::1] trngs, double[:, :, ::1] volrat, int g_Mf, int g_Tf, double[:, ::1] O_zoom, double[:, :, ::1] volrat_zoom):
+    cdef double tL, tH
+    cdef double d1h, d2h, d3h, d4h, d1l, d2l, d3l, d4l
+    cdef int ti, inside, outside, border
+    cdef int m1, m2
+    cdef double dtf          = (trngs[1] - trngs[0]) / g_Tf
+    cdef double fg_Mf = float(g_Mf)
+    cdef double fg_Tf = float(g_Tf)
 
+    cdef double *p_O     = &O[0, 0]
+    cdef double *p_trngs     = &trngs[0]
+    cdef double *p_volrat = &volrat[0, 0, 0]
 
-#     for ti in xrange(g_T-1):
-#         tL = trngs[ti]
-#         tH = trngs[ti+1]
+    cdef int it, inboundary, i_here, i_til_end
 
-#         inside  = 0
-#         outside = 0
-#         border  = 0
-#         for m1 in xrange(g_M-1):
-#             for m2 in xrange(g_M-1):
-#                 if (((O[m1, m2] < tH) or (O[m1+1, m2] < tH) or \
-#                     (O[m1, m2+1] < tH) or (O[m1+1, m2+1] < tH)) and \
-#                     ((O[m1, m2] > tL) or (O[m1+1, m2] > tL) or \
-#                      (O[m1, m2+1] > tL) or (O[m1+1, m2+1] > tL))):
-#                     #  a border
-#                     border += 1
+    inside  = 0
+    outside = 0
+    border  = 0
 
-#                     #volrat[m1, m2, ti] = mkd.calc_volrat(O, g_Mf, g_Tf, fg_Mf, fg_Tf, m1, m2, tL, dtf, O_zoom, volrat_zoom)
-#                     volrat[m1, m2, ti] = calc_fine_volrat2(O, g_M, g_Mf, g_Tf, fg_Mf, fg_Tf, m1, m2, tL, dtf, O_zoom, volrat_zoom)
+    for m1 in xrange(g_M-1):
+        for m2 in xrange(g_M-1):
+            inboundary = 1
+            #for itf in xrange(g_Tf-1):
+            it = -1
+            while (it < g_T-1) and (inboundary == 1):
+                it += 1
+                tL = p_trngs[it]
+                tH = p_trngs[it+1]
 
-#                 else:  #  not a border
-#                     if ((O[m1, m2] > tH) and (O[m1+1, m2] > tH) and \
-#                         (O[m1, m2+1] > tH) and (O[m1+1, m2+1] > tH)):
-#                         inside += 1
-#                         volrat[m1, m2, ti] = 1
-#                     else:
-#                         outside += 1
-#                         volrat[m1, m2, ti] = 0
+                d1h = tH - p_O[m1*g_M + m2] 
+                d2h = tH - p_O[(m1+1)*g_M+m2] 
+                d3h = tH - p_O[m1*g_M+m2+1] 
+                d4h = tH - p_O[(m1+1)*g_M + m2+1]
+                d1l = p_O[m1*g_M+ m2] - tL
+                d2l = p_O[(m1+1)*g_M+ m2] - tL
+                d3l = p_O[m1*g_M+ m2+1] - tL
+                d4l = p_O[(m1+1)*g_M+ m2+1] - tL
 
-#         print "%(t)d    %(in)d   %(out)d   %(bord)d" % {"t" : ti, "in" : inside, "out" : outside, "bord" : border}
+                if (((d1h > 0) or (d2h > 0) or \
+                     (d3h > 0) or (d4h > 0)) and \
+                    ((d1l > 0) or (d2l > 0) or \
+                     (d3l > 0) or (d4l > 0))):
+                    border += 1
 
-#         inside_t += inside
-#         outside_t += outside
-#         border_t += border
-#     return inside_t, outside_t, border_t
+                    p_volrat[m1*(g_M-1)*(g_T-1)+ m2*(g_T-1) + it] = calc_fine_volrat2(O, g_M, g_Mf, g_Tf, fg_Mf, fg_Tf, m1, m2, tL, dtf, O_zoom, volrat_zoom)
+                else:  #  not a border
+                    if ((d1h < 0) and (d2h < 0) and \
+                        (d3h < 0) and (d4h < 0)):
+                        p_volrat[m1*(g_M-1)*(g_T-1) + m2*(g_T-1) + it] = 1
+                    else:
+                        p_volrat[m1*(g_M-1)*(g_T-1) + m2*(g_T-1) + it] = 0
+                        inboundary = 0
+                        i_here = m1*(g_M-1)*(g_T-1) + m2*(g_T-1)
+                        for i_til_end in xrange(it+1, g_T-1):
+                            p_volrat[i_here + i_til_end] = 0
+
+        print "%(t)d    %(in)d   %(out)d   %(bord)d" % {"t" : it, "in" : inside, "out" : outside, "bord" : border}
+
+    return inside, outside, border
 
 
 
