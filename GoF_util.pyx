@@ -183,13 +183,23 @@ def calc_volrat4(int g_T, int g_M, double[:, :, :, ::1] O, double[::1] trngs, do
     inside  = 0
     outside = 0
     border  = 0
+    
+    cdef int _m1, _m2, _m3
+    cdef int _m1p1, _m2p1, _m3p1, m4p1
 
     print "before loop in calc_volrat4"
     for m1 in xrange(g_M-1):
         print "m1  %d" % m1
+        _m1 = m1*g_Mm1_3
+        _m1p1 = (m1+1)*g_Mm1_3
         for m2 in xrange(g_M-1):
+            _m2 = m2*g_Mm1_2
+            _m2p1 = (m2+1)*g_Mm1_2
             for m3 in xrange(g_M-1):
+                _m3 = m3*g_Mm1
+                _m3p1 = (m3+1)*g_Mm1
                 for m4 in xrange(g_M-1):
+                    m4p1 = m4+1
                     inboundary = 1
 
                     it = -1
@@ -198,58 +208,58 @@ def calc_volrat4(int g_T, int g_M, double[:, :, :, ::1] O, double[::1] trngs, do
                         tL = p_trngs[it]
                         tH = p_trngs[it+1]
 
-                        d01h = tH - p_O[m1*g_Mm1_3 + m2*g_Mm1_2 + m3*g_Mm1+ m4] 
+                        d01h = tH - p_O[_m1 + _m2 + m3*g_Mm1+ m4] 
 
                         #  1   
-                        d11h = tH - p_O[(m1+1)*g_Mm1_3 + m2*g_Mm1_2 + m3*g_Mm1+ m4] 
-                        d12h = tH - p_O[m1*g_Mm1_3 + (m2+1)*g_Mm1_2 + m3*g_Mm1+ m4] 
-                        d13h = tH - p_O[m1*g_Mm1_3 + m2*g_Mm1_2 + (m3+1)*g_Mm1+ m4] 
-                        d14h = tH - p_O[m1*g_Mm1_3 + m2*g_Mm1_2 + m3*g_Mm1+ (m4+1)] 
+                        d11h = tH - p_O[_m1p1 + _m2 + _m3+ m4] 
+                        d12h = tH - p_O[_m1 + _m2p1 + _m3+ m4] 
+                        d13h = tH - p_O[_m1 + _m2 + _m3p1+ m4] 
+                        d14h = tH - p_O[_m1 + _m2 + _m3+ m4p1] 
 
                         #  2   
-                        d21h = tH - p_O[(m1+1)*g_Mm1_3 + (m2+1)*g_Mm1_2 + m3*g_Mm1+ m4]     # 1 2
-                        d22h = tH - p_O[(m1+1)*g_Mm1_3 + m2*g_Mm1_2 + (m3+1)*g_Mm1+ m4]     # 1 3
-                        d23h = tH - p_O[(m1+1)*g_Mm1_3 + m2*g_Mm1_2 + m3*g_Mm1+ (m4+1)]     # 1 4
-                        d24h = tH - p_O[m1*g_Mm1_3 + (m2+1)*g_Mm1_2 + (m3+1)*g_Mm1+ m4]     # 2 3
-                        d25h = tH - p_O[m1*g_Mm1_3 + (m2+1)*g_Mm1_2 + m3*g_Mm1+ (m4+1)]     # 2 4
-                        d26h = tH - p_O[m1*g_Mm1_3 + m2*g_Mm1_2 + (m3+1)*g_Mm1+ (m4+1)]     # 3 4
+                        d21h = tH - p_O[_m1p1 + _m2p1 + _m3+ m4]     # 1 2
+                        d22h = tH - p_O[_m1p1 + _m2 + _m3p1+ m4]     # 1 3
+                        d23h = tH - p_O[_m1p1 + _m2 + _m3+ m4p1]     # 1 4
+                        d24h = tH - p_O[_m1 + _m2p1 + _m3p1+ m4]     # 2 3
+                        d25h = tH - p_O[_m1 + _m2p1 + _m3+ m4p1]     # 2 4
+                        d26h = tH - p_O[_m1 + _m2 + _m3p1+ m4p1]     # 3 4
 
                         # 3  
-                        d31h = tH - p_O[(m1+1)*g_Mm1_3 + (m2+1)*g_Mm1_2 + (m3+1)*g_Mm1+ m4]   # 1 2 3
-                        d32h = tH - p_O[(m1+1)*g_Mm1_3 + (m2+1)*g_Mm1_2 + m3*g_Mm1+ (m4+1)]   # 1 2 4
-                        d33h = tH - p_O[(m1+1)*g_Mm1_3 + m2*g_Mm1_2 + (m3+1)*g_Mm1+ (m4+1)]   # 1 3 4
-                        d34h = tH - p_O[m1*g_Mm1_3 + (m2+1)*g_Mm1_2 + (m3+1)*g_Mm1+ (m4+1)]   # 2 3 4
+                        d31h = tH - p_O[_m1p1 + _m2p1 + _m3p1+ m4]   # 1 2 3
+                        d32h = tH - p_O[_m1p1 + _m2p1 + _m3+ m4p1]   # 1 2 4
+                        d33h = tH - p_O[_m1p1 + _m2 + _m3p1+ m4p1]   # 1 3 4
+                        d34h = tH - p_O[_m1 + _m2p1 + _m3p1+ m4p1]   # 2 3 4
 
                         # 4
-                        d41h = tH - p_O[(m1+1)*g_Mm1_3 + (m2+1)*g_Mm1_2 + (m3+1)*g_Mm1+ (m4+1)]   # 1 2 3 4      
+                        d41h = tH - p_O[_m1p1 + _m2p1 + _m3p1+ m4p1]   # 1 2 3 4      
 
 
 
 
-                        d01l = p_O[m1*g_Mm1_3 + m2*g_Mm1_2 + m3*g_Mm1+ m4] - tL
+                        d01l = p_O[_m1 + _m2 + _m3+ m4] - tL
 
                         #  1   
-                        d11l = p_O[(m1+1)*g_Mm1_3 + m2*g_Mm1_2 + m3*g_Mm1+ m4] - tL
-                        d12l = p_O[m1*g_Mm1_3 + (m2+1)*g_Mm1_2 + m3*g_Mm1+ m4] - tL
-                        d13l = p_O[m1*g_Mm1_3 + m2*g_Mm1_2 + (m3+1)*g_Mm1+ m4] - tL
-                        d14l = p_O[m1*g_Mm1_3 + m2*g_Mm1_2 + m3*g_Mm1+ (m4+1)] - tL
+                        d11l = p_O[_m1p1 + _m2 + _m3+ m4] - tL
+                        d12l = p_O[_m1 + _m2p1 + _m3+ m4] - tL
+                        d13l = p_O[_m1 + _m2 + _m3p1+ m4] - tL
+                        d14l = p_O[_m1 + _m2 + _m3+ m4p1] - tL
 
                         #  2   
-                        d21l = p_O[(m1+1)*g_Mm1_3 + (m2+1)*g_Mm1_2 + m3*g_Mm1+ m4]- tL     # 1 2
-                        d22l = p_O[(m1+1)*g_Mm1_3 + m2*g_Mm1_2 + (m3+1)*g_Mm1+ m4]- tL     # 1 3
-                        d23l = p_O[(m1+1)*g_Mm1_3 + m2*g_Mm1_2 + m3*g_Mm1+ (m4+1)]- tL     # 1 4
-                        d24l = p_O[m1*g_Mm1_3 + (m2+1)*g_Mm1_2 + (m3+1)*g_Mm1+ m4]- tL     # 2 3
-                        d25l = p_O[m1*g_Mm1_3 + (m2+1)*g_Mm1_2 + m3*g_Mm1+ (m4+1)]- tL     # 2 4
-                        d26l = p_O[m1*g_Mm1_3 + m2*g_Mm1_2 + (m3+1)*g_Mm1+ (m4+1)]- tL     # 3 4
+                        d21l = p_O[_m1p1 + _m2p1 + _m3+ m4]- tL     # 1 2
+                        d22l = p_O[_m1p1 + _m2 + _m3p1+ m4]- tL     # 1 3
+                        d23l = p_O[_m1p1 + _m2 + _m3+ m4p1]- tL     # 1 4
+                        d24l = p_O[_m1 + _m2p1 + _m3p1+ m4]- tL     # 2 3
+                        d25l = p_O[_m1 + _m2p1 + _m3+ m4p1]- tL     # 2 4
+                        d26l = p_O[_m1 + _m2 + _m3p1+ m4p1]- tL     # 3 4
 
                         # 3  
-                        d31l = p_O[(m1+1)*g_Mm1_3 + (m2+1)*g_Mm1_2 + (m3+1)*g_Mm1+ m4] - tL   # 1 2 3
-                        d32l = p_O[(m1+1)*g_Mm1_3 + (m2+1)*g_Mm1_2 + m3*g_Mm1+ (m4+1)] - tL   # 1 2 4
-                        d33l = p_O[(m1+1)*g_Mm1_3 + m2*g_Mm1_2 + (m3+1)*g_Mm1+ (m4+1)] - tL   # 1 3 4
-                        d34l = p_O[m1*g_Mm1_3 + (m2+1)*g_Mm1_2 + (m3+1)*g_Mm1+ (m4+1)] - tL   # 2 3 4
+                        d31l = p_O[_m1p1 + _m2p1 + _m3p1+ m4] - tL   # 1 2 3
+                        d32l = p_O[_m1p1 + _m2p1 + _m3+ m4p1] - tL   # 1 2 4
+                        d33l = p_O[_m1p1 + _m2 + _m3p1+ m4p1] - tL   # 1 3 4
+                        d34l = p_O[_m1 + _m2p1 + _m3p1+ m4p1] - tL   # 2 3 4
 
                         # 4
-                        d41l = p_O[(m1+1)*g_Mm1_3 + (m2+1)*g_Mm1_2 + (m3+1)*g_Mm1+ (m4+1)] - tL   # 1 2 3 4      
+                        d41l = p_O[_m1p1 + _m2p1 + _m3p1+ m4p1] - tL   # 1 2 3 4      
 
 
                         if (((d01h > 0) or \
@@ -321,6 +331,8 @@ def calc_fine_volrat4(double[:, :, :, ::1] O, int g_M, int g_Mf, int g_Tf, doubl
     cdef int g_Mfm1_2xTfm1 = g_Mfm1 * g_Mfm1xTfm1
     cdef int g_Mfm1_3xTfm1 = g_Mfm1 * g_Mfm1_2xTfm1
 
+    cdef int _m1, _m2, _m3
+    cdef int _m1p1, _m2p1, _m3p1, m4p1
 
     cdef int inboundary 
 
@@ -331,9 +343,16 @@ def calc_fine_volrat4(double[:, :, :, ::1] O, int g_M, int g_Mf, int g_Tf, doubl
                     p_O_z[im1f*g_Mf*g_Mf*g_Mf + im2f*g_Mf*g_Mf + im3f*g_Mf + im4f] = p_O[m1m2m3m4] + im1f*ifg_Mfm1*dO_m1 + im2f*ifg_Mfm1*dO_m2 + im3f*ifg_Mfm1*dO_m3 + im4f*ifg_Mfm1*dO_m4
 
     for im1f in xrange(g_Mf-1):
+        _m1 = im1f*g_Mfm1_3
+        _m1p1 = (im1f+1)*g_Mfm1_3
         for im2f in xrange(g_Mf-1):
+            _m2 = im2f*g_Mfm1_2
+            _m2p1 = (im2f+1)*g_Mfm1_2
             for im3f in xrange(g_Mf-1):
+                _m3 = im3f*g_Mfm1
+                _m3p1 = (im3f+1)*g_Mfm1
                 for im4f in xrange(g_Mf-1):
+                    m4p1 = im4f+1
                     inboundary = 1
                     #for itf in xrange(g_Tf-1):
                     itf = -1
@@ -343,58 +362,58 @@ def calc_fine_volrat4(double[:, :, :, ::1] O, int g_M, int g_Mf, int g_Tf, doubl
                         tH = t + (itf+1) * dtf 
 
 
-                        d01h = tH - p_O_z[im1f*g_Mfm1_3 + im2f*g_Mfm1_2 + im3f*g_Mfm1+ im4f] 
+                        d01h = tH - p_O_z[_m1 + _m2 + _m3+ im4f] 
 
                         #  1   
-                        d11h = tH - p_O_z[(im1f+1)*g_Mfm1_3 + im2f*g_Mfm1_2 + im3f*g_Mfm1+ im4f] 
-                        d12h = tH - p_O_z[im1f*g_Mfm1_3 + (im2f+1)*g_Mfm1_2 + im3f*g_Mfm1+ im4f] 
-                        d13h = tH - p_O_z[im1f*g_Mfm1_3 + im2f*g_Mfm1_2 + (im3f+1)*g_Mfm1+ im4f] 
-                        d14h = tH - p_O_z[im1f*g_Mfm1_3 + im2f*g_Mfm1_2 + im3f*g_Mfm1+ (im4f+1)] 
+                        d11h = tH - p_O_z[_m1p1 + _m2 + _m3+ im4f] 
+                        d12h = tH - p_O_z[_m1 + _m2p1 + _m3+ im4f] 
+                        d13h = tH - p_O_z[_m1 + _m2 + _m3p1+ im4f] 
+                        d14h = tH - p_O_z[_m1 + _m2 + _m3+ m4p1] 
 
                         #  2   
-                        d21h = tH - p_O_z[(im1f+1)*g_Mfm1_3 + (im2f+1)*g_Mfm1_2 + im3f*g_Mfm1+ im4f]     # 1 2
-                        d22h = tH - p_O_z[(im1f+1)*g_Mfm1_3 + im2f*g_Mfm1_2 + (im3f+1)*g_Mfm1+ im4f]     # 1 3
-                        d23h = tH - p_O_z[(im1f+1)*g_Mfm1_3 + im2f*g_Mfm1_2 + im3f*g_Mfm1+ (im4f+1)]     # 1 4
-                        d24h = tH - p_O_z[im1f*g_Mfm1_3 + (im2f+1)*g_Mfm1_2 + (im3f+1)*g_Mfm1+ im4f]     # 2 3
-                        d25h = tH - p_O_z[im1f*g_Mfm1_3 + (im2f+1)*g_Mfm1_2 + im3f*g_Mfm1+ (im4f+1)]     # 2 4
-                        d26h = tH - p_O_z[im1f*g_Mfm1_3 + im2f*g_Mfm1_2 + (im3f+1)*g_Mfm1+ (im4f+1)]     # 3 4
+                        d21h = tH - p_O_z[_m1p1 + _m2p1 + _m3+ im4f]     # 1 2
+                        d22h = tH - p_O_z[_m1p1 + _m2 + _m3p1+ im4f]     # 1 3
+                        d23h = tH - p_O_z[_m1p1 + _m2 + _m3+ m4p1]     # 1 4
+                        d24h = tH - p_O_z[_m1 + _m2p1 + _m3p1+ im4f]     # 2 3
+                        d25h = tH - p_O_z[_m1 + _m2p1 + _m3+ m4p1]     # 2 4
+                        d26h = tH - p_O_z[_m1 + _m2 + _m3p1+ m4p1]     # 3 4
 
                         # 3  
-                        d31h = tH - p_O_z[(im1f+1)*g_Mfm1_3 + (im2f+1)*g_Mfm1_2 + (im3f+1)*g_Mfm1+ im4f]   # 1 2 3
-                        d32h = tH - p_O_z[(im1f+1)*g_Mfm1_3 + (im2f+1)*g_Mfm1_2 + im3f*g_Mfm1+ (im4f+1)]   # 1 2 4
-                        d33h = tH - p_O_z[(im1f+1)*g_Mfm1_3 + im2f*g_Mfm1_2 + (im3f+1)*g_Mfm1+ (im4f+1)]   # 1 3 4
-                        d34h = tH - p_O_z[im1f*g_Mfm1_3 + (im2f+1)*g_Mfm1_2 + (im3f+1)*g_Mfm1+ (im4f+1)]   # 2 3 4
+                        d31h = tH - p_O_z[_m1p1 + _m2p1 + _m3p1+ im4f]   # 1 2 3
+                        d32h = tH - p_O_z[_m1p1 + _m2p1 + _m3+ m4p1]   # 1 2 4
+                        d33h = tH - p_O_z[_m1p1 + _m2 + _m3p1+ m4p1]   # 1 3 4
+                        d34h = tH - p_O_z[_m1 + _m2p1 + _m3p1+ m4p1]   # 2 3 4
 
                         # 4
-                        d41h = tH - p_O_z[(im1f+1)*g_Mfm1_3 + (im2f+1)*g_Mfm1_2 + (im3f+1)*g_Mfm1+ (im4f+1)]   # 1 2 3 4      
+                        d41h = tH - p_O_z[_m1p1 + _m2p1 + _m3p1+ m4p1]   # 1 2 3 4      
 
 
 
 
-                        d01l = p_O_z[im1f*g_Mfm1_3 + im2f*g_Mfm1_2 + im3f*g_Mfm1+ im4f] - tL
+                        d01l = p_O_z[_m1 + _m2 + _m3+ im4f] - tL
 
                         #  1   
-                        d11l = p_O_z[(im1f+1)*g_Mfm1_3 + im2f*g_Mfm1_2 + im3f*g_Mfm1+ im4f] - tL
-                        d12l = p_O_z[im1f*g_Mfm1_3 + (im2f+1)*g_Mfm1_2 + im3f*g_Mfm1+ im4f] - tL
-                        d13l = p_O_z[im1f*g_Mfm1_3 + im2f*g_Mfm1_2 + (im3f+1)*g_Mfm1+ im4f] - tL
-                        d14l = p_O_z[im1f*g_Mfm1_3 + im2f*g_Mfm1_2 + im3f*g_Mfm1+ (im4f+1)] - tL
+                        d11l = p_O_z[_m1p1 + _m2 + _m3+ im4f] - tL
+                        d12l = p_O_z[_m1 + _m2p1 + _m3+ im4f] - tL
+                        d13l = p_O_z[_m1 + _m2 + _m3p1+ im4f] - tL
+                        d14l = p_O_z[_m1 + _m2 + _m3+ m4p1] - tL
 
                         #  2   
-                        d21l = p_O_z[(im1f+1)*g_Mfm1_3 + (im2f+1)*g_Mfm1_2 + im3f*g_Mfm1+ im4f]- tL     # 1 2
-                        d22l = p_O_z[(im1f+1)*g_Mfm1_3 + im2f*g_Mfm1_2 + (im3f+1)*g_Mfm1+ im4f]- tL     # 1 3
-                        d23l = p_O_z[(im1f+1)*g_Mfm1_3 + im2f*g_Mfm1_2 + im3f*g_Mfm1+ (im4f+1)]- tL     # 1 4
-                        d24l = p_O_z[im1f*g_Mfm1_3 + (im2f+1)*g_Mfm1_2 + (im3f+1)*g_Mfm1+ im4f]- tL     # 2 3
-                        d25l = p_O_z[im1f*g_Mfm1_3 + (im2f+1)*g_Mfm1_2 + im3f*g_Mfm1+ (im4f+1)]- tL     # 2 4
-                        d26l = p_O_z[im1f*g_Mfm1_3 + im2f*g_Mfm1_2 + (im3f+1)*g_Mfm1+ (im4f+1)]- tL     # 3 4
+                        d21l = p_O_z[_m1p1 + _m2p1 + _m3+ im4f]- tL     # 1 2
+                        d22l = p_O_z[_m1p1 + _m2 + _m3p1+ im4f]- tL     # 1 3
+                        d23l = p_O_z[_m1p1 + _m2 + _m3+ m4p1]- tL     # 1 4
+                        d24l = p_O_z[_m1 + _m2p1 + _m3p1+ im4f]- tL     # 2 3
+                        d25l = p_O_z[_m1 + _m2p1 + _m3+ m4p1]- tL     # 2 4
+                        d26l = p_O_z[_m1 + _m2 + _m3p1+ m4p1]- tL     # 3 4
 
                         # 3  
-                        d31l = p_O_z[(im1f+1)*g_Mfm1_3 + (im2f+1)*g_Mfm1_2 + (im3f+1)*g_Mfm1+ im4f] - tL   # 1 2 3
-                        d32l = p_O_z[(im1f+1)*g_Mfm1_3 + (im2f+1)*g_Mfm1_2 + im3f*g_Mfm1+ (im4f+1)] - tL   # 1 2 4
-                        d33l = p_O_z[(im1f+1)*g_Mfm1_3 + im2f*g_Mfm1_2 + (im3f+1)*g_Mfm1+ (im4f+1)] - tL   # 1 3 4
-                        d34l = p_O_z[im1f*g_Mfm1_3 + (im2f+1)*g_Mfm1_2 + (im3f+1)*g_Mfm1+ (im4f+1)] - tL   # 2 3 4
+                        d31l = p_O_z[_m1p1 + _m2p1 + _m3p1+ im4f] - tL   # 1 2 3
+                        d32l = p_O_z[_m1p1 + _m2p1 + _m3+ m4p1] - tL   # 1 2 4
+                        d33l = p_O_z[_m1p1 + _m2 + _m3p1+ m4p1] - tL   # 1 3 4
+                        d34l = p_O_z[_m1 + _m2p1 + _m3p1+ m4p1] - tL   # 2 3 4
 
                         # 4
-                        d41l = p_O_z[(im1f+1)*g_Mfm1_3 + (im2f+1)*g_Mfm1_2 + (im3f+1)*g_Mfm1+ (im4f+1)] - tL   # 1 2 3 4      
+                        d41l = p_O_z[_m1p1 + _m2p1 + _m3p1+ m4p1] - tL # 1 2 3 4
 
 
                         if (((d01h > 0) or \
@@ -445,3 +464,62 @@ def calc_fine_volrat4(double[:, :, :, ::1] O, int g_M, int g_Mf, int g_Tf, doubl
                                     p_vlr_z[i_here + i_til_end] = 0
 
     return _N.mean(vlr_z)
+
+def find_O2(int g_M, int NT, double[::1] attimes, double[:, :, ::1] occ, double[:, ::1] O):
+    #  for each mark on the grid, loop until O(mk)
+    cdef double maxt, att
+    cdef int inboundary, i, j, it
+    cdef double *p_attimes = &attimes[0]
+    cdef double *p_occ    = &occ[0, 0, 0]
+    cdef double *p_O      = &O[0, 0]
+
+    cdef int ig_M, ig_M_NT, g_M2
+    g_M2 = g_M * g_M
+    for i in xrange(g_M):
+        ig_M = i*g_M
+        for j in xrange(g_M):
+            inboundary = 1
+            it = -1
+            while inboundary and (it < NT):
+                it += 1
+            #for it in xrange(NT):
+                att = p_attimes[it]
+
+                if p_O[ig_M+ j] >= att:
+                    p_occ[it*g_M2 + ig_M + j] = 1.
+                else:
+                    inboundary = 0
+                    
+
+def find_O4(int g_M, int NT, double[::1] attimes, double[:, :, :, :, ::1] occ, double[:, :, :, ::1] O):
+    #  for each mark on the grid, loop until O(mk)
+    cdef double maxt, att
+    cdef int inboundary, i, j, k, l, it
+    cdef double *p_attimes = &attimes[0]
+    cdef double *p_occ    = &occ[0, 0, 0, 0, 0]
+    cdef double *p_O      = &O[0, 0, 0, 0]
+
+    cdef int ig_M3, jg_M2, kg_M, g_M4, g_M3, g_M2
+    g_M4 = g_M * g_M * g_M * g_M
+    g_M3 = g_M * g_M * g_M 
+    g_M2 = g_M * g_M
+    
+    for i in xrange(g_M):
+        #print "i is %d" % i
+        ig_M3 = i*g_M3
+        for j in xrange(g_M):
+            jg_M2 = j*g_M2
+            for k in xrange(g_M):
+                kg_M = k*g_M
+                for l in xrange(g_M):
+                    inboundary = 1
+                    it = -1
+                    while inboundary and (it < NT-1):
+                        it += 1
+                        att = p_attimes[it]
+
+                        if p_O[ig_M3 + jg_M2 + kg_M + l] >= att:
+                            p_occ[it*g_M4 + ig_M3 + jg_M2 + kg_M + l] = 1.
+                        else:
+                            inboundary = 0
+                    
