@@ -24,12 +24,13 @@ def calc_volrat2(int g_T, int g_M, double[:, ::1] O, double[::1] trngs, double[:
     outside = 0
     border  = 0
 
+    cdef int it_Start = 0     #  doesn't make sense to start from -1 for every new mark, because the 
     for m1 in xrange(g_M-1):
         for m2 in xrange(g_M-1):
             inboundary = 1
             #for itf in xrange(g_Tf-1):
             it = -1
-            while (it < g_T-1) and (inboundary == 1):
+            while (it < g_T-2) and (inboundary == 1):
                 it += 1
                 tL = p_trngs[it]
                 tH = p_trngs[it+1]
@@ -107,7 +108,7 @@ def calc_fine_volrat2(double[:, ::1] O, int g_M, int g_Mf, int g_Tf, double fg_M
             inboundary = 1
             #for itf in xrange(g_Tf-1):
             itf = -1
-            while (itf < g_Tfm1) and (inboundary == 1):
+            while (itf < g_Tfm1-1) and (inboundary == 1):
                 itf += 1
                 tL = t + itf * dtf
                 tH = t + (itf+1) * dtf 
@@ -203,7 +204,7 @@ def calc_volrat4(int g_T, int g_M, double[:, :, :, ::1] O, double[::1] trngs, do
                     inboundary = 1
 
                     it = -1
-                    while (it < g_T-1) and (inboundary == 1):
+                    while (it < g_T-2) and (inboundary == 1):
                         it += 1
                         tL = p_trngs[it]
                         tH = p_trngs[it+1]
@@ -274,9 +275,9 @@ def calc_volrat4(int g_T, int g_M, double[:, :, :, ::1] O, double[::1] trngs, do
                              (d41l > 0))):
 
 
-                            p_volrat[m1*g_Mm1_3xTm1+ m2*g_Mm1_2xTm1 + m3*g_Mm1xTm1 + m4*g_Tm1 + it] = calc_fine_volrat4(O, g_M, g_Mf, g_Tf, fg_Mf, fg_Tf, m1, m2, m3, m4, tL, dtf, O_zoom, volrat_zoom)
+                            #p_volrat[m1*g_Mm1_3xTm1+ m2*g_Mm1_2xTm1 + m3*g_Mm1xTm1 + m4*g_Tm1 + it] = calc_fine_volrat4(O, g_M, g_Mf, g_Tf, fg_Mf, fg_Tf, m1, m2, m3, m4, tL, dtf, O_zoom, volrat_zoom)
 
-                            #p_volrat[m1*g_Mm1_3xTm1+ m2*g_Mm1_2xTm1 + m3*g_Mm1xTm1 + m4*g_Tm1 + it] = 0.5
+                            p_volrat[m1*g_Mm1_3xTm1+ m2*g_Mm1_2xTm1 + m3*g_Mm1xTm1 + m4*g_Tm1 + it] = 0.5
                         else:  #  not a border
                             if (d01h < 0) and \
                                (d11h<0) and (d12h<0) and (d13h<0) and (d14h<0) and \
@@ -356,7 +357,7 @@ def calc_fine_volrat4(double[:, :, :, ::1] O, int g_M, int g_Mf, int g_Tf, doubl
                     inboundary = 1
                     #for itf in xrange(g_Tf-1):
                     itf = -1
-                    while (itf < g_Tfm1) and (inboundary == 1):
+                    while (itf < g_Tfm1-1) and (inboundary == 1):
                         itf += 1
                         tL = t + itf * dtf
                         tH = t + (itf+1) * dtf 
@@ -465,12 +466,12 @@ def calc_fine_volrat4(double[:, :, :, ::1] O, int g_M, int g_Mf, int g_Tf, doubl
 
     return _N.mean(vlr_z)
 
-def find_O2(int g_M, int NT, double[::1] attimes, double[:, :, ::1] occ, double[:, ::1] O):
+def find_O2(int g_M, int NT, double[::1] attimes, double[::1] occ, double[:, ::1] O):
     #  for each mark on the grid, loop until O(mk)
     cdef double maxt, att
     cdef int inboundary, i, j, it
     cdef double *p_attimes = &attimes[0]
-    cdef double *p_occ    = &occ[0, 0, 0]
+    cdef double *p_occ    = &occ[0]     #  start with 0s
     cdef double *p_O      = &O[0, 0]
 
     cdef int ig_M, ig_M_NT, g_M2
@@ -480,23 +481,22 @@ def find_O2(int g_M, int NT, double[::1] attimes, double[:, :, ::1] occ, double[
         for j in xrange(g_M):
             inboundary = 1
             it = -1
-            while inboundary and (it < NT):
+            while inboundary and (it < NT-1):
                 it += 1
-            #for it in xrange(NT):
                 att = p_attimes[it]
 
                 if p_O[ig_M+ j] >= att:
-                    p_occ[it*g_M2 + ig_M + j] = 1.
+                    p_occ[it] += 1.
                 else:
                     inboundary = 0
                     
 
-def find_O4(int g_M, int NT, double[::1] attimes, double[:, :, :, :, ::1] occ, double[:, :, :, ::1] O):
+def find_O4(int g_M, int NT, double[::1] attimes, double[::1] occ, double[:, :, :, ::1] O):
     #  for each mark on the grid, loop until O(mk)
     cdef double maxt, att
     cdef int inboundary, i, j, k, l, it
     cdef double *p_attimes = &attimes[0]
-    cdef double *p_occ    = &occ[0, 0, 0, 0, 0]
+    cdef double *p_occ    = &occ[0]
     cdef double *p_O      = &O[0, 0, 0, 0]
 
     cdef int ig_M3, jg_M2, kg_M, g_M4, g_M3, g_M2
@@ -505,7 +505,6 @@ def find_O4(int g_M, int NT, double[::1] attimes, double[:, :, :, :, ::1] occ, d
     g_M2 = g_M * g_M
     
     for i in xrange(g_M):
-        #print "i is %d" % i
         ig_M3 = i*g_M3
         for j in xrange(g_M):
             jg_M2 = j*g_M2
@@ -519,7 +518,8 @@ def find_O4(int g_M, int NT, double[::1] attimes, double[:, :, :, :, ::1] occ, d
                         att = p_attimes[it]
 
                         if p_O[ig_M3 + jg_M2 + kg_M + l] >= att:
-                            p_occ[it*g_M4 + ig_M3 + jg_M2 + kg_M + l] = 1.
+                            p_occ[it] += 1.
                         else:
                             inboundary = 0
                     
+
