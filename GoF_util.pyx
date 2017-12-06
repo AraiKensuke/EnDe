@@ -5,7 +5,7 @@ cimport numpy as _N
 ##############################################################
 ########################  4D marks
 ##############################################################
-def calc_volrat2(int g_T, int g_M, double[:, ::1] O, double[::1] trngs, double[:, :, ::1] volrat, int g_Mf, int g_Tf, double[:, ::1] O_zoom, double[:, :, ::1] volrat_zoom):
+def calc_volrat2(int g_T, int g_M, double[:, ::1] O, double[::1] trngs, double[:, :, ::1] volrat, int g_Tf, int g_Mf, double[:, ::1] O_zoom, double[:, :, ::1] volrat_zoom):
     cdef double tL, tH
     cdef double d1h, d2h, d3h, d4h, d1l, d2l, d3l, d4l
     cdef int ti, inside, outside, border
@@ -153,12 +153,12 @@ def calc_fine_volrat2(double[:, ::1] O, int g_M, int g_Mf, int g_Tf, double fg_M
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def calc_volrat4(int g_T, int g_M, double[:, :, :, ::1] O, double[::1] trngs, double[:, :, :, :, ::1] volrat, int g_Mf, int g_Tf, double[:, :, :, ::1] O_zoom, double[:, :, :, :, ::1] volrat_zoom):
+def calc_volrat4(long g_T, long g_M, double[:, :, :, ::1] O, double[::1] trngs, double[:, :, :, :, ::1] volrat, long g_Tf, long g_Mf, double[:, :, :, ::1] O_zoom, double[:, :, :, :, ::1] volrat_zoom):
     #  changes in rescaled-time direction is abrupt, while over marks may not be so abrupt.  Cut box in mark direction in 4 
     cdef double tL, tH
     cdef double d1h, d2h, d3h, d4h, d1l, d2l, d3l, d4l
-    cdef int ti, inside, outside, border
-    cdef int m1, m2, m3, m4
+    cdef long ti, inside, outside, border
+    cdef long m1, m2, m3, m4
     cdef double dtf          = (trngs[1] - trngs[0]) / g_Tf
     cdef double fg_Mf = float(g_Mf)
     cdef double fg_Tf = float(g_Tf)
@@ -167,38 +167,39 @@ def calc_volrat4(int g_T, int g_M, double[:, :, :, ::1] O, double[::1] trngs, do
     cdef double *p_trngs     = &trngs[0]
     cdef double *p_volrat = &volrat[0, 0, 0, 0, 0]
 
-    cdef int it, inboundary, i_here, i_til_end
+    cdef long it, inboundary, i_here, i_til_end
 
-    cdef double ig_Mm1 = 1./(g_M-1)
-    cdef int    g_Mm1 = g_M-1
-    cdef int g_Mm1_3 = g_Mm1*g_Mm1*g_Mm1
-    cdef int g_Mm1_2 = g_Mm1*g_Mm1
+    cdef long g_M3 = g_M*g_M*g_M
+    cdef long g_M2 = g_M*g_M
 
-    cdef int    g_Tm1 = g_T-1
-    cdef int g_M3 = g_M*g_M*g_M
-    cdef int g_M2 = g_M*g_M
-    cdef int g_Mm1xTm1 = (g_M-1) * g_Tm1
-    cdef int g_Mm1_2xTm1 = g_Mm1 * g_Mm1xTm1
-    cdef int g_Mm1_3xTm1 = g_Mm1 * g_Mm1_2xTm1
+    cdef long    g_Tm1 = g_T-1
+    cdef long g_Mm1xTm1 = (g_M-1) * g_Tm1
+    cdef long g_Mm1_2xTm1 = (g_M-1) * g_Mm1xTm1
+    cdef long g_Mm1_3xTm1 = (g_M-1) * g_Mm1_2xTm1
 
     inside  = 0
     outside = 0
     border  = 0
     
-    cdef int _m1, _m2, _m3
-    cdef int _m1p1, _m2p1, _m3p1, m4p1
+    cdef long _m1, _m2, _m3
+    cdef long _m1p1, _m2p1, _m3p1, m4p1
 
     print "before loop in calc_volrat4"
+    tH    = 0
+    print "g_M  %d" % g_M
+    print "%.5f" % (tH - p_O[10*g_M*g_M*g_M + 10*g_M*g_M + 10*g_M + 10])
+    print "%.5f" % (tH - O[10, 10, 10, 10])
+
     for m1 in xrange(g_M-1):
-        print "m1  %d" % m1
-        _m1 = m1*g_Mm1_3
-        _m1p1 = (m1+1)*g_Mm1_3
+        #print "m1  %d" % m1
+        _m1 = m1*g_M3
+        _m1p1 = (m1+1)*g_M3
         for m2 in xrange(g_M-1):
-            _m2 = m2*g_Mm1_2
-            _m2p1 = (m2+1)*g_Mm1_2
+            _m2 = m2*g_M2
+            _m2p1 = (m2+1)*g_M2
             for m3 in xrange(g_M-1):
-                _m3 = m3*g_Mm1
-                _m3p1 = (m3+1)*g_Mm1
+                _m3 = m3*g_M
+                _m3p1 = (m3+1)*g_M
                 for m4 in xrange(g_M-1):
                     m4p1 = m4+1
                     inboundary = 1
@@ -206,10 +207,13 @@ def calc_volrat4(int g_T, int g_M, double[:, :, :, ::1] O, double[::1] trngs, do
                     it = -1
                     while (it < g_T-2) and (inboundary == 1):
                         it += 1
+
                         tL = p_trngs[it]
                         tH = p_trngs[it+1]
 
-                        d01h = tH - p_O[_m1 + _m2 + m3*g_Mm1+ m4] 
+                        d01h = tH - p_O[_m1 + _m2 + _m3+ m4] 
+                        #d01h = tH - O[m1, m2, m3, m4] 
+                        #print "--- %(1).4f    %(2).4f" % {"1" : O[m1, m2, m3, m4], "2" : p_O[_m1 + _m2 + _m3+ m4p1]}
 
                         #  1   
                         d11h = tH - p_O[_m1p1 + _m2 + _m3+ m4] 
@@ -232,11 +236,9 @@ def calc_volrat4(int g_T, int g_M, double[:, :, :, ::1] O, double[::1] trngs, do
                         d34h = tH - p_O[_m1 + _m2p1 + _m3p1+ m4p1]   # 2 3 4
 
                         # 4
-                        d41h = tH - p_O[_m1p1 + _m2p1 + _m3p1+ m4p1]   # 1 2 3 4      
+                        d41h = tH - p_O[_m1p1 + _m2p1 + _m3p1+ m4p1] # 1 2 3 4
 
-
-
-
+                        ###################################3
                         d01l = p_O[_m1 + _m2 + _m3+ m4] - tL
 
                         #  1   
@@ -260,24 +262,20 @@ def calc_volrat4(int g_T, int g_M, double[:, :, :, ::1] O, double[::1] trngs, do
                         d34l = p_O[_m1 + _m2p1 + _m3p1+ m4p1] - tL   # 2 3 4
 
                         # 4
-                        d41l = p_O[_m1p1 + _m2p1 + _m3p1+ m4p1] - tL   # 1 2 3 4      
-
+                        d41l = p_O[_m1p1 + _m2p1 + _m3p1+ m4p1] - tL   # 1 2 3 4
+                        
 
                         if (((d01h > 0) or \
                              (d11h > 0) or (d12h > 0) or (d13h > 0) or (d14h > 0) or \
                              (d21h > 0) or (d22h > 0) or (d23h > 0) or (d24h > 0) or (d25h > 0) or (d26h > 0) or \
                              (d31h > 0) or (d32h > 0) or (d33h > 0) or (d34h > 0) or \
-                             (d41h)) and
+                             (d41h > 0)) and
                             ((d01l > 0) or \
                              (d11l > 0) or (d12l > 0) or (d13l > 0) or (d14l > 0) or \
                              (d21l > 0) or (d22l > 0) or (d23l > 0) or (d24l > 0) or (d25l > 0) or (d26l > 0) or \
                              (d31l > 0) or (d32l > 0) or (d33l > 0) or (d34l > 0) or \
                              (d41l > 0))):
-
-
-                            #p_volrat[m1*g_Mm1_3xTm1+ m2*g_Mm1_2xTm1 + m3*g_Mm1xTm1 + m4*g_Tm1 + it] = calc_fine_volrat4(O, g_M, g_Mf, g_Tf, fg_Mf, fg_Tf, m1, m2, m3, m4, tL, dtf, O_zoom, volrat_zoom)
-
-                            p_volrat[m1*g_Mm1_3xTm1+ m2*g_Mm1_2xTm1 + m3*g_Mm1xTm1 + m4*g_Tm1 + it] = 0.5
+                            p_volrat[m1*g_Mm1_3xTm1+ m2*g_Mm1_2xTm1 + m3*g_Mm1xTm1 + m4*g_Tm1 + it] = calc_fine_volrat4(O, g_M, g_Mf, g_Tf, fg_Mf, fg_Tf, m1, m2, m3, m4, tL, dtf, O_zoom, volrat_zoom)
                         else:  #  not a border
                             if (d01h < 0) and \
                                (d11h<0) and (d12h<0) and (d13h<0) and (d14h<0) and \
@@ -296,9 +294,13 @@ def calc_volrat4(int g_T, int g_M, double[:, :, :, ::1] O, double[::1] trngs, do
 
 
 
+
+
+
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def calc_fine_volrat4(double[:, :, :, ::1] O, int g_M, int g_Mf, int g_Tf, double fg_Mf, double fg_Tf, int m1, int m2, int m3, int m4, double t, double dtf, double[:, :, :, ::1] O_z, double[:, :, :, :, ::1] vlr_z):
+def calc_fine_volrat4(double[:, :, :, ::1] O,  long g_M, long g_Mf, int g_Tf, double fg_Mf, double fg_Tf, long m1, long m2, long m3, long m4, double t, double dtf, double[:, :, :, ::1] O_z, double[:, :, :, :, ::1] vlr_z):
     #  changes in rescaled-time direction is abrupt, while over marks may not be so abrupt.  Cut box in mark direction in 4 
     cdef double sm = 0.01
 
@@ -308,7 +310,7 @@ def calc_fine_volrat4(double[:, :, :, ::1] O, int g_M, int g_Mf, int g_Tf, doubl
     cdef double dO_m3 = O[m1, m2, m3+1, m4] - O[m1, m2, m3, m4]
     cdef double dO_m4 = O[m1, m2, m3, m4+1] - O[m1, m2, m3, m4]
 
-    cdef int im1f, im2f, im3f, im4f, itf, i_til_end, i_here
+    cdef long im1f, im2f, im3f, im4f, itf, i_til_end, i_here
 
     cdef double *p_O     = &O[0, 0, 0, 0]
     cdef double *p_O_z   = &O_z[0, 0, 0, 0]
@@ -317,25 +319,25 @@ def calc_fine_volrat4(double[:, :, :, ::1] O, int g_M, int g_Mf, int g_Tf, doubl
 
     #  make a finer grid for O_z
 
-    cdef int m1m2m3m4 = g_M*g_M*g_M*m1 + g_M*g_M*m2 + g_M*m3 + m4
+    cdef long m1m2m3m4 = g_M*g_M*g_M*m1 + g_M*g_M*m2 + g_M*m3 + m4
     cdef double tL, tH
     cdef double d1h, d2h, d3h, d4h, d1l, d2l, d3l, d4l
 
     cdef double ifg_Mfm1 = 1./(fg_Mf-1)
-    cdef int    g_Mfm1 = g_Mf-1
-    cdef int    g_Mfm1_3 = g_Mfm1*g_Mfm1*g_Mfm1
-    cdef int    g_Mfm1_2 = g_Mfm1*g_Mfm1
-    cdef int    g_Tfm1 = g_Tf-1
-    cdef int g_Mf3 = g_Mf*g_Mf*g_Mf
-    cdef int g_Mf2 = g_Mf*g_Mf
-    cdef int g_Mfm1xTfm1 = g_Mfm1 * g_Tfm1
-    cdef int g_Mfm1_2xTfm1 = g_Mfm1 * g_Mfm1xTfm1
-    cdef int g_Mfm1_3xTfm1 = g_Mfm1 * g_Mfm1_2xTfm1
+    cdef long    g_Mfm1  = g_Mf - 1
+    cdef long    g_Mfm1_3 = g_Mfm1*g_Mfm1*g_Mfm1
+    cdef long    g_Mfm1_2 = g_Mfm1*g_Mfm1
+    cdef long    g_Tfm1 = g_Tf-1
+    cdef long g_Mf3 = g_Mf*g_Mf*g_Mf
+    cdef long g_Mf2 = g_Mf*g_Mf
+    cdef long g_Mfm1xTfm1 = g_Mfm1 * g_Tfm1
+    cdef long g_Mfm1_2xTfm1 = g_Mfm1 * g_Mfm1xTfm1
+    cdef long g_Mfm1_3xTfm1 = g_Mfm1 * g_Mfm1_2xTfm1
 
-    cdef int _m1, _m2, _m3
-    cdef int _m1p1, _m2p1, _m3p1, m4p1
+    cdef long _m1, _m2, _m3
+    cdef long _m1p1, _m2p1, _m3p1, m4p1
 
-    cdef int inboundary 
+    cdef long inboundary 
 
     for im1f in xrange(g_Mf):
         for im2f in xrange(g_Mf):
@@ -344,14 +346,14 @@ def calc_fine_volrat4(double[:, :, :, ::1] O, int g_M, int g_Mf, int g_Tf, doubl
                     p_O_z[im1f*g_Mf*g_Mf*g_Mf + im2f*g_Mf*g_Mf + im3f*g_Mf + im4f] = p_O[m1m2m3m4] + im1f*ifg_Mfm1*dO_m1 + im2f*ifg_Mfm1*dO_m2 + im3f*ifg_Mfm1*dO_m3 + im4f*ifg_Mfm1*dO_m4
 
     for im1f in xrange(g_Mf-1):
-        _m1 = im1f*g_Mfm1_3
-        _m1p1 = (im1f+1)*g_Mfm1_3
+        _m1 = im1f*g_Mf3
+        _m1p1 = (im1f+1)*g_Mf3
         for im2f in xrange(g_Mf-1):
-            _m2 = im2f*g_Mfm1_2
-            _m2p1 = (im2f+1)*g_Mfm1_2
+            _m2 = im2f*g_Mf2
+            _m2p1 = (im2f+1)*g_Mf2
             for im3f in xrange(g_Mf-1):
-                _m3 = im3f*g_Mfm1
-                _m3p1 = (im3f+1)*g_Mfm1
+                _m3 = im3f*g_Mf
+                _m3p1 = (im3f+1)*g_Mf
                 for im4f in xrange(g_Mf-1):
                     m4p1 = im4f+1
                     inboundary = 1
@@ -421,7 +423,7 @@ def calc_fine_volrat4(double[:, :, :, ::1] O, int g_M, int g_Mf, int g_Tf, doubl
                              (d11h > 0) or (d12h > 0) or (d13h > 0) or (d14h > 0) or \
                              (d21h > 0) or (d22h > 0) or (d23h > 0) or (d24h > 0) or (d25h > 0) or (d26h > 0) or \
                              (d31h > 0) or (d32h > 0) or (d33h > 0) or (d34h > 0) or \
-                             (d41h)) and
+                             (d41h > 0)) and
                             ((d01l > 0) or \
                              (d11l > 0) or (d12l > 0) or (d13l > 0) or (d14l > 0) or \
                              (d21l > 0) or (d22l > 0) or (d23l > 0) or (d24l > 0) or (d25l > 0) or (d26l > 0) or \
@@ -522,4 +524,3 @@ def find_O4(int g_M, int NT, double[::1] attimes, double[::1] occ, double[:, :, 
                         else:
                             inboundary = 0
                     
-
