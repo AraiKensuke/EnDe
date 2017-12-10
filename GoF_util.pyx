@@ -184,11 +184,7 @@ def calc_volrat4(long g_T, long g_M, double[:, :, :, ::1] O, double[::1] trngs, 
     cdef long _m1, _m2, _m3
     cdef long _m1p1, _m2p1, _m3p1, m4p1
 
-    print "before loop in calc_volrat4"
-    tH    = 0
-    print "g_M  %d" % g_M
-    print "%.5f" % (tH - p_O[10*g_M*g_M*g_M + 10*g_M*g_M + 10*g_M + 10])
-    print "%.5f" % (tH - O[10, 10, 10, 10])
+    cdef int i_start_search 
 
     for m1 in xrange(g_M-1):
         #print "m1  %d" % m1
@@ -430,26 +426,46 @@ def calc_fine_volrat4(double[:, :, :, ::1] O,  long g_M, long g_Mf, int g_Tf, do
                              (d31l > 0) or (d32l > 0) or (d33l > 0) or (d34l > 0) or \
                              (d41l > 0))):
                             #  a border
-                            r01h = sm if (d01h<=0) else (1 if (d01h>dtf) else d01h*idtf)
+                            # r01h = sm if (d01h<=0) else (1 if (d01h>dtf) else d01h*idtf)
 
-                            r11h = sm if (d11h<=0) else (1 if (d11h>dtf) else d11h*idtf)
-                            r12h = sm if (d12h<=0) else (1 if (d12h>dtf) else d12h*idtf)
-                            r13h = sm if (d13h<=0) else (1 if (d13h>dtf) else d13h*idtf)
-                            r14h = sm if (d14h<=0) else (1 if (d14h>dtf) else d14h*idtf)
+                            # r11h = sm if (d11h<=0) else (1 if (d11h>dtf) else d11h*idtf)
+                            # r12h = sm if (d12h<=0) else (1 if (d12h>dtf) else d12h*idtf)
+                            # r13h = sm if (d13h<=0) else (1 if (d13h>dtf) else d13h*idtf)
+                            # r14h = sm if (d14h<=0) else (1 if (d14h>dtf) else d14h*idtf)
 
-                            r21h = sm if (d21h<=0) else (1 if (d21h>dtf) else d21h*idtf)
-                            r22h = sm if (d22h<=0) else (1 if (d22h>dtf) else d22h*idtf)
-                            r23h = sm if (d23h<=0) else (1 if (d23h>dtf) else d23h*idtf)
-                            r24h = sm if (d24h<=0) else (1 if (d24h>dtf) else d24h*idtf)
-                            r25h = sm if (d25h<=0) else (1 if (d25h>dtf) else d25h*idtf)
-                            r26h = sm if (d26h<=0) else (1 if (d26h>dtf) else d26h*idtf)
+                            # r21h = sm if (d21h<=0) else (1 if (d21h>dtf) else d21h*idtf)
+                            # r22h = sm if (d22h<=0) else (1 if (d22h>dtf) else d22h*idtf)
+                            # r23h = sm if (d23h<=0) else (1 if (d23h>dtf) else d23h*idtf)
+                            # r24h = sm if (d24h<=0) else (1 if (d24h>dtf) else d24h*idtf)
+                            # r25h = sm if (d25h<=0) else (1 if (d25h>dtf) else d25h*idtf)
+                            # r26h = sm if (d26h<=0) else (1 if (d26h>dtf) else d26h*idtf)
 
-                            r31h = sm if (d31h<=0) else (1 if (d31h>dtf) else d31h*idtf)
-                            r32h = sm if (d32h<=0) else (1 if (d32h>dtf) else d32h*idtf)
-                            r33h = sm if (d33h<=0) else (1 if (d33h>dtf) else d33h*idtf)
-                            r34h = sm if (d34h<=0) else (1 if (d34h>dtf) else d34h*idtf)
+                            # r31h = sm if (d31h<=0) else (1 if (d31h>dtf) else d31h*idtf)
+                            # r32h = sm if (d32h<=0) else (1 if (d32h>dtf) else d32h*idtf)
+                            # r33h = sm if (d33h<=0) else (1 if (d33h>dtf) else d33h*idtf)
+                            # r34h = sm if (d34h<=0) else (1 if (d34h>dtf) else d34h*idtf)
 
-                            r41h = sm if (d41h<=0) else (1 if (d41h>dtf) else d41h*idtf)
+                            # r41h = sm if (d41h<=0) else (1 if (d41h>dtf) else d41h*idtf)
+                            r01h = sm if (d01h<=0) else (1 if (d01h>dtf) else d01l*idtf)
+
+                            r11h = sm if (d11h<=0) else (1 if (d11h>dtf) else d11l*idtf)
+                            r12h = sm if (d12h<=0) else (1 if (d12h>dtf) else d12l*idtf)
+                            r13h = sm if (d13h<=0) else (1 if (d13h>dtf) else d13l*idtf)
+                            r14h = sm if (d14h<=0) else (1 if (d14h>dtf) else d14l*idtf)
+
+                            r21h = sm if (d21h<=0) else (1 if (d21h>dtf) else d21l*idtf)
+                            r22h = sm if (d22h<=0) else (1 if (d22h>dtf) else d22l*idtf)
+                            r23h = sm if (d23h<=0) else (1 if (d23h>dtf) else d23l*idtf)
+                            r24h = sm if (d24h<=0) else (1 if (d24h>dtf) else d24l*idtf)
+                            r25h = sm if (d25h<=0) else (1 if (d25h>dtf) else d25l*idtf)
+                            r26h = sm if (d26h<=0) else (1 if (d26h>dtf) else d26l*idtf)
+
+                            r31h = sm if (d31h<=0) else (1 if (d31h>dtf) else d31l*idtf)
+                            r32h = sm if (d32h<=0) else (1 if (d32h>dtf) else d32l*idtf)
+                            r33h = sm if (d33h<=0) else (1 if (d33h>dtf) else d33l*idtf)
+                            r34h = sm if (d34h<=0) else (1 if (d34h>dtf) else d34l*idtf)
+
+                            r41h = sm if (d41h<=0) else (1 if (d41h>dtf) else d41l*idtf)
 
                             p_vlr_z[im1f*g_Mfm1_3xTfm1 + im2f*g_Mfm1_2xTfm1 + im3f*g_Mfm1xTfm1 + im4f*g_Tfm1 + itf] = r01h * r11h*r12h*r13h*r14h * r21h*r22h*r23h*r24h*r25h*r26h * r31h*r32h*r33h*r34h + r41h
                         else:  #  not a border
