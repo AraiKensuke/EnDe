@@ -615,7 +615,7 @@ class mkdecoder:
 
         dm = _N.diff(mrngs[0])[:, 0]
         
-        if smpld_marks is not None:
+        if (smpld_marks is not None) and (oo.mdim > 1):
             tt0 = _tm.time()
             sN = smpld_marks.shape[0]
             for s in xrange(sN):
@@ -686,6 +686,22 @@ class mkdecoder:
             tt1 = _tm.time()
             print "done   %.4f" % (tt1-tt0)
         else:   #  not smpld_marks.  brute force, calculate over entire grid
+            if oo.mdim == 1:
+                if not kde:
+                    for im1 in xrange(g_M):
+                        tt0 = _tm.time()
+                        mk[:, 1:] = _N.array([mrngs[nt, 0, im1]])
+
+                        mkint = _hb.evalAtFxdMks_new(mk, l0sr, usnt, iSgsnt, i2pidcovsnt, Msnt, oo.Nx, oo.mdim + 1)*oo.dt
+                        O[im1] = _N.sum(mkint[disc_pos_t0t1])
+                else:
+                    for im1 in xrange(g_M):
+                        tt0 = _tm.time()
+                        mk[:, 1:] = _N.array([mrngs[nt, 0, im1]])
+
+                        mkint = _ku.kerFr(mk[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx, oo.dxp, oo.occ)
+                        O[im1] = _N.sum(mkint[disc_pos_t0t1])
+
             if oo.mdim == 2:
                 if not kde:
                     for im1 in xrange(g_M):

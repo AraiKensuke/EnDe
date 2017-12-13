@@ -180,6 +180,8 @@ def calc_volrat4(long g_T, long g_M, double[:, :, :, ::1] O, double[::1] trngs, 
     inside  = 0
     outside = 0
     border  = 0
+    cdef double p01, p11, p12, p13, p14, p21, p22, p23, p24, p25, p26, p31, p32, p33, p34, p41
+
     
     cdef long _m1, _m2, _m3
     cdef long _m1p1, _m2p1, _m3p1, m4p1
@@ -201,64 +203,87 @@ def calc_volrat4(long g_T, long g_M, double[:, :, :, ::1] O, double[::1] trngs, 
                     inboundary = 1
 
                     it = -1
+                    p01 = p_O[_m1 + _m2 + _m3+ m4]
+                    
+                    p11 = p_O[_m1p1 + _m2 + _m3+ m4]
+                    p12 = p_O[_m1 + _m2p1 + _m3+ m4]
+                    p13 = p_O[_m1 + _m2 + _m3p1+ m4]
+                    p14 = p_O[_m1 + _m2 + _m3+ m4p1]
+
+                    p21 = p_O[_m1p1 + _m2p1 + _m3+ m4]     # 1 2
+                    p22 = p_O[_m1p1 + _m2 + _m3p1+ m4]     # 1 3
+                    p23 = p_O[_m1p1 + _m2 + _m3+ m4p1]     # 1 4
+                    p24 = p_O[_m1 + _m2p1 + _m3p1+ m4]     # 2 3
+                    p25 = p_O[_m1 + _m2p1 + _m3+ m4p1]     # 2 4
+                    p26 = p_O[_m1 + _m2 + _m3p1+ m4p1]     # 3 4
+
+                    # 3  
+                    p31 = p_O[_m1p1 + _m2p1 + _m3p1+ m4]   # 1 2 3
+                    p32 = p_O[_m1p1 + _m2p1 + _m3+ m4p1]   # 1 2 4
+                    p33 = p_O[_m1p1 + _m2 + _m3p1+ m4p1]   # 1 3 4
+                    p34 = p_O[_m1 + _m2p1 + _m3p1+ m4p1]   # 2 3 4
+
+                    # 4
+                    p41 = p_O[_m1p1 + _m2p1 + _m3p1+ m4p1] # 1 2 3 4
+
                     while (it < g_T-2) and (inboundary == 1):
                         it += 1
 
                         tL = p_trngs[it]
                         tH = p_trngs[it+1]
 
-                        d01h = tH - p_O[_m1 + _m2 + _m3+ m4] 
+                        d01h = tH - p01
                         #d01h = tH - O[m1, m2, m3, m4] 
                         #print "--- %(1).4f    %(2).4f" % {"1" : O[m1, m2, m3, m4], "2" : p_O[_m1 + _m2 + _m3+ m4p1]}
 
                         #  1   
-                        d11h = tH - p_O[_m1p1 + _m2 + _m3+ m4] 
-                        d12h = tH - p_O[_m1 + _m2p1 + _m3+ m4] 
-                        d13h = tH - p_O[_m1 + _m2 + _m3p1+ m4] 
-                        d14h = tH - p_O[_m1 + _m2 + _m3+ m4p1] 
+                        d11h = tH - p11
+                        d12h = tH - p12
+                        d13h = tH - p13
+                        d14h = tH - p14
 
                         #  2   
-                        d21h = tH - p_O[_m1p1 + _m2p1 + _m3+ m4]     # 1 2
-                        d22h = tH - p_O[_m1p1 + _m2 + _m3p1+ m4]     # 1 3
-                        d23h = tH - p_O[_m1p1 + _m2 + _m3+ m4p1]     # 1 4
-                        d24h = tH - p_O[_m1 + _m2p1 + _m3p1+ m4]     # 2 3
-                        d25h = tH - p_O[_m1 + _m2p1 + _m3+ m4p1]     # 2 4
-                        d26h = tH - p_O[_m1 + _m2 + _m3p1+ m4p1]     # 3 4
+                        d21h = tH - p21
+                        d22h = tH - p22
+                        d23h = tH - p23
+                        d24h = tH - p24
+                        d25h = tH - p25
+                        d26h = tH - p26
 
                         # 3  
-                        d31h = tH - p_O[_m1p1 + _m2p1 + _m3p1+ m4]   # 1 2 3
-                        d32h = tH - p_O[_m1p1 + _m2p1 + _m3+ m4p1]   # 1 2 4
-                        d33h = tH - p_O[_m1p1 + _m2 + _m3p1+ m4p1]   # 1 3 4
-                        d34h = tH - p_O[_m1 + _m2p1 + _m3p1+ m4p1]   # 2 3 4
+                        d31h = tH - p31
+                        d32h = tH - p32
+                        d33h = tH - p33
+                        d34h = tH - p34
 
                         # 4
-                        d41h = tH - p_O[_m1p1 + _m2p1 + _m3p1+ m4p1] # 1 2 3 4
+                        d41h = tH - p41
 
                         ###################################3
-                        d01l = p_O[_m1 + _m2 + _m3+ m4] - tL
+                        d01l = p01 - tL
 
                         #  1   
-                        d11l = p_O[_m1p1 + _m2 + _m3+ m4] - tL
-                        d12l = p_O[_m1 + _m2p1 + _m3+ m4] - tL
-                        d13l = p_O[_m1 + _m2 + _m3p1+ m4] - tL
-                        d14l = p_O[_m1 + _m2 + _m3+ m4p1] - tL
+                        d11l = p11 - tL
+                        d12l = p12 - tL
+                        d13l = p13 - tL
+                        d14l = p14 - tL
 
                         #  2   
-                        d21l = p_O[_m1p1 + _m2p1 + _m3+ m4]- tL     # 1 2
-                        d22l = p_O[_m1p1 + _m2 + _m3p1+ m4]- tL     # 1 3
-                        d23l = p_O[_m1p1 + _m2 + _m3+ m4p1]- tL     # 1 4
-                        d24l = p_O[_m1 + _m2p1 + _m3p1+ m4]- tL     # 2 3
-                        d25l = p_O[_m1 + _m2p1 + _m3+ m4p1]- tL     # 2 4
-                        d26l = p_O[_m1 + _m2 + _m3p1+ m4p1]- tL     # 3 4
+                        d21l = p21 - tL
+                        d22l = p22 - tL
+                        d23l = p23 - tL
+                        d24l = p24 - tL
+                        d25l = p25 - tL
+                        d26l = p26 - tL
 
                         # 3  
-                        d31l = p_O[_m1p1 + _m2p1 + _m3p1+ m4] - tL   # 1 2 3
-                        d32l = p_O[_m1p1 + _m2p1 + _m3+ m4p1] - tL   # 1 2 4
-                        d33l = p_O[_m1p1 + _m2 + _m3p1+ m4p1] - tL   # 1 3 4
-                        d34l = p_O[_m1 + _m2p1 + _m3p1+ m4p1] - tL   # 2 3 4
+                        d31l = p31 - tL
+                        d32l = p32 - tL
+                        d33l = p33 - tL
+                        d34l = p34 - tL
 
                         # 4
-                        d41l = p_O[_m1p1 + _m2p1 + _m3p1+ m4p1] - tL   # 1 2 3 4
+                        d41l = p41 - tL
                         
 
                         if (((d01h > 0) or \
@@ -330,6 +355,8 @@ def calc_fine_volrat4(double[:, :, :, ::1] O,  long g_M, long g_Mf, int g_Tf, do
     cdef long g_Mfm1_2xTfm1 = g_Mfm1 * g_Mfm1xTfm1
     cdef long g_Mfm1_3xTfm1 = g_Mfm1 * g_Mfm1_2xTfm1
 
+    cdef double p01, p11, p12, p13, p14, p21, p22, p23, p24, p25, p26, p31, p32, p33, p34, p41
+
     cdef long _m1, _m2, _m3
     cdef long _m1p1, _m2p1, _m3p1, m4p1
 
@@ -355,64 +382,87 @@ def calc_fine_volrat4(double[:, :, :, ::1] O,  long g_M, long g_Mf, int g_Tf, do
                     inboundary = 1
                     #for itf in xrange(g_Tf-1):
                     itf = -1
+
+                    p01 = p_O_z[_m1 + _m2 + _m3+ im4f]
+                    
+                    p11 = p_O_z[_m1p1 + _m2 + _m3+ im4f]
+                    p12 = p_O_z[_m1 + _m2p1 + _m3+ im4f]
+                    p13 = p_O_z[_m1 + _m2 + _m3p1+ im4f]
+                    p14 = p_O_z[_m1 + _m2 + _m3+ m4p1]
+
+                    p21 = p_O_z[_m1p1 + _m2p1 + _m3+ im4f]     # 1 2
+                    p22 = p_O_z[_m1p1 + _m2 + _m3p1+ im4f]     # 1 3
+                    p23 = p_O_z[_m1p1 + _m2 + _m3+ m4p1]     # 1 4
+                    p24 = p_O_z[_m1 + _m2p1 + _m3p1+ im4f]     # 2 3
+                    p25 = p_O_z[_m1 + _m2p1 + _m3+ m4p1]     # 2 4
+                    p26 = p_O_z[_m1 + _m2 + _m3p1+ m4p1]     # 3 4
+
+                    # 3  
+                    p31 = p_O_z[_m1p1 + _m2p1 + _m3p1+ im4f]   # 1 2 3
+                    p32 = p_O_z[_m1p1 + _m2p1 + _m3+ m4p1]   # 1 2 4
+                    p33 = p_O_z[_m1p1 + _m2 + _m3p1+ m4p1]   # 1 3 4
+                    p34 = p_O_z[_m1 + _m2p1 + _m3p1+ m4p1]   # 2 3 4
+
+                    # 4
+                    p41 = p_O_z[_m1p1 + _m2p1 + _m3p1+ m4p1] # 1 2 3 4
+
                     while (itf < g_Tfm1-1) and (inboundary == 1):
                         itf += 1
                         tL = t + itf * dtf
                         tH = t + (itf+1) * dtf 
 
 
-                        d01h = tH - p_O_z[_m1 + _m2 + _m3+ im4f] 
+                        d01h = tH - p01
 
                         #  1   
-                        d11h = tH - p_O_z[_m1p1 + _m2 + _m3+ im4f] 
-                        d12h = tH - p_O_z[_m1 + _m2p1 + _m3+ im4f] 
-                        d13h = tH - p_O_z[_m1 + _m2 + _m3p1+ im4f] 
-                        d14h = tH - p_O_z[_m1 + _m2 + _m3+ m4p1] 
+                        d11h = tH - p11
+                        d12h = tH - p12
+                        d13h = tH - p13
+                        d14h = tH - p14
 
                         #  2   
-                        d21h = tH - p_O_z[_m1p1 + _m2p1 + _m3+ im4f]     # 1 2
-                        d22h = tH - p_O_z[_m1p1 + _m2 + _m3p1+ im4f]     # 1 3
-                        d23h = tH - p_O_z[_m1p1 + _m2 + _m3+ m4p1]     # 1 4
-                        d24h = tH - p_O_z[_m1 + _m2p1 + _m3p1+ im4f]     # 2 3
-                        d25h = tH - p_O_z[_m1 + _m2p1 + _m3+ m4p1]     # 2 4
-                        d26h = tH - p_O_z[_m1 + _m2 + _m3p1+ m4p1]     # 3 4
+                        d21h = tH - p21
+                        d22h = tH - p22
+                        d23h = tH - p23
+                        d24h = tH - p24
+                        d25h = tH - p25
+                        d26h = tH - p26
 
                         # 3  
-                        d31h = tH - p_O_z[_m1p1 + _m2p1 + _m3p1+ im4f]   # 1 2 3
-                        d32h = tH - p_O_z[_m1p1 + _m2p1 + _m3+ m4p1]   # 1 2 4
-                        d33h = tH - p_O_z[_m1p1 + _m2 + _m3p1+ m4p1]   # 1 3 4
-                        d34h = tH - p_O_z[_m1 + _m2p1 + _m3p1+ m4p1]   # 2 3 4
+                        d31h = tH - p31
+                        d32h = tH - p32
+                        d33h = tH - p33
+                        d34h = tH - p34
 
                         # 4
-                        d41h = tH - p_O_z[_m1p1 + _m2p1 + _m3p1+ m4p1]   # 1 2 3 4      
+                        d41h = tH - p41
 
-
-
-
-                        d01l = p_O_z[_m1 + _m2 + _m3+ im4f] - tL
+                        ###################################3
+                        d01l = p01 - tL
 
                         #  1   
-                        d11l = p_O_z[_m1p1 + _m2 + _m3+ im4f] - tL
-                        d12l = p_O_z[_m1 + _m2p1 + _m3+ im4f] - tL
-                        d13l = p_O_z[_m1 + _m2 + _m3p1+ im4f] - tL
-                        d14l = p_O_z[_m1 + _m2 + _m3+ m4p1] - tL
+                        d11l = p11 - tL
+                        d12l = p12 - tL
+                        d13l = p13 - tL
+                        d14l = p14 - tL
 
                         #  2   
-                        d21l = p_O_z[_m1p1 + _m2p1 + _m3+ im4f]- tL     # 1 2
-                        d22l = p_O_z[_m1p1 + _m2 + _m3p1+ im4f]- tL     # 1 3
-                        d23l = p_O_z[_m1p1 + _m2 + _m3+ m4p1]- tL     # 1 4
-                        d24l = p_O_z[_m1 + _m2p1 + _m3p1+ im4f]- tL     # 2 3
-                        d25l = p_O_z[_m1 + _m2p1 + _m3+ m4p1]- tL     # 2 4
-                        d26l = p_O_z[_m1 + _m2 + _m3p1+ m4p1]- tL     # 3 4
+                        d21l = p21 - tL
+                        d22l = p22 - tL
+                        d23l = p23 - tL
+                        d24l = p24 - tL
+                        d25l = p25 - tL
+                        d26l = p26 - tL
 
                         # 3  
-                        d31l = p_O_z[_m1p1 + _m2p1 + _m3p1+ im4f] - tL   # 1 2 3
-                        d32l = p_O_z[_m1p1 + _m2p1 + _m3+ m4p1] - tL   # 1 2 4
-                        d33l = p_O_z[_m1p1 + _m2 + _m3p1+ m4p1] - tL   # 1 3 4
-                        d34l = p_O_z[_m1 + _m2p1 + _m3p1+ m4p1] - tL   # 2 3 4
+                        d31l = p31 - tL
+                        d32l = p32 - tL
+                        d33l = p33 - tL
+                        d34l = p34 - tL
 
                         # 4
-                        d41l = p_O_z[_m1p1 + _m2p1 + _m3p1+ m4p1] - tL # 1 2 3 4
+                        d41l = p41 - tL
+
 
 
                         if (((d01h > 0) or \
