@@ -71,6 +71,41 @@ def hc_sub_2_vec_K4(double[:, ::1] mAS, double [:, ::1] u, double [:, :, ::1] ou
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
+def hc_sub_2_vec_K2(double[:, ::1] mAS, double [:, ::1] u, double [:, :, ::1] out, int M, int N):
+    #  mAS - u.  mAS: K-dim marks from N spikes, u: M K-dim cluster centers
+    #  mAS   N x K
+    #  u     M x K
+
+    cdef int K  = 2   # hardcoded
+    #  output is M x N x K
+    
+    cdef int m, n, mK, mKN, nK, mKN_nK
+
+    cdef double *p_mAS   = &mAS[0, 0]
+    cdef double *p_u     = &u[0, 0]
+    cdef double *p_out   = &out[0, 0, 0]
+
+    cdef double u_m_0, u_m_1, u_m_2, u_m_3  # u[m, 0] to u[m, 3]
+    for 0 <= m < M:
+        mK = m*K
+        mKN= m*K*N
+
+        u_m_0 = p_u[mK]
+        u_m_1 = p_u[mK + 1]
+        for 0 <= n < N:
+            nK = n*K
+            #mKN_nK = mKN+nK
+
+            #  mAS[n, k] = p_mAS[n*K + k]
+            #  u[m, k]   = p_u[m*K + k]
+            #  out[m, n, k]   = p_out[m*K*N + n*K + k]
+            p_out[mKN+nK]     = p_mAS[nK]   - u_m_0
+            p_out[mKN+nK + 1] = p_mAS[nK+1] - u_m_1
+
+        #out[m, n, k] = mAS[n, k] - u[m, k]
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
 def hc_bcast1_par(double[:, ::1] fr, double [:, ::1] xASr, double[:, ::1] iq2r, double [:, ::1] qdrSPC, int M, int N, int nthrds=4):
     #  fxs       M x fss   
     #  fxrux     Nupx    
@@ -175,27 +210,3 @@ def evalAtFxdMks_new(double[:, ::1] fxdMks, double[::1] l0, double[:, ::1] us, d
                 #p_zs[ix] += l0[m] * i2pidcovs[m] * _N.exp(-0.5*mxval[m, ix])
 
     return zs
-
-# def rolled_out_q2(int M):
-#     #  v_sts    int of size len(Asts)   all spikes in epoch
-#     cdef int SPKS, strt_ind_m
-#     for 0 <= m < M:
-#         strt_ind_m = cls_str_ind[m]
-#         SPKS = cls_str_ind[m+1]- strt_ind_m
-#         fm   = f[m]
-
-#         for 0 <= s < SPKS:
-#             sxI += (xt0t1[v_sts[s+strt_ind_m]-t0] - fm)*(xt0t1[v_sts[s+strt_ind_m]-t0] - fm)
-#         SL_B[m] = sxI*0.5
-#     return SL_B
-        
-        
-    # for m in xrange(M):
-    #     if clstsz[m] > 0:
-    #         sts = v_sts[cls_str_ind[m]:cls_str_ind[m+1]]
-    #         xI = (xt0t1[sts-t0]-f[m])*(xt0t1[sts-t0]-f[m])*0.5
-    #         SL_B = _N.sum(xI)  #  spiking part of likelihood
-    #         #  -S/2 (likelihood)  -(a+1)
-    #         sLLkPr[m] = -(0.5*clstsz[m] + _q2_a[m] + 1)*lq2x - iq2x*(_q2_B[m] + SL_B)   #  just (isig2)^{-S/2} x (isig2)^{-(_q2_a + 1)}   
-    #     else:
-    #         sLLkPr[m] = -(_q2_a[m] + 1)*lq2x - iq2x*_q2_B[m]

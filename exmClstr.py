@@ -302,10 +302,11 @@ def timeline(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1, xL=0, xH=3, ytic
     _plt.close()
 
 
-def timeline_v2(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1, xL=0, xH=3, yticks=[0, 1, 2, 3], thin=1, allFR=None):   #  25Hz
+def timeline_v2(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1, xL=0, xH=3, yticks=[0, 1, 2, 3], thin=1, allFR=None, tcksz=19, lblsz=21, t0=None, t1=None, figw=10, figh=10, ytpos="left"):   #  25Hz
     d = _N.loadtxt(datFN("%s.dat" % datfn))   #  marks
-    itv = _N.loadtxt(datFN("%s.dat" % itvfn))
     N = d.shape[0]          #  ALL spikes
+    itv = _N.loadtxt(datFN("%s.dat" % itvfn))
+
     epochs = itv.shape[0]-1
     ch1 += 2   #  because this is data col
     ch2 += 2
@@ -363,52 +364,84 @@ def timeline_v2(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1, xL=0, xH=3, y
         else:
             sts = _sts[::thin]
 
-    fig = _plt.figure(figsize=(10, 10))
+    fig = _plt.figure(figsize=(figw, figh))
     #######################
-    ax =_plt.subplot2grid((5, 3), (0, 0), colspan=3)
+    #ax =_plt.subplot2grid((5, 3), (0, 0), colspan=3)
+    ax =_plt.subplot2grid((33, 3), (0, 0), colspan=3, rowspan=5)
     _plt.scatter(sts/1000., d[sts, 0], s=2, color="black")
-    mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
-    mF.setTicksAndLims(xlabel=None, ylabel="position", xticks=None, yticks=yticks, xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[xL-0.3, xH+0.3], tickFS=15, labelFS=18)
+    if ytpos == "left":
+        mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
+        mF.setTicksAndLims(xlabel="time (s)", ylabel="position", yticks=[-6, -5, -3, -1, 0, 1, 3, 5, 6], xticks=None, yticksD=["H     ", "C", "L     ", "C", "H     ", "C", "R     ", "C", "H     "], xticksD=None, xlim=[0, N/1000.], ylim=[xL-0.3, xH+0.3], tickFS=tcksz, labelFS=lblsz)
+    else:
+        mF.arbitraryAxes(ax, axesVis=[False, True, True, False], xtpos="bottom", ytpos="right")
+        mF.setTicksAndLims(xlabel="time (s)", ylabel="position", yticks=[-6, -5, -3, -1, 0, 1, 3, 5, 6], xticks=None, yticksD=["H", "   C", "L", "   C", "H", "   C", "R", "   C", "H"], xticksD=None, xlim=[0, N/1000.], ylim=[xL-0.3, xH+0.3], tickFS=tcksz, labelFS=lblsz)
+
     for ep in xrange(epochs):
         _plt.axvline(x=(itv[ep+1]*N/1000.), color="red", ls="--")
     #######################
-    ax = _plt.subplot2grid((5, 3), (1, 0), colspan=3)
+    #ax = _plt.subplot2grid((5, 3), (1, 0), colspan=3)
+    ax = _plt.subplot2grid((33, 3), (10, 0), colspan=3, rowspan=5)
     print len(sts)
     _plt.scatter(sts/1000., d[sts, 2], s=2, color="black")
-    mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
-    mF.setTicksAndLims(xlabel=None, ylabel="mk elctrd 1", xticks=None, yticks=[0, 3, 6], xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[wvfmMin[0], wvfmMax[0]], tickFS=15, labelFS=18)
+    if ytpos == "left":
+        mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
+        mF.setTicksAndLims(xlabel=None, ylabel="channel 1\nmark (a.u.)", xticks=None, yticks=[], xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[wvfmMin[0], wvfmMax[0]], tickFS=tcksz, labelFS=lblsz)
+    else:
+        mF.arbitraryAxes(ax, axesVis=[False, True, True, False], xtpos="bottom", ytpos="right")
+        mF.setTicksAndLims(xlabel=None, ylabel="channel 1\nmark (a.u.)", xticks=None, yticks=[], xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[wvfmMin[0], wvfmMax[0]], tickFS=tcksz, labelFS=lblsz)
+
     for ep in xrange(epochs):
         _plt.axvline(x=(itv[ep+1]*N/1000.), color="red", ls="--")
     #######################
-    ax = _plt.subplot2grid((5, 3), (2, 0), colspan=3)
+    ax = _plt.subplot2grid((33, 3), (16, 0), colspan=3, rowspan=5)
+    #ax = _plt.subplot2grid((5, 3), (2, 0), colspan=3)
     _plt.scatter(sts/1000., d[sts, 3], s=2, color="black")
-    mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
-    mF.setTicksAndLims(xlabel=None, ylabel="mk elctrd 2", xticks=None, yticks=[0, 3, 6], xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[wvfmMin[1], wvfmMax[1]], tickFS=15, labelFS=18)
+    if ytpos == "left":
+        mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
+        mF.setTicksAndLims(xlabel=None, ylabel="channel 2\nmark (a.u.)", xticks=None, yticks=[], xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[wvfmMin[0], wvfmMax[0]], tickFS=tcksz, labelFS=lblsz)
+    else:
+        mF.arbitraryAxes(ax, axesVis=[False, True, True, False], xtpos="bottom", ytpos="right")
+        mF.setTicksAndLims(xlabel=None, ylabel="channel 2\nmark (a.u.)", xticks=None, yticks=[], xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[wvfmMin[0], wvfmMax[0]], tickFS=tcksz, labelFS=lblsz)
     for ep in xrange(epochs):
         _plt.axvline(x=(itv[ep+1]*N/1000.), color="red", ls="--")
     #######################
-    ax = _plt.subplot2grid((5, 3), (3, 0), colspan=3)
+    #ax = _plt.subplot2grid((5, 3), (3, 0), colspan=3)
+    ax = _plt.subplot2grid((33, 3), (22, 0), colspan=3, rowspan=5)
     print len(sts)
     _plt.scatter(sts/1000., d[sts, 4], s=2, color="black")
-    mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
-    mF.setTicksAndLims(xlabel=None, ylabel="mk elctrd 3", xticks=None, yticks=[0, 3, 6], xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[wvfmMin[0], wvfmMax[0]], tickFS=15, labelFS=18)
+    if ytpos == "left":
+        mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
+        mF.setTicksAndLims(xlabel=None, ylabel="channel 3\nmark (a.u.)", xticks=None, yticks=[], xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[wvfmMin[0], wvfmMax[0]], tickFS=tcksz, labelFS=lblsz)
+    else:
+        mF.arbitraryAxes(ax, axesVis=[False, True, True, False], xtpos="bottom", ytpos="right")
+        mF.setTicksAndLims(xlabel=None, ylabel="channel 3\nmark (a.u.)", xticks=None, yticks=[], xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[wvfmMin[0], wvfmMax[0]], tickFS=tcksz, labelFS=lblsz)
     for ep in xrange(epochs):
         _plt.axvline(x=(itv[ep+1]*N/1000.), color="red", ls="--")
     #######################
-    ax = _plt.subplot2grid((5, 3), (4, 0), colspan=3)
+    ax = _plt.subplot2grid((33, 3), (28, 0), colspan=3, rowspan=5)
+    #ax = _plt.subplot2grid((5, 3), (4, 0), colspan=3)
     _plt.scatter(sts/1000., d[sts, 5], s=2, color="black")
-    mF.arbitraryAxes(ax, axesVis=[5, True, False, False], xtpos="bottom", ytpos="left")
-    mF.setTicksAndLims(xlabel="time (s)", ylabel="mk elctrd 4", xticks=None, yticks=[0, 3, 6], xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[wvfmMin[1], wvfmMax[1]], tickFS=15, labelFS=18)
+    if ytpos == "left":
+        mF.arbitraryAxes(ax, axesVis=[True, True, False, False], xtpos="bottom", ytpos="left")
+        mF.setTicksAndLims(xlabel="time (s)", ylabel="channel 4\nmark (a.u.)", xticks=None, yticks=[], xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[wvfmMin[0], wvfmMax[0]], tickFS=tcksz, labelFS=lblsz)
+    else:
+        mF.arbitraryAxes(ax, axesVis=[False, True, True, False], xtpos="bottom", ytpos="right")
+        mF.setTicksAndLims(xlabel="time (s)", ylabel="channel 4\nmark (a.u.)", xticks=None, yticks=[], xticksD=None, yticksD=None, xlim=[0, N/1000.], ylim=[wvfmMin[0], wvfmMax[0]], tickFS=tcksz, labelFS=lblsz)
     for ep in xrange(epochs):
         _plt.axvline(x=(itv[ep+1]*N/1000.), color="red", ls="--")
 
 
 
 
-    fig.subplots_adjust(left=0.15, bottom=0.15, wspace=0.38, hspace=0.38)
+    #fig.subplots_adjust(left=0.08, bottom=0.08, right=0.95, top=0.95, wspace=0.9, hspace=0.9)
+    if ytpos == "left":
+        fig.subplots_adjust(left=0.16, bottom=0.08, right=0.98, top=0.95, wspace=0.4, hspace=0.4)
+    if ytpos == "right":
+        fig.subplots_adjust(left=0.05, bottom=0.08, right=0.84, top=0.95, wspace=0.4, hspace=0.4)
     epochs = len(itv)-1
-    choutfn = "%(of)s_%(1)d,%(2)d.png" % {"of" : outfn, "1" : (ch1-1), "2" : (ch2-1)}
-    _plt.savefig(resFN(choutfn, dir=bfn), transparent=True)
+    for fmt in ["png", "eps"]:
+        choutfn = "%(of)s.%(fmt)s" % {"of" : outfn, "fmt" : fmt}
+        _plt.savefig(resFN(choutfn, dir=bfn), transparent=True)
     _plt.close()
 
 
