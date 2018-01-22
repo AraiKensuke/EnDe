@@ -71,6 +71,41 @@ def hc_sub_2_vec_K4(double[:, ::1] mAS, double [:, ::1] u, double [:, :, ::1] ou
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
+def hc_sub_2_vec_K2(double[:, ::1] mAS, double [:, ::1] u, double [:, :, ::1] out, int M, int N):
+    #  mAS - u.  mAS: K-dim marks from N spikes, u: M K-dim cluster centers
+    #  mAS   N x K
+    #  u     M x K
+
+    cdef int K  = 2   # hardcoded
+    #  output is M x N x K
+    
+    cdef int m, n, mK, mKN, nK, mKN_nK
+
+    cdef double *p_mAS   = &mAS[0, 0]
+    cdef double *p_u     = &u[0, 0]
+    cdef double *p_out   = &out[0, 0, 0]
+
+    cdef double u_m_0, u_m_1, u_m_2, u_m_3  # u[m, 0] to u[m, 3]
+    for 0 <= m < M:
+        mK = m*K
+        mKN= m*K*N
+
+        u_m_0 = p_u[mK]
+        u_m_1 = p_u[mK + 1]
+        for 0 <= n < N:
+            nK = n*K
+            #mKN_nK = mKN+nK
+
+            #  mAS[n, k] = p_mAS[n*K + k]
+            #  u[m, k]   = p_u[m*K + k]
+            #  out[m, n, k]   = p_out[m*K*N + n*K + k]
+            p_out[mKN+nK]     = p_mAS[nK]   - u_m_0
+            p_out[mKN+nK + 1] = p_mAS[nK+1] - u_m_1
+
+        #out[m, n, k] = mAS[n, k] - u[m, k]
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
 def hc_bcast1_par(double[:, ::1] fr, double [:, ::1] xASr, double[:, ::1] iq2r, double [:, ::1] qdrSPC, int M, int N, int nthrds=4):
     #  fxs       M x fss   
     #  fxrux     Nupx    

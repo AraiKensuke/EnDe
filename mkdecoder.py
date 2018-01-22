@@ -516,6 +516,7 @@ class mkdecoder:
                 covs.append(prms[nt][uFE][2])
                 M.append(covs[nt].shape[0])
 
+                print covs[nt]
                 iSgs.append(_N.linalg.inv(covs[nt]))
                 i2pidcovs.append((1/_N.sqrt(2*_N.pi))**(oo.mdim+1)*(1./_N.sqrt(_N.linalg.det(covs[nt]))))
                 #i2pidcovsr.append(i2pidcovs.reshape((M, 1)))
