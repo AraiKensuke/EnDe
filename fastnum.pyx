@@ -125,55 +125,6 @@ cdef void inner_loop_hc_4(double *p_v, double *p_iSg, double *p_qdr, int N, int 
     cdef double iS11 = p_iSg[mkk+k+1]
     cdef double iS22 = p_iSg[mkk+2*k+2]
     cdef double iS33 = p_iSg[mkk+3*k+3]
-    cdef double iS01 = p_iSg[mkk+1]
-    cdef double iS02 = p_iSg[mkk+2]
-    cdef double iS03 = p_iSg[mkk+3]
-    cdef double iS12 = p_iSg[mkk+k+2]
-    cdef double iS13 = p_iSg[mkk+k+3]
-    cdef double iS23 = p_iSg[mkk+2*k+3]
-
-    for n in range(N):
-        mNk_nk = mNk + n*k
-
-        #  mkk offsets pointer so we're accessing mth iSg
-        #  p_iSg[mkk_ik+i*k + j] = p_iSg[i, j] of the mth
-
-        # p_qdr[mN+n] = p_v[mNk_nk]*p_iSg[mkk]*p_v[mNk_nk] + \
-        #               p_v[mNk_nk+1]*p_iSg[mkk+k+1]*p_v[mNk_nk+1] + \
-        #               p_v[mNk_nk+2]*p_iSg[mkk+2*k+2]*p_v[mNk_nk+2] + \
-        #               p_v[mNk_nk+3]*p_iSg[mkk+3*k+3]*p_v[mNk_nk+3] + \
-        #               2*(p_v[mNk_nk]*p_iSg[mkk+1]*p_v[mNk_nk+1] + \
-        #                  p_v[mNk_nk]*p_iSg[mkk+2]*p_v[mNk_nk+2] + \
-        #                  p_v[mNk_nk]*p_iSg[mkk+3]*p_v[mNk_nk+3] + \
-        #                  p_v[mNk_nk+1]*p_iSg[mkk+k+2]*p_v[mNk_nk+2] + \
-        #                  p_v[mNk_nk+1]*p_iSg[mkk+k+3]*p_v[mNk_nk+3] + \
-        #                  p_v[mNk_nk+2]*p_iSg[mkk+2*k+3]*p_v[mNk_nk+3])
-        p_qdr[mN+n] = p_v[mNk_nk]*iS00*p_v[mNk_nk] + \
-                      p_v[mNk_nk+1]*iS11*p_v[mNk_nk+1] + \
-                      p_v[mNk_nk+2]*iS22*p_v[mNk_nk+2] + \
-                      p_v[mNk_nk+3]*iS33*p_v[mNk_nk+3] + \
-                      2*(p_v[mNk_nk]*iS01*p_v[mNk_nk+1] + \
-                         p_v[mNk_nk]*iS02*p_v[mNk_nk+2] + \
-                         p_v[mNk_nk]*iS03*p_v[mNk_nk+3] + \
-                         p_v[mNk_nk+1]*iS12*p_v[mNk_nk+2] + \
-                         p_v[mNk_nk+1]*iS13*p_v[mNk_nk+3] + \
-                         p_v[mNk_nk+2]*iS23*p_v[mNk_nk+3])
-
-@cython.boundscheck(False)
-@cython.wraparound(False)
-cdef void inner_loop_hc_4_v2(double *p_v, double *p_iSg, double *p_qdr, int N, int k, int mN, int mNk, int mkk) nogil:
-    #  hardcoded for k = 5.  pos + marks.  pos, marks are orthogonal
-    #  In this case, should be 1 + 4 + 6 terms
-    #   xSx = x[0]*x[0]*S00 + x[1]*S11*x[1] + x[2]*S22*x[2] + ... (diag trms)
-    #      + 2(x[1]S12 x[2] + x[1]S13 x[3] + x[1]S14 x[4] +
-    #          x[2]S23 x[3] + x[2]S24 x[4] + 
-    #          x[3]S34 x[4])
-    cdef int n, mNk_nk
-
-    cdef double iS00 = p_iSg[mkk]
-    cdef double iS11 = p_iSg[mkk+k+1]
-    cdef double iS22 = p_iSg[mkk+2*k+2]
-    cdef double iS33 = p_iSg[mkk+3*k+3]
     cdef double iS01 = 2*p_iSg[mkk+1]   #  this
     cdef double iS02 = 2*p_iSg[mkk+2]
     cdef double iS03 = 2*p_iSg[mkk+3]
@@ -207,6 +158,31 @@ cdef void inner_loop_hc_4_v2(double *p_v, double *p_iSg, double *p_qdr, int N, i
                                         iS13*p_v[mNk_nk+3]) + \
                          p_v[mNk_nk+2]*(iS22*p_v[mNk_nk+2] + \
                                         iS23*p_v[mNk_nk+3])
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef void inner_loop_hc_4_diag(double *p_v, double *p_iSg, double *p_qdr, int N, int k, int mN, int mNk, int mkk) nogil:
+    #  hardcoded for k = 5.  pos + marks.  pos, marks are orthogonal
+    #  In this case, should be 1 + 4 + 6 terms
+    #   xSx = x[0]*x[0]*S00 + x[1]*S11*x[1] + x[2]*S22*x[2] + ... (diag trms)
+    #      + 2(x[1]S12 x[2] + x[1]S13 x[3] + x[1]S14 x[4] +
+    #          x[2]S23 x[3] + x[2]S24 x[4] + 
+    #          x[3]S34 x[4])
+    cdef int n, mNk_nk
+
+    cdef double iS00 = p_iSg[mkk]
+    cdef double iS11 = p_iSg[mkk+k+1]
+    cdef double iS22 = p_iSg[mkk+2*k+2]
+    cdef double iS33 = p_iSg[mkk+3*k+3]
+
+    for n in range(N):
+        mNk_nk = mNk + n*k
+
+        p_qdr[mN+n] = p_v[mNk_nk+3]*iS33*p_v[mNk_nk+3] + \
+                      p_v[mNk_nk]*iS00*p_v[mNk_nk] + \
+                      p_v[mNk_nk+1]*iS11*p_v[mNk_nk+1] + \
+                      p_v[mNk_nk+2]*iS22*p_v[mNk_nk+2]
+
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -275,7 +251,7 @@ def multi_qdrtcs_hard_code_4(double[:, :, ::1] v, double[:, :, ::1] iSg, double[
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def multi_qdrtcs_hard_code_4_v2(double[:, :, ::1] v, double[:, :, ::1] iSg, double[:, ::1] qdr, int M, int N, int k):
+def multi_qdrtcs_hard_code_4_diag(double[:, :, ::1] v, double[:, :, ::1] iSg, double[:, ::1] qdr, int M, int N, int k):
     #  fxs       M x fss   
     #  fxrux     Nupx    
     #  f_intgrd  Nupx
@@ -288,7 +264,7 @@ def multi_qdrtcs_hard_code_4_v2(double[:, :, ::1] v, double[:, :, ::1] iSg, doub
     with nogil:
         for 0 <= m < M:
             #  write output to p_qdr[m, n].  (xn - um)iSg_m (xn - um)
-            inner_loop_hc_4_v2(p_v, p_iSg, p_qdr, N, k, m*N, m*N*k, m*k*k)
+            inner_loop_hc_4_diag(p_v, p_iSg, p_qdr, N, k, m*N, m*N*k, m*k*k)
 
 @cython.boundscheck(False)
 @cython.wraparound(False)

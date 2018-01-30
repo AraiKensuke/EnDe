@@ -72,9 +72,10 @@ def initClusters(oo, M_max, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=
         if (len(unonhash) > 0) and (len(hashsp) > 0):  # REAL DATA
             labH, labS, clstrs = emMKPOS_sep1A(_x[unonhash], _x[hashsp], K=K, TR=3)
         elif len(unonhash) == 0:
-            labS, labH, clstrs = emMKPOS_sep1A(None, _x[hashsp], TR=5, K=K)
+            labH, labS, clstrs = emMKPOS_sep1A(None, _x[hashsp], TR=5, K=K)
         else:
-            labS, labH, clstrs = emMKPOS_sep1A(_x[unonhash], None, TR=5, K=K)
+            print "---------  here"
+            labH, labS, clstrs = emMKPOS_sep1A(_x[unonhash], None, TR=5, K=K)
             #  labs, labh are at this point both starting from 0
         if doSepHash:
             contiguous_pack2(labH, startAt=0)
@@ -102,6 +103,7 @@ def initClusters(oo, M_max, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=
 
             if len(these) > 0:
                 flatlabels[unonhash[these]] = i
+
         for i in labH:
             these = _N.where(labH == i)[0]
 

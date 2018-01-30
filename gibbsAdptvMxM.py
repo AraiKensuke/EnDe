@@ -104,7 +104,7 @@ class MarkAndRF:
         oo.xLo = xLo
         oo.xHi = xHi
 
-    def gibbs(self, ITERS, K, priors, ep1=0, ep2=None, saveSamps=True, saveOcc=True, gtdiffusion=False, doSepHash=True, use_spc=True, nz_pth=0., smth_pth_ker=100, ignoresilence=False, use_omp=False, nThrds=2, f_STEPS=13, q2_STEPS=13, f_SMALL=10, q2_SMALL=10, f_cldz=10, q2_cldz=10, minSmps=20):
+    def gibbs(self, ITERS, K, priors, ep1=0, ep2=None, saveSamps=True, saveOcc=True, gtdiffusion=False, doSepHash=True, use_spc=True, nz_pth=0., smth_pth_ker=100, ignoresilence=False, use_omp=False, nThrds=2, f_STEPS=13, q2_STEPS=13, f_SMALL=10, q2_SMALL=10, f_cldz=10, q2_cldz=10, minSmps=20, diag_cov=False):
         """
         gtdiffusion:  use ground truth center of place field in calculating variance of center.  Meaning of diffPerMin different
         """
@@ -197,7 +197,8 @@ class MarkAndRF:
                 u_u_  = _N.empty((M_use, K))
                 u_Sg_ = _N.empty((M_use, K, K))
                 Sg_nu_ = _N.empty(M_use)
-                Sg_PSI_ = _N.empty((M_use, K, K))
+                Sg_PSI_ = _N.zeros((M_use, K, K))
+                Sg_PSI_diag = _N.zeros((M_use, K))
                 #Sg_     = _N.empty((M_max, K, K))   # sampled value
                 #uptriinds = _N.triu_indices_from(Sg[0],1)
 
@@ -349,14 +350,14 @@ class MarkAndRF:
             iiq2r= iiq2.reshape((M_use, 1))
 
             for itr in xrange(ITERS):
-                #tt1 = _tm.time()
+                #ttsw1 = _tm.time()
                 iSg = _N.linalg.inv(Sg)
 
                 if (itr % 100) == 0:    
                     print "-------itr  %(i)d" % {"i" : itr}
 
-                _sA.stochasticAssignment(oo, epc, itr, M_use, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mAS, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, ((epc > 0) and (itr == 0)), nthrds=oo.nThrds)
-                #tt2 = _tm.time()
+                _sA.stochasticAssignment(oo, epc, itr, M_use, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mAS, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, ((epc > 0) and (itr == 0)), diag_cov, nthrds=oo.nThrds)
+                #ttsw2 = _tm.time()
                 ###############  FOR EACH CLUSTER
                 for m in xrange(M_use):   #  get the minds
                     minds = _N.where(gz[itr, :, m] == 1)[0]  
@@ -366,10 +367,10 @@ class MarkAndRF:
                     clstsz[m]        = L
                     v_sts[cls_str_ind[m]:cls_str_ind[m+1]] = sts
 
-                #tt3 = _tm.time()
+                #ttsw3 = _tm.time()
                 mcs = _N.empty((M_use, K))   # cluster sample means
 
-                #tt4 = _tm.time()
+                #ttsw4 = _tm.time()
 
                 ###############
                 ###############     u
@@ -413,7 +414,7 @@ class MarkAndRF:
                 smp_mk_hyps[oo.ky_h_u_Sg][:, :, itr] = u_Sg_.T
 
 
-                #tt5 = _tm.time()
+                #ttsw5 = _tm.time()
                 ###############
                 ###############  Conditional f
                 ###############
@@ -432,7 +433,7 @@ class MarkAndRF:
                 #f[0] = 0
                 smp_sp_prms[oo.ky_p_f, itr] = f
 
-                #tt6 = _tm.time()
+                #ttsw6 = _tm.time()
                 ##############
                 ##############  VARIANCE, COVARIANCE
                 ##############
@@ -440,28 +441,56 @@ class MarkAndRF:
                 # tt6a = 0
                 # tt6b = 0
                 # tt6c = 0
-                for m in xrange(M_use):
-                    #infor = _tm.time()
-                    #if clstsz[m] > K:
-                    ##  dof of posterior distribution of cluster covariance
-                    Sg_nu_[m] = _Sg_nu[m, 0] + clstsz[m]
-                    ##  dof of posterior distribution of cluster covariance
-                    ur = u[m].reshape((1, K))
-                    clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
-                    #tt6a += (_tm.time()-infor)
-                    #infor = _tm.time()
-                    #clstx    = l_sts[m]]
-                    #  dot((clstx-ur).T, (clstx-ur))==ZERO(K) when clstsz ==0
-                    Sg_PSI_[m] = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
-                    #tt6b += (_tm.time()-infor)
-                    #infor = _tm.time()
-                    # else:
-                    #     Sg_nu_ = _Sg_nu[m, 0] 
-                    #     ##  dof of posterior distribution of cluster covariance
-                    #     ur = u[m].reshape((1, K))
-                    #     Sg_PSI_ = _Sg_PSI[m]
-                    Sg[m] = _ss.invwishart.rvs(df=Sg_nu_[m], scale=Sg_PSI_[m])
-                    #tt6c += (_tm.time()-infor)
+                
+                if diag_cov:
+                    for m in xrange(M_use):
+                        #infor = _tm.time()
+                        #if clstsz[m] > K:
+                        ##  dof of posterior distribution of cluster covariance
+                        Sg_nu_[m] = _Sg_nu[m, 0] + clstsz[m]
+                        ##  dof of posterior distribution of cluster covariance
+                        ur = u[m].reshape((1, K))
+                        clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
+                        #tt6a += (_tm.time()-infor)
+                        #infor = _tm.time()
+                        #clstx    = l_sts[m]]
+                        #  dot((clstx-ur).T, (clstx-ur))==ZERO(K) when clstsz ==0
+                        Sg_PSI_[m] = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
+                        #tt6b += (_tm.time()-infor)
+                        #infor = _tm.time()
+                        # else:
+                        #     Sg_nu_ = _Sg_nu[m, 0] 
+                        #     ##  dof of posterior distribution of cluster covariance
+                        #     ur = u[m].reshape((1, K))
+                        #     Sg_PSI_ = _Sg_PSI[m]
+                        Sg[m] = 0
+
+                        _N.fill_diagonal(Sg[m], _ss.invgamma.rvs(Sg_nu_[m], scale=_N.diagonal(Sg_PSI_[m])))
+                        #for ik in xrange(K):
+                            #Sg[m, ik, ik] = _ss.invgamma.rvs(Sg_nu_[m], scale=Sg_PSI_[m, ik, ik])
+                else:
+                    for m in xrange(M_use):
+                        #infor = _tm.time()
+                        #if clstsz[m] > K:
+                        ##  dof of posterior distribution of cluster covariance
+                        Sg_nu_[m] = _Sg_nu[m, 0] + clstsz[m]
+                        ##  dof of posterior distribution of cluster covariance
+                        ur = u[m].reshape((1, K))
+                        clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
+                        tt6a += (_tm.time()-infor)
+                        #infor = _tm.time()
+                        #clstx    = l_sts[m]]
+                        #  dot((clstx-ur).T, (clstx-ur))==ZERO(K) when clstsz ==0
+                        Sg_PSI_[m] = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
+                        tt6b += (_tm.time()-infor)
+                        #infor = _tm.time()
+                        # else:
+                        #     Sg_nu_ = _Sg_nu[m, 0] 
+                        #     ##  dof of posterior distribution of cluster covariance
+                        #     ur = u[m].reshape((1, K))
+                        #     Sg_PSI_ = _Sg_PSI[m]
+                        Sg[m] = _ss.invwishart.rvs(df=Sg_nu_[m], scale=Sg_PSI_[m])
+                        tt6c += (_tm.time()-infor)
 
                 # print "-----------"
                 # print tt6a      0.0008
@@ -476,7 +505,7 @@ class MarkAndRF:
                 smp_mk_hyps[oo.ky_h_Sg_nu][0, itr] = Sg_nu_
                 smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, itr] = Sg_PSI_.T
 
-                #tt7 = _tm.time()
+                #ttsw7 = _tm.time()
                 ##############
                 ##############  SAMPLE SPATIAL VARIANCE
                 ##############
@@ -492,7 +521,7 @@ class MarkAndRF:
                     _Dq2_a = _q2_a
                     _Dq2_B = _q2_B
 
-                #tt8 = _tm.time()
+                #ttsw8 = _tm.time()
 
                 _cdfs.smp_q2(M_use, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _Dq2_a, _Dq2_B, m_rnds, epc)
                 # if epc == 1:
@@ -503,7 +532,7 @@ class MarkAndRF:
                 # print "-----------------"
                 # print q2
 
-                #tt9 = _tm.time()
+                #ttsw9 = _tm.time()
 
 
 
@@ -560,20 +589,20 @@ class MarkAndRF:
 
                 smp_sp_prms[oo.ky_p_l0, itr] = l0
 
-                # tt10 = _tm.time()
+                # ttsw10 = _tm.time()
                 # print "#timing start"
                 # print "nt+= 1"
-                # print "t2t1+=%.4e" % (tt2-tt1)
-                # print "t3t2+=%.4e" % (tt3-tt2)
-                # print "t4t3+=%.4e" % (tt4-tt3)
-                # print "t5t4+=%.4e" % (tt5-tt4)
-                # print "t6t5+=%.4e" % (tt6-tt5)
-                # print "t7t6+=%.4e" % (tt7-tt6)  # slow
-                # print "t8t7+=%.4e" % (tt8-tt7)
-                # print "t9t8+=%.4e" % (tt9-tt8)
-                # print "t10t9+=%.4e" % (tt10-tt9)
+                # print "t2t1+=%.4e" % (ttsw2-ttsw1)
+                # print "t3t2+=%.4e" % (ttsw3-ttsw2)
+                # print "t4t3+=%.4e" % (ttsw4-ttsw3)
+                # print "t5t4+=%.4e" % (ttsw5-ttsw4)
+                # print "t6t5+=%.4e" % (ttsw6-ttsw5)
+                # print "t7t6+=%.4e" % (ttsw7-ttsw6)  # slow
+                # print "t8t7+=%.4e" % (ttsw8-ttsw7)
+                # print "t9t8+=%.4e" % (ttsw9-ttsw8)
+                # print "t10t9+=%.4e" % (ttsw10-ttsw9)
                 # print "#timing end"
-                # print (tt10-tt1)
+                # print (ttsw10-ttsw1)
 
 
             ttB = _tm.time()

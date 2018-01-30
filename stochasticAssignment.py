@@ -17,7 +17,7 @@ import pickle
 twpi = 2*_N.pi
 wdSpc = 1
 
-def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mAS, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, cmp2Existing, nthrds=1):
+def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mAS, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, cmp2Existing, diag_cov, nthrds=1):
     #  Msc   Msc signal clusters
     #  M     all clusters, including nz clstr.  M == Msc when not using nzclstr
     #  Gibbs sampling
@@ -54,7 +54,10 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     #ttt4       = _tm.time()
     #_fm.multi_qdrtcs_par_func_sym(dmu, iSg, qdrMKS, M, N, K, nthrds=1)
 
-    _fm.multi_qdrtcs_hard_code_4_v2(dmu, iSg, qdrMKS, M, N, K)
+    if diag_cov:
+        _fm.multi_qdrtcs_hard_code_4(dmu, iSg, qdrMKS, M, N, K)
+    else:
+        _fm.multi_qdrtcs_hard_code_4_diag(dmu, iSg, qdrMKS, M, N, K)
     #ttt5       = _tm.time()
 
     #  fr is    M x 1, xASr is 1 x N, iq2r is M x 1
