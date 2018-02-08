@@ -189,6 +189,8 @@ def smp_f(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
     cdef double* p_adtv_pdf_params = &v_adtv_pdf_params[0]
     cdef double U, FQ2
 
+    print "**********************smp_f"
+
     for 0 <= m < M:
         if p_clstsz[m] > 0:
             tmp = 0
@@ -234,6 +236,7 @@ def smp_q2(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
     cdef double* p_adtv_pdf_params = &v_adtv_pdf_params[0]
     cdef double SL_a, SL_B
 
+    print "**********************smp_q2"
     #  v_sts   spike times, (5 10 11 16) (3 7 9)
     #  
     for m in xrange(M):
@@ -266,16 +269,17 @@ def smp_q2(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
         # _N.savetxt(fn, dat, fmt="%.4e %.4e")
 
 
-"""
+
 ########################################################################
 @cython.cdivision(True)
-cdef double pdfIG(double q2c, double fxd_f, double a, double B, double* p_riemann_x, double *p_px, long Nupx, double ibnsz, double dt, double l0, double dSilenceX, double xL, double xH) nogil:
+cdef double pdfIG(double q2c, double fxd_f, double a, double B, double* p_riemann_x, double *p_px, long Nupx, double ibnsz, double dt, double l0, double dSilenceX, double xL, double xH):
     #  
     cdef double hlfIIQ2 = -0.5/q2c
     cdef double sptlIntgrl = 0.0
     cdef double dd
     cdef int n, iL, iR
     cdef double sd = sqrt(q2c)
+    cdef double tab_sI
 
     iL = int((fxd_f-6*sd-xL)*ibnsz)
     iR = int((fxd_f+6*sd-xL)*ibnsz)
@@ -287,12 +291,14 @@ cdef double pdfIG(double q2c, double fxd_f, double a, double B, double* p_rieman
         dd = fxd_f-p_riemann_x[n]
         sptlIntgrl += exp(dd*dd*hlfIIQ2)*p_px[n]
     sptlIntgrl *= ((dt*l0)/sqrt(twpi*q2c))*dSilenceX
+    #tab_sI = dt*l0*_cpt.conv_px(fxd_f, sqrt(q2c))
+    #printf("**%.4e   %.4e\n", sptlIntgrl, -tab_sI)
     
     return -(a + 1)*log(q2c) - B/q2c-sptlIntgrl
-
+"""
 ########################################################################
 @cython.cdivision(True)
-cdef double pdfNRM(double fc, double fxd_q2, double fxd_IIQ2, double Mc, double Sigma2c, double *p_riemann_x, double *p_px, long Nupx, double ibnsz, double dt, double l0, double dSilenceX, double xL, double xH) nogil:
+cdef double pdfNRM(double fc, double fxd_q2, double fxd_IIQ2, double Mc, double Sigma2c, double *p_riemann_x, double *p_px, long Nupx, double ibnsz, double dt, double l0, double dSilenceX, double xL, double xH):
     #  Value of pdf @ fc.  
     #  fxd_IIQ2    1./q2_c
     #  Mc          - spiking + prior  mean
@@ -304,6 +310,7 @@ cdef double pdfNRM(double fc, double fxd_q2, double fxd_IIQ2, double Mc, double 
     cdef double dd = 0
     cdef int n, iL, iR, iL_, iR_
     cdef double sd = sqrt(fxd_q2)
+    cdef double tab_sI
     
     iL = int((fc-6*sd-xL)*ibnsz)
     iR = int((fc+6*sd-xL)*ibnsz)
@@ -323,9 +330,11 @@ cdef double pdfNRM(double fc, double fxd_q2, double fxd_IIQ2, double Mc, double 
     #     printf("Nupx---  %d", Nupx)
     #     printf("sptlIntgrl----  %d  %d    %.4f   %d %d\n", iL, iR, sptlIntgrl, iL_, iR_)
     #     printf("fc %.4e   sd %.4e    Mc %.4e  Sigma2c %.4e\n", fc, sd, Mc, Sigma2c)
+    #tab_sI = dt*l0*_cpt.conv_px(fc, sqrt(fxd_q2))
+    #printf("__%.4e   %.4e\n", sptlIntgrl, -tab_sI)
 
     return -0.5*(fc-Mc)*(fc-Mc)/Sigma2c-sptlIntgrl
-"""
+
 
 ########################################################################
 @cython.cdivision(True)
@@ -334,7 +343,7 @@ cdef double pdfIG(double q2c, double fxd_f, double a, double B, double* p_rieman
     cdef double tab_sI = dt*l0*_cpt.conv_px(fxd_f, sd)
 
     return -(a + 1)*log(q2c) - B/q2c+tab_sI
-
+"""
 ########################################################################
 @cython.cdivision(True)
 cdef double pdfNRM(double fc, double fxd_q2, double fxd_IIQ2, double Mc, double Sigma2c, double *p_riemann_x, double *p_px, long Nupx, double ibnsz, double dt, double l0, double dSilenceX, double xL, double xH):
