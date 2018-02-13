@@ -9,6 +9,7 @@ import matplotlib.pyplot as _plt
 #uniqFN(filename, serial=False, iStart=1, returnPrevious=False)
 import utilities as _U
 import conv_gau as _cpt
+cimport conv_gau as _cpt
 
 twoPOW = _N.array([1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072], dtype=_N.int)
 cdef long[::1] v_twoPOW = twoPOW
@@ -189,8 +190,6 @@ def smp_f(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
     cdef double* p_adtv_pdf_params = &v_adtv_pdf_params[0]
     cdef double U, FQ2
 
-    print "**********************smp_f"
-
     for 0 <= m < M:
         if p_clstsz[m] > 0:
             tmp = 0
@@ -236,7 +235,6 @@ def smp_q2(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
     cdef double* p_adtv_pdf_params = &v_adtv_pdf_params[0]
     cdef double SL_a, SL_B
 
-    print "**********************smp_q2"
     #  v_sts   spike times, (5 10 11 16) (3 7 9)
     #  
     for m in xrange(M):
@@ -295,47 +293,9 @@ cdef double pdfIG(double q2c, double fxd_f, double a, double B, double* p_rieman
     #printf("**%.4e   %.4e\n", sptlIntgrl, -tab_sI)
     
     return -(a + 1)*log(q2c) - B/q2c-sptlIntgrl
+    #return -(a + 1)*log(q2c) - B/q2c+tab_sI
+
 """
-########################################################################
-@cython.cdivision(True)
-cdef double pdfNRM(double fc, double fxd_q2, double fxd_IIQ2, double Mc, double Sigma2c, double *p_riemann_x, double *p_px, long Nupx, double ibnsz, double dt, double l0, double dSilenceX, double xL, double xH):
-    #  Value of pdf @ fc.  
-    #  fxd_IIQ2    1./q2_c
-    #  Mc          - spiking + prior  mean
-    #  Sigma2c     - spiking + prior  variance
-    #  p_riemann_x - points at which integral discretized
-    #  p_px        - occupancy
-    cdef double hlfIIQ2 = -0.5*fxd_IIQ2
-    cdef double sptlIntgrl = 0.0
-    cdef double dd = 0
-    cdef int n, iL, iR, iL_, iR_
-    cdef double sd = sqrt(fxd_q2)
-    cdef double tab_sI
-    
-    iL = int((fc-6*sd-xL)*ibnsz)
-    iR = int((fc+6*sd-xL)*ibnsz)
-    iL = iL if iL >= 0 else 0
-    iR = iR if iR <= Nupx else Nupx
-
-    ##  calculate 
-    #for n in xrange(Nupx):    #  integrate
-    for iL <= n < iR:    #  integrate
-        dd = fc-p_riemann_x[n]
-        sptlIntgrl += exp(dd*dd*hlfIIQ2)*p_px[n]
-    sptlIntgrl *= ((dt*l0)/sqrt(twpi*fxd_q2))*dSilenceX
-
-    # if iDBG == 1:
-    #     iL_ = int((fc-6*sd-xL)*ibnsz)
-    #     iR_ = int((fc+6*sd-xL)*ibnsz)
-    #     printf("Nupx---  %d", Nupx)
-    #     printf("sptlIntgrl----  %d  %d    %.4f   %d %d\n", iL, iR, sptlIntgrl, iL_, iR_)
-    #     printf("fc %.4e   sd %.4e    Mc %.4e  Sigma2c %.4e\n", fc, sd, Mc, Sigma2c)
-    #tab_sI = dt*l0*_cpt.conv_px(fc, sqrt(fxd_q2))
-    #printf("__%.4e   %.4e\n", sptlIntgrl, -tab_sI)
-
-    return -0.5*(fc-Mc)*(fc-Mc)/Sigma2c-sptlIntgrl
-
-
 ########################################################################
 @cython.cdivision(True)
 cdef double pdfIG(double q2c, double fxd_f, double a, double B, double* p_riemann_x, double *p_px, long Nupx, double ibnsz, double dt, double l0, double dSilenceX, double xL, double xH):
@@ -351,6 +311,7 @@ cdef double pdfNRM(double fc, double fxd_q2, double fxd_IIQ2, double Mc, double 
     cdef double tab_sI = dt*l0*_cpt.conv_px(fc, sd)
 
     return -0.5*(fc-Mc)*(fc-Mc)/Sigma2c+tab_sI
+
 
 ########################################################################
 @cython.cdivision(True)
@@ -368,56 +329,7 @@ def l0_spatial(long M, double dt, double[::1] v_fxd_fc, double[::1] v_fxd_q2, do
     cdef double *p_l0_exp_px = &v_l0_exp_px[0]
 
     for m in xrange(M):
-        fc = p_fxd_fc[m]
-        q2c= p_fxd_q2[m]
         p_l0_exp_px[m] = -dt*_cpt.conv_px(p_fxd_fc[m], sqrt(p_fxd_q2[m]))
-
-"""
-########################################################################
-@cython.cdivision(True)
-def l0_spatial(long M, double dt, double[::1] v_fxd_fc, double[::1] v_fxd_q2, double[::1] v_l0_exp_px):
-    #  Value of pdf @ fc.  
-    #  fxd_IIQ2    1./q2_c
-    #  Mc          - spiking + prior  mean
-    #  Sigma2c     - spiking + prior  variance
-    #  p_riemann_x - points at which integral discretized
-    #  p_px        - occupancy
-    global p_riemann_xs;      global p_px_all
-    global x_Lo, x_Hi
-
-    cdef double hlfIIQ2
-    cdef double sptlIntgrl = 0.0
-    cdef long Nupx, iStart
-    cdef int n, m, iL, iR
-    cdef double dSilenceX, ibnsz, sd
-    cdef double *p_l0_exp_px = &v_l0_exp_px[0]
-    cdef double *p_fxd_fc    = &v_fxd_fc[0]
-    cdef double *p_fxd_q2    = &v_fxd_q2[0]
-
-    ##  calculate 
-    for m in xrange(M):
-        fc = p_fxd_fc[m]
-        q2c= p_fxd_q2[m]
-        getOccDens(q2c, &Nupx, &iStart, &dSilenceX, &ibnsz)
-        sptlIntgrl = 0.0
-        hlfIIQ2 = -0.5/q2c
-        sd = sqrt(q2c)
-
-        iL = int((fc-6*sd-x_Lo)*ibnsz)
-
-        iR = int((fc+6*sd-x_Lo)*ibnsz)
-        iL = iL if iL >= 0 else 0
-        iR = iR if iR <= Nupx else Nupx
-
-        #for n in xrange(Nupx):
-        for iL <= n < iR:
-            sptlIntgrl += exp(((p_riemann_xs[iStart+n]-fc)*(p_riemann_xs[iStart+n]-fc))*hlfIIQ2)*p_px_all[iStart+n]
-        sptlIntgrl *= (dt/sqrt(twpi*q2c))*dSilenceX
-        p_l0_exp_px[m] = sptlIntgrl
-
-        
-        #print "%(sI).4e   %(c).4e" % {"sI" : sptlIntgrl, "c" : -dt*_cpt.conv_px(p_fxd_fc[m], sqrt(p_fxd_q2[m]))}
-"""
 
 ########################################################################
 @cython.cdivision(True)

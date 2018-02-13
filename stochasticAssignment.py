@@ -55,9 +55,10 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     #_fm.multi_qdrtcs_par_func_sym(dmu, iSg, qdrMKS, M, N, K, nthrds=1)
 
     if diag_cov:
-        _fm.multi_qdrtcs_hard_code_4(dmu, iSg, qdrMKS, M, N, K)
+       _fm.multi_qdrtcs_hard_code_4_diag(dmu, iSg, qdrMKS, M, N, K)
     else:
-        _fm.multi_qdrtcs_hard_code_4_diag(dmu, iSg, qdrMKS, M, N, K)
+        _fm.multi_qdrtcs_hard_code_4(dmu, iSg, qdrMKS, M, N, K)
+
     #ttt5       = _tm.time()
 
     #  fr is    M x 1, xASr is 1 x N, iq2r is M x 1
@@ -320,14 +321,15 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     _hcb.hc_qdr_sum(pkFRr, mkNrms, qdrSPC, qdrMKS, cont, M, N)
     #ttt8       = _tm.time()   
     mcontr     = _N.max(cont, axis=0).reshape((1, nSpks))  #  1 x N
-    cont       -= mcontr   
+    cont       -= mcontr     #  M x N
     #ttt9       = _tm.time()
-    _N.exp(cont, out=econt)     
+    _fm.exp_on_arr(cont, econt, M, N)   # _N.exp(cont, out=econt)  
     #ttt10       = _tm.time()
-    for m in xrange(M):
+    for m in xrange(M):  #  rat is (M x N)
         rat[m+1] = rat[m] + econt[m]
 
-    rat /= rat[M]
+    #rat /= rat[M]
+    rnds *= rat[M]   #  used to be     #rat /= rat[M] (more # of computations)
     # if (epc == 1) and (it > 2):
     #     qdr = qdrSPC + qdrMKS
     #     for n in xrange(rat.shape[1]):
@@ -347,9 +349,8 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     #ttt11       = _tm.time()
     M1 = rat[1:] >= rnds
     M2 = rat[0:-1] <= rnds
-
-
     gz[it] = (M1&M2).T
+            
 
     # if it % 1000 == 0:
     #     print "iter %d" % it
@@ -377,8 +378,8 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
         print "length of reassign_l8r   %d"  % len(reassign_l8r)
         for ii in xrange(len(reassign_l8r)):
 
-            gz[it, reassign_l8r[ii][:, 0]] = False
-            gz[it, reassign_l8r[ii][:, 0], reassign_l8r[ii][:, 1]] = True
+            gz[it, reassign_l8r[ii][:, 0]] = 0
+            gz[it, reassign_l8r[ii][:, 0], reassign_l8r[ii][:, 1]] = 1
     #     #  gz   is ITERS x N x M   (N # of spikes in epoch)
     #     gz[it, newNonHashSpks] = False   #  not a member of any of them
     #     gz[it, newNonHashSpks, newNonHashSpksMemClstr] = True

@@ -47,25 +47,27 @@ def hc_sub_2_vec_K4(double[:, ::1] mAS, double [:, ::1] u, double [:, :, ::1] ou
     cdef double *p_out   = &out[0, 0, 0]
 
     cdef double u_m_0, u_m_1, u_m_2, u_m_3  # u[m, 0] to u[m, 3]
-    for 0 <= m < M:
-        mK = m*K
-        mKN= m*K*N
 
-        u_m_0 = p_u[mK]
-        u_m_1 = p_u[mK + 1]
-        u_m_2 = p_u[mK + 2]
-        u_m_3 = p_u[mK + 3]
-        for 0 <= n < N:
-            nK = n*K
-            #mKN_nK = mKN+nK
+    with nogil:
+        for 0 <= m < M:
+            mK = m*K
+            mKN= mK*N
 
-            #  mAS[n, k] = p_mAS[n*K + k]
-            #  u[m, k]   = p_u[m*K + k]
-            #  out[m, n, k]   = p_out[m*K*N + n*K + k]
-            p_out[mKN+nK]     = p_mAS[nK]   - u_m_0
-            p_out[mKN+nK + 1] = p_mAS[nK+1] - u_m_1
-            p_out[mKN+nK + 2] = p_mAS[nK+2] - u_m_2
-            p_out[mKN+nK + 3] = p_mAS[nK+3] - u_m_3
+            u_m_0 = p_u[mK]
+            u_m_1 = p_u[mK + 1]
+            u_m_2 = p_u[mK + 2]
+            u_m_3 = p_u[mK + 3]
+            for 0 <= n < N:
+                nK = n*K
+                #mKN_nK = mKN+nK
+
+                #  mAS[n, k] = p_mAS[n*K + k]
+                #  u[m, k]   = p_u[m*K + k]
+                #  out[m, n, k]   = p_out[m*K*N + n*K + k]
+                p_out[mKN+nK]     = p_mAS[nK]   - u_m_0
+                p_out[mKN+nK + 1] = p_mAS[nK+1] - u_m_1
+                p_out[mKN+nK + 2] = p_mAS[nK+2] - u_m_2
+                p_out[mKN+nK + 3] = p_mAS[nK+3] - u_m_3
 
         #out[m, n, k] = mAS[n, k] - u[m, k]
 
@@ -86,6 +88,7 @@ def hc_sub_2_vec_K2(double[:, ::1] mAS, double [:, ::1] u, double [:, :, ::1] ou
     cdef double *p_out   = &out[0, 0, 0]
 
     cdef double u_m_0, u_m_1, u_m_2, u_m_3  # u[m, 0] to u[m, 3]
+
     for 0 <= m < M:
         mK = m*K
         mKN= m*K*N

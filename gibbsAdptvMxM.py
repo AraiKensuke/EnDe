@@ -15,10 +15,14 @@ from posteriorUtil import MAPvalues2
 from filter import gauKer
 import gibbsApprMxMutil as gAMxMu
 import stochasticAssignment as _sA
-import cdf_smp as _cdfs
+import cdf_smp_tbl as _cdfs
+#import cdf_smp as _cdfs
+import ig_from_cdf_pkg as _ifcp
 
 import clrs 
 import compress_gz as c_gz
+import conv_gau as _gct
+#import conv_px_tbl as _cpt
 
 class MarkAndRF:
     ky_p_l0 = 0;    ky_p_f  = 1;    ky_p_q2 = 2
@@ -47,6 +51,7 @@ class MarkAndRF:
     diffPerMin = 1.  #  diffusion per minute
     epochs   = None
     adapt    = False
+    use_conv_tabl = True
 
     outdir   = None
     polyFit  = True
@@ -150,6 +155,7 @@ class MarkAndRF:
         
         ######################################  PRECOMPUTED
 
+        _ifcp.init()
         tau_l0 = oo.t_hlf_l0/_N.log(2)
         tau_q2 = oo.t_hlf_q2/_N.log(2)
 
@@ -181,7 +187,32 @@ class MarkAndRF:
             
             xt0t1 = smthd_pos
 
-            _cdfs.change_occ_px(xt0t1, oo.xLo, oo.xHi)
+            if oo.use_conv_tabl:
+                Nf  = 1000
+                fs  = _N.linspace(oo.f_L, oo.f_H, Nf)                
+                Ngrd = 1000
+                dx  = 12./Ngrd
+                x_grid = _N.linspace(-6+dx/2, 6-dx/2, Ngrd)
+                i0  = 35
+                imi0=_N.arange(-i0, i0)
+                k=0.3
+                qs   = _N.exp(k*imi0*0.5)
+                iq2s= 1./(qs*qs)
+
+                cnts, xbns = _N.histogram(xt0t1, bins=_N.linspace(-6, 6, Ngrd+1), normed=False)
+                tbl = _gct.build_gau_pxdx_tbl(cnts, x_grid, xt0t1, fs, iq2s, i0, k, oo.f_L, oo.f_H, usepx=True)
+
+                print "tab:   min  %(min).3f    max  %(max).3f" % {"min" : _N.min(_gct._tab), "max" : _N.max(_gct._tab)}
+
+
+                #_plt.imshow(_N.exp(_gct._tab.T), aspect=10, cmap=_plt.get_cmap("Blues"), origin="lower", interpolation=None)
+
+
+
+
+
+            #else:
+                _cdfs.change_occ_px(xt0t1, oo.xLo, oo.xHi)
             #px, xbns = _N.histogram(xt0t1, bins=posbins, normed=True)
             
             #pxr      = px.reshape((1, oo.Nupx))
@@ -309,7 +340,7 @@ class MarkAndRF:
             xt0t1 = _N.array(x[t0:t1])
 
             nSpks    = len(Asts)
-            gz   = _N.zeros((ITERS, nSpks, M_use), dtype=_N.bool)
+            gz   = _N.zeros((ITERS, nSpks, M_use), dtype=_N.uint8)
             oo.gz=gz
 
             _cdfs.dSilenceX = (NSexp/float(oo.Nupx))*(oo.xHi-oo.xLo)
@@ -465,9 +496,10 @@ class MarkAndRF:
                         #     Sg_PSI_ = _Sg_PSI[m]
                         Sg[m] = 0
 
-                        _N.fill_diagonal(Sg[m], _ss.invgamma.rvs(Sg_nu_[m], scale=_N.diagonal(Sg_PSI_[m])))
-                        #for ik in xrange(K):
-                            #Sg[m, ik, ik] = _ss.invgamma.rvs(Sg_nu_[m], scale=Sg_PSI_[m, ik, ik])
+                        #N.fill_diagonal(Sg[m], _ss.invgamma.rvs(Sg_nu_[m], scale=_N.diagonal(Sg_PSI_[m])))
+
+                        for ik in xrange(K):
+                            Sg[m, ik, ik] = _ifcp.sampIG_single(Sg_nu_[m], Sg_PSI_[m, ik, ik])
                 else:
                     for m in xrange(M_use):
                         #infor = _tm.time()
@@ -477,12 +509,12 @@ class MarkAndRF:
                         ##  dof of posterior distribution of cluster covariance
                         ur = u[m].reshape((1, K))
                         clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
-                        tt6a += (_tm.time()-infor)
+                        #tt6a += (_tm.time()-infor)
                         #infor = _tm.time()
                         #clstx    = l_sts[m]]
                         #  dot((clstx-ur).T, (clstx-ur))==ZERO(K) when clstsz ==0
                         Sg_PSI_[m] = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
-                        tt6b += (_tm.time()-infor)
+                        #tt6b += (_tm.time()-infor)
                         #infor = _tm.time()
                         # else:
                         #     Sg_nu_ = _Sg_nu[m, 0] 
@@ -490,7 +522,7 @@ class MarkAndRF:
                         #     ur = u[m].reshape((1, K))
                         #     Sg_PSI_ = _Sg_PSI[m]
                         Sg[m] = _ss.invwishart.rvs(df=Sg_nu_[m], scale=Sg_PSI_[m])
-                        tt6c += (_tm.time()-infor)
+                        #tt6c += (_tm.time()-infor)
 
                 # print "-----------"
                 # print tt6a      0.0008
@@ -529,18 +561,17 @@ class MarkAndRF:
                 #     q2[5] = 0.5
 
                 smp_sp_prms[oo.ky_p_q2, itr]   = q2
-                # print "-----------------"
-                # print q2
 
                 #ttsw9 = _tm.time()
-
-
 
                 ###############
                 ###############  CONDITIONAL l0
                 ###############
                 #  _ss.gamma.rvs.  uses k, theta  k is 1/B (B is our thing)
-                _cdfs.l0_spatial(M_use, oo.dt, f, q2, l0_exp_px)
+                if oo.use_conv_tabl:
+                    _cdfs.l0_spatial(M_use, oo.dt, f, q2, l0_exp_px)
+                else:
+                    _cdfs.l0_spatial(M_use, oo.dt, f, q2, l0_exp_px)
 
                 #iiq2 = 1./q2
                 #iiq2r= iiq2.reshape((M, 1))
@@ -581,6 +612,9 @@ class MarkAndRF:
                 except ValueError:
                     print "problem with l0"
                     print l0_exp_px
+                    print l0_a_
+                    print l0_B_
+
                     #_N.savetxt("fxux", (fr - ux)*(fr-ux))
                     #_N.savetxt("fr", fr)
                     #_N.savetxt("iiq2", iiq2)
@@ -589,7 +623,7 @@ class MarkAndRF:
 
                 smp_sp_prms[oo.ky_p_l0, itr] = l0
 
-                # ttsw10 = _tm.time()
+                #ttsw10 = _tm.time()
                 # print "#timing start"
                 # print "nt+= 1"
                 # print "t2t1+=%.4e" % (ttsw2-ttsw1)
@@ -601,8 +635,7 @@ class MarkAndRF:
                 # print "t8t7+=%.4e" % (ttsw8-ttsw7)
                 # print "t9t8+=%.4e" % (ttsw9-ttsw8)
                 # print "t10t9+=%.4e" % (ttsw10-ttsw9)
-                # print "#timing end"
-                # print (ttsw10-ttsw1)
+                # print "#timing end  %.5f" % (ttsw10-ttsw1)
 
 
             ttB = _tm.time()

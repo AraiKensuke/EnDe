@@ -281,3 +281,56 @@ def multi_qdrtcs_par_func2(double[:, :, ::1] v, double[:, :, ::1] iSg, double[:,
     with nogil, parallel(num_threads=nthrds):
         for m in prange(M):
             inner_loop2(p_v, p_iSg, p_qdr, N, k, m*N, m*N*k, m*k*k)
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def exp_on_arr(double[:, ::1] inp, double[:, ::1] out, long M, long N):
+    cdef double *p_inp  = &inp[0, 0]
+    cdef double *p_out  =  &out[0, 0]
+    cdef long m, n, mN = 0
+
+    with nogil:
+        for 0 <= m < M:
+            mN = m*N
+            for 0 <= n < N:
+                p_out[mN + n] = exp(p_inp[mN + n])
+
+
+#    M1 = rat[1:] >= rnds       
+#    M2 = rat[0:-1] <= rnds
+#    gz[it] = (M1&M2).T
+
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def set_occ(double[:, ::1] crats, double[::1] rnds, char[:, ::1] gz, long M, long N):
+    #  instead of doing the following:
+    #M1 = crat[1:] >= rnds
+    #M2 = crat[0:-1] <= rnds
+    #gz = (M1&M2)
+    # in python to occupation binary vector gz with 0 or 1s,
+    #  call this function (with call to gz.fill(0) before calling set_occ)
+    cdef long n, im, nind, m
+    cdef double* p_crats = &crats[0, 0]
+    cdef double* p_rnds  = &rnds[0]
+    cdef char* p_gz = &gz[0, 0]
+    cdef double rnd
+
+    with nogil:
+        for n in xrange(N):
+            im = 0
+            nind = im*N+n
+            rnd  = p_rnds[n]
+            while rnd >= p_crats[nind]:   #  crats
+                # rnds[0] = 0.1  crats = [0, 0.2]    i expect gz[0, n] = 1
+                #p_gz[im*N+n] = 0 
+                p_gz[nind] = 0 
+                im += 1
+                nind += N
+            p_gz[(im-1)*N+ n] = 1
+
+            #  actually slower than calling gz.fill(0) before call to srch_occ
+            # for im*N+n <= m < M*N+n by N:
+            #     p_gz[m] = 0
+                

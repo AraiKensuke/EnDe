@@ -88,7 +88,7 @@ def init():
     _tab= ld["tbl"]
 
 @cython.cdivision(True)
-def conv_px(double f, double q):
+cdef double conv_px(double f, double q) nogil:
     global _k, _i0, _Nf, _f_L, _f_H, _tab, p_tab
     #  read from table of pre-calculated convolutions 
     #  of p(x) [the spatial occupancy] with N(x | f, q**2)
@@ -113,27 +113,18 @@ def conv_px(double f, double q):
 
     cdef double ans
 
+    """
     if f >= _f_H:
         ans = (1-p_qi_r)*_tab[fi,qi] + p_qi_r*_tab[fi, qi+1]
     else:
         ans = (1-p_qi_r)*((1-p_fi_r)*_tab[fi,qi] + p_fi_r*_tab[fi+1, qi]) + \
               p_qi_r*((1-p_fi_r)*_tab[fi, qi+1] + p_fi_r*_tab[fi+1, qi+1])
-
-    # cdef double ans = (1-p_qi_r)*((1-p_fi_r)*p_tab[_Nq2*fi+qi] + p_fi_r*p_tab[_Nq2*(fi+1)+ qi]) + \
-    #     p_qi_r*((1-p_fi_r)*p_tab[_Nq2*fi+qi+1] + p_fi_r*p_tab[_Nq2*(fi+1)+ qi+1])
-
-    if ans > 0:
-        print "---------woa, ans > 0   %.4e=ans" % ans
-        if f >= _f_H:
-            print "min  %(min).3f    max  %(max).3f" % {"min" : _N.min(_tab), "max" : _N.max(_tab)}
-            print "f == _f_H"
-            print "[[%(1).4f  %(2).4f     %(tot).4f   r %(r1).4e  %(r2).4e]]" % {"1" : _tab[fi, qi], "2" : _tab[fi, qi+1], "tot" : (1-p_qi_r)*_tab[fi,qi] + p_qi_r*_tab[fi, qi+1], "r1" : 1-p_qi_r, "r2" : p_qi_r}
-        else:
-            print "f != _f_H"
-            print "[[%(1).4f  %(2).4f  %(3).4f  %(4).4f]]" % {"1" : _tab[fi, qi], "2" : _tab[fi+1, qi], "3" : _tab[fi, qi+1], "4" : _tab[fi+1, qi+1]}
-        print ">>  f=%(f).3f   f_L=%(f_L).3f  f_H=%(f_H).3f    _Nf=%(nf)d    fi_r=%(fi_r).3f" % {"f" : f, "f_L" : _f_L, "f_H" : _f_H, "nf" : _Nf, "fi_r" : fi_r}
-        print "p_fi_r=%(1).4f   p_qi_r=%(2).4f     q=%(q).4e    f=%(f).4f" % {"1" : p_fi_r, "2" : p_qi_r, "q" : q, "f" : f}
-
+    """
+    if f >= _f_H:
+        ans = (1-p_qi_r)*p_tab[_Nq2*fi+qi] + p_qi_r*p_tab[_Nq2*fi+qi+1]
+    else:
+        ans = (1-p_qi_r)*((1-p_fi_r)*p_tab[_Nq2*fi+qi] + p_fi_r*p_tab[_Nq2*(fi+1)+ qi]) + \
+              p_qi_r*((1-p_fi_r)*p_tab[_Nq2*fi+qi+1] + p_fi_r*p_tab[_Nq2*(fi+1)+ qi+1])
 
     return ans
     # return (1-p_qi_r)*((1-p_fi_r)*_tab[fi, qi] + p_fi_r*_tab[fi+1, qi]) + \
