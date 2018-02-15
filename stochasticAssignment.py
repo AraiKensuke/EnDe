@@ -49,30 +49,21 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     pkFRr      = pkFR.reshape((M, 1))
     #dmu        = (mASr - ur)     # mASr 1 x N x K,     ur  is M x 1 x K
     N          = mAS.shape[0]
-    dmu        = _N.empty((M, N, K))     # mASr 1 x N x K,     ur  is M x 1 x K
-    _hcb.hc_sub_2_vec_K4(mAS, u, dmu, M, N)
+    #dmu        = _N.empty((M, N, K))     # mASr 1 x N x K,     ur  is M x 1 x K
+    #_hcb.hc_sub_2_vec_K4(mAS, u, dmu, M, N)
     #ttt4       = _tm.time()
-    #_fm.multi_qdrtcs_par_func_sym(dmu, iSg, qdrMKS, M, N, K, nthrds=1)
-
-    if diag_cov:
-       _fm.multi_qdrtcs_hard_code_4_diag(dmu, iSg, qdrMKS, M, N, K)
-    else:
-        _fm.multi_qdrtcs_hard_code_4(dmu, iSg, qdrMKS, M, N, K)
-
-    #ttt5       = _tm.time()
-
-    #  fr is    M x 1, xASr is 1 x N, iq2r is M x 1
-    #qdrSPC     = (fr - xASr)*(fr - xASr)*iq2r  #  M x nSpks   # 0.01s
     qdrSPC     = _N.empty((M, N))
-    _hcb.hc_bcast1(fr, xASr, iq2r, qdrSPC, M, N)
-
-    ###  how far is closest cluster to each newly observed mark
-
-
-    #  mAS = mks[Asts+t0] 
-    #  xAS = x[Asts + t0]   #  position @ spikes
+    #_fm.multi_qdrtcs_par_func_sym(dmu, iSg, qdrMKS, M, N, K, nthrds=1)
+    exp_arg = _N.empty((M, N))    
+    if diag_cov:
+       _fm.full_qdrtcs_K4_diag(pkFRr, mkNrms, exp_arg, fr, xASr, iq2r, \
+                               qdrSPC, mAS, u, iSg, qdrMKS, M, N, K)
+    else:
+       _fm.full_qdrtcs_K4(pkFRr, mkNrms, exp_arg, fr, xASr, iq2r, \
+                          qdrSPC, mAS, u, iSg, qdrMKS, M, N, K)
+    #ttt5       = _tm.time()
     #ttt6       = _tm.time()
-    
+
     cmp2Existing = False
     if cmp2Existing and (M > 1):   #  compare only non-hash spikes and non-hash clusters
         # realCl = _N.where(freeClstr == False)[0]
@@ -317,8 +308,8 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     ####  outside cmp2Existing here
     #   (Mx1) + (Mx1) - (MxN + MxN)
     #cont       = pkFRr + mkNrms - 0.5*(qdrSPC + qdrMKS)
-    exp_arg = _N.empty((M, N))
-    _hcb.hc_qdr_sum(pkFRr, mkNrms, qdrSPC, qdrMKS, exp_arg, M, N)
+    #exp_arg = _N.empty((M, N))
+    #_hcb.hc_qdr_sum(pkFRr, mkNrms, qdrSPC, qdrMKS, exp_arg, M, N)
     #ttt8       = _tm.time()   
     mx_exp_argr     = _N.max(exp_arg, axis=0).reshape((1, nSpks))  #  1 x N
     exp_arg       -= mx_exp_argr     #  M x N
@@ -347,10 +338,23 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
 
     # print rat
     #ttt11       = _tm.time()
-    M1 = rat[1:] >= rnds
-    M2 = rat[0:-1] <= rnds
-    gz[it] = (M1&M2).T
-            
+    # M1 = rat[1:] >= rnds
+    # M2 = rat[0:-1] <= rnds
+    # gz[it] = (M1&M2).T
+    _fm.set_occ(rat, rnds, gz[it], M, N)            
+    # print "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
+    # print gz[it, :, 3]
+    # print gz[it, :, 8]
+    # print gz[it, :, 10]
+    # print "--------------------"
+    # M1 = rat[1:] >= rnds
+    # M2 = rat[0:-1] <= rnds
+    # gz[it] = (M1&M2).T
+    # print gz[it, :, 3]
+    # print gz[it, :, 8]
+    # print gz[it, :, 10]
+
+
 
     # if it % 1000 == 0:
     #     print "iter %d" % it

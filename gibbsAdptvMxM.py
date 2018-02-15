@@ -385,7 +385,8 @@ class MarkAndRF:
             outs1 = _N.empty((M_use, K))
             outs2 = _N.empty((M_use, K))
 
-            for itr in xrange(ITERS):
+            ###########  BEGIN GIBBS SAMPLING ##############################
+            for itr in xrange(ITERS):  
                 #ttsw1 = _tm.time()
                 iSg = _N.linalg.inv(Sg)
                 #ttsw2 = _tm.time()
@@ -411,35 +412,13 @@ class MarkAndRF:
                 ###############     u
                 ###############
                 _N.copyto(u_Sg_, _N.linalg.inv(_iu_Sg + clstsz_rr*iSg))
-                #_fm.multiple_mat_dot_v(_iu_Sg, _u_u, outs)  # M x K x K   dot   M x K
 
                 for m in xrange(M_use):  
                     #  elapsed time ratios
                     #  inv  9.1, clstx   3.1,    mean   6.5,  einsum  5.2
                     if clstsz[m] > 0:   # >= K causes Cholesky to fail at times.
-                        #u_Sg_[m] = _N.linalg.inv(_iu_Sg[m] + clstsz[m]*iSg[m])
                         clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
-
                         mcs[m]       = _N.mean(clstx, axis=0)
-                        #_fm.mean_random_indices(mks, v_sts[cls_str_ind[m]:cls_str_ind[m+1]], mcs[m], clstsz[m], K)
-                        #clst_wv_mn   = 
-
-                        #u_u_[m] = _N.einsum("jk,k->j", u_Sg_[m], _N.dot(_iu_Sg[m], _u_u[m]) + clstsz[m]*_N.dot(iSg[m], mcs[m]))
-                        #u_u_[m] = _N.dot(u_Sg_[m], _N.dot(_iu_Sg[m], _u_u[m]) + clstsz[m]*_N.dot(iSg[m], mcs[m]))
-                        ########  POSITION
-                        ##  mean of posterior distribution of cluster means
-                        #  sigma^2 and mu are the current Gibbs-sampled values
-                        ##  mean of posterior distribution of cluster means
-                        # print "for cluster %(m)d with size %(sz)d" % {"m" : m, "sz" : clstsz[m]}
-                    else:
-                        mcs[m] = 0
-                        #u_Sg_[m] = _N.array(_u_Sg[m])
-                        #u_u_[m] = _N.array(_u_u[m])
-                        # if (epc == 1) and (itr < 10):
-                        #     print "u_Sg_[%d]" % m
-                        #     print u_Sg_[m]
-                        #     print "u_u_[%d]" % m
-                        #     print u_u_[m]
                 _fm.multiple_mat_dot_v(_iu_Sg, _u_u, outs1, M_use, K)
                 _fm.multiple_mat_dot_v(iSg, mcs, outs2, M_use, K)
                 _fm.multiple_mat_dot_v(u_Sg_, outs1 + clstsz_r*outs2, u_u_, M_use, K)
@@ -456,8 +435,6 @@ class MarkAndRF:
 
                     raise
                 u       = _N.einsum("njk,nk->nj", C, ucmvnrms) + u_u_
-                # if epc == 1:
-                #     u[5] = _N.array([ 4.9,  4.7,  2.8,  3.8])
 
                 smp_mk_prms[oo.ky_p_u][:, itr] = u.T  # dim of u wrong
                 smp_mk_hyps[oo.ky_h_u_u][:, itr] = u_u_.T
@@ -476,11 +453,6 @@ class MarkAndRF:
                 m_rnds = _N.random.rand(M_use)
                 
                 _cdfs.smp_f(M_use, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _f_u, q2pr, m_rnds)
-                # if epc == 1:
-                #     f[:] = -400
-                #     f[5] = 3
-
-                #f[0] = 0
                 smp_sp_prms[oo.ky_p_f, itr] = f
 
                 #ttsw7 = _tm.time()
@@ -495,27 +467,14 @@ class MarkAndRF:
                 if diag_cov:
                     for m in xrange(M_use):
                         #infor = _tm.time()
-                        #if clstsz[m] > K:
-                        ##  dof of posterior distribution of cluster covariance
                         Sg_nu_[m] = _Sg_nu[m, 0] + clstsz[m]
-                        ##  dof of posterior distribution of cluster covariance
                         ur = u[m].reshape((1, K))
                         clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
                         #tt6a += (_tm.time()-infor)
-                        #infor = _tm.time()
-                        #clstx    = l_sts[m]]
                         #  dot((clstx-ur).T, (clstx-ur))==ZERO(K) when clstsz ==0
                         Sg_PSI_[m] = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
                         #tt6b += (_tm.time()-infor)
-                        #infor = _tm.time()
-                        # else:
-                        #     Sg_nu_ = _Sg_nu[m, 0] 
-                        #     ##  dof of posterior distribution of cluster covariance
-                        #     ur = u[m].reshape((1, K))
-                        #     Sg_PSI_ = _Sg_PSI[m]
                         Sg[m] = 0
-
-                        #N.fill_diagonal(Sg[m], _ss.invgamma.rvs(Sg_nu_[m], scale=_N.diagonal(Sg_PSI_[m])))
 
                         for ik in xrange(K):
                             Sg[m, ik, ik] = _ifcp.sampIG_single(Sg_nu_[m], Sg_PSI_[m, ik, ik])
@@ -543,15 +502,6 @@ class MarkAndRF:
                         Sg[m] = _ss.invwishart.rvs(df=Sg_nu_[m], scale=Sg_PSI_[m])
                         #tt6c += (_tm.time()-infor)
 
-                # print "-----------"
-                # print tt6a      0.0008
-                # print tt6b      0.0009
-                # print tt6c      0.012    invwishart.rvs  very slow
-                # print "-----------"
-                #s_u.m_sample_invwishart(Sg_PSI_, Sg_nu_, K, uptriinds, Sg)
-                
-                ##  dof of posterior distribution of cluster covariance
-
                 smp_mk_prms[oo.ky_p_Sg][:, :, itr] = Sg.T
                 smp_mk_hyps[oo.ky_h_Sg_nu][0, itr] = Sg_nu_
                 smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, itr] = Sg_PSI_.T
@@ -575,9 +525,6 @@ class MarkAndRF:
                 #ttsw9 = _tm.time()
 
                 _cdfs.smp_q2(M_use, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _Dq2_a, _Dq2_B, m_rnds, epc)
-                # if epc == 1:
-                #     #q2[:] = 0.0001
-                #     q2[5] = 0.5
 
                 smp_sp_prms[oo.ky_p_q2, itr]   = q2
 
@@ -592,13 +539,6 @@ class MarkAndRF:
                 else:
                     _cdfs.l0_spatial(M_use, oo.dt, f, q2, l0_exp_px)
 
-                #iiq2 = 1./q2
-                #iiq2r= iiq2.reshape((M, 1))
-                #fr = f.reshape((M, 1))
-                #l0_intgrd   = _N.exp(-0.5*(fr - uxr)*(fr-uxr) * iiq2r)  
-
-                #l0_exp_px   = _N.sum(l0_intgrd*pxr, axis=1) * _cdfs.dSilenceX
-                #BL  = ((oo.dt)/_N.sqrt(twpi*q2))*l0_exp_px    #  dim M
                 BL  = l0_exp_px    #  dim M
 
                 if (epc > 0) and oo.adapt:
@@ -618,26 +558,13 @@ class MarkAndRF:
                 l0_B_ = BL + _Dl0_B
 
 
-                # _ss.gamma.rvs(20+20, scale=(1/(50+50.))) ~ 0.4
-                # _ss.gamma.rvs(20+ 0, scale=(1/(50+50.))) ~ 0.2
-                #  if no spikes observed, sampled l0 is smaller.  
                 try:   #  if there is no prior, if a cluster 
                     l0 = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_), size=M_use)  #  check
-                    # if epc == 1:
-                    #     l0[:] = 1e-200
-                    #     l0[5] = 300.
-
-                    #l0 = _N.ones(M)#_ss.gamma.rvs(l0_a_, scale=(1/l0_B_))  #  check
                 except ValueError:
                     print "problem with l0    %d" % itr
                     print l0_exp_px
                     print l0_a_
                     print l0_B_
-
-                    #_N.savetxt("fxux", (fr - ux)*(fr-ux))
-                    #_N.savetxt("fr", fr)
-                    #_N.savetxt("iiq2", iiq2)
-                    #_N.savetxt("l0_intgrd", l0_intgrd)
                     raise
 
                 smp_sp_prms[oo.ky_p_l0, itr] = l0
