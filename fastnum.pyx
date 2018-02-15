@@ -2,6 +2,7 @@
 cimport cython
 from cython.parallel import parallel, prange
 from libc.stdlib cimport abort, malloc, free
+from libc.stdio cimport printf
 from libc.math cimport exp
 import numpy as _N
 cimport numpy as _N
@@ -266,6 +267,280 @@ def multi_qdrtcs_hard_code_4_diag(double[:, :, ::1] v, double[:, :, ::1] iSg, do
             #  write output to p_qdr[m, n].  (xn - um)iSg_m (xn - um)
             inner_loop_hc_4_diag(p_v, p_iSg, p_qdr, N, k, m*N, m*N*k, m*k*k)
 
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def multi_qdrtcs_hard_code_4_diag_v2(double[:, :, ::1] v, double[:, :, ::1] iSg, double[:, ::1] qdr, int M, int N, int k):
+    #  fxs       M x fss   
+    #  fxrux     Nupx    
+    #  f_intgrd  Nupx
+    cdef int n, m, mNk, mkk, nk, ik, mNk_nk, mN
+
+    cdef double *p_v   = &v[0, 0, 0]
+    cdef double *p_iSg = &iSg[0, 0, 0]
+    cdef double *p_qdr = &qdr[0, 0]
+
+    cdef double iS00
+    cdef double iS11
+    cdef double iS22
+    cdef double iS33
+
+
+    with nogil:
+        for 0 <= m < M:
+            mkk  = m*k*k
+            mN   = m*N
+            mNk   = m*N*k
+            #  write output to p_qdr[m, n].  (xn - um)iSg_m (xn - um)
+
+            iS00 = p_iSg[mkk]
+            iS11 = p_iSg[mkk+k+1]
+            iS22 = p_iSg[mkk+2*k+2]
+            iS33 = p_iSg[mkk+3*k+3]
+
+            for n in range(N):
+                mNk_nk = mNk + n*k
+
+                p_qdr[mN+n] = p_v[mNk_nk+3]*iS33*p_v[mNk_nk+3] + \
+                              p_v[mNk_nk]*iS00*p_v[mNk_nk] + \
+                              p_v[mNk_nk+1]*iS11*p_v[mNk_nk+1] + \
+                              p_v[mNk_nk+2]*iS22*p_v[mNk_nk+2]
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def full_qdrtcs_K4(double[:, ::1] pkFRr, double [:, ::1] mkNrms, double[:, ::1] exp_arg, double[:, ::1] fr, double [:, ::1] xASr, double[:, ::1] iq2r, double [:, ::1] qdrSPC, double[:, ::1] mAS, double [:, ::1] u, double[:, :, ::1] iSg, double[:, ::1] qdrMKS, int M, int N, int k):
+#(double[:, ::1] pkFRr, double [:, ::1] mkNrms, double[:, ::1] exp_arg, double[:, ::1] fr, double [:, ::1] xASr, double[:, ::1] iq2r, double [:, ::1] qdrSPC, double[:, :, ::1] v, double[:, :, ::1] iSg, double[:, ::1] qdrMKS, int M, int N, int k):
+                  
+    #  fxs       M x fss   
+    #  fxrux     Nupx    
+    #  f_intgrd  Nupx
+    cdef int n, m, mNk, mkk, nk, ik, mNk_nk, mN, mNn, mK, nK
+
+    cdef double *p_mAS   = &mAS[0, 0]
+    cdef double *p_u     = &u[0, 0]
+    #cdef double *p_v   = &v[0, 0, 0]
+    cdef double *p_iSg = &iSg[0, 0, 0]
+    cdef double *p_qdrMKS = &qdrMKS[0, 0]
+
+    cdef double pfrm
+    cdef double piq2rm
+    cdef double *p_qdrSPC   = &qdrSPC[0, 0]
+    cdef double *p_fr       = &fr[0, 0]
+    cdef double *p_xASr     = &xASr[0, 0]
+    cdef double *p_iq2r     = &iq2r[0, 0]
+
+    cdef double *p_pkFRr       = &pkFRr[0, 0]
+    cdef double *p_mkNrms     = &mkNrms[0, 0]
+    cdef double *p_exp_arg       = &exp_arg[0, 0]
+    cdef double pkFRr_m, mkNrms_m
+
+    cdef double iS00
+    cdef double iS11
+    cdef double iS22
+    cdef double iS33
+    cdef double iS01
+    cdef double iS02
+    cdef double iS03
+    cdef double iS12
+    cdef double iS13
+    cdef double iS23
+    cdef double u_m_0
+    cdef double u_m_1
+    cdef double u_m_2
+    cdef double u_m_3
+
+
+    with nogil:
+        for 0 <= m < M:
+            mkk  = m*k*k
+            mN   = m*N
+            #mNk   = m*N*k
+            #mNk   = m*N*k
+            mK =   m*k
+
+            #  write output to p_qdr[m, n].  (xn - um)iSg_m (xn - um)
+
+            iS00 = p_iSg[mkk]
+            iS11 = p_iSg[mkk+k+1]
+            iS22 = p_iSg[mkk+2*k+2]
+            iS33 = p_iSg[mkk+3*k+3]
+            iS01 = 2*p_iSg[mkk+1]   #  this
+            iS02 = 2*p_iSg[mkk+2]
+            iS03 = 2*p_iSg[mkk+3]
+            iS12 = 2*p_iSg[mkk+k+2]
+            iS13 = 2*p_iSg[mkk+k+3]
+            iS23 = 2*p_iSg[mkk+2*k+3]
+
+            u_m_0 = p_u[mK]
+            u_m_1 = p_u[mK + 1]
+            u_m_2 = p_u[mK + 2]
+            u_m_3 = p_u[mK + 3]
+
+
+            pfrm = p_fr[m]
+            piq2rm= p_iq2r[m]
+
+            pkFRr_m = p_pkFRr[m]
+            mkNrms_m = p_mkNrms[m]
+
+            for n in range(N):
+                #mNk_nk = mNk + n*k
+                mNn    = mN+n
+                nK     = n*k
+                p_qdrMKS[mNn] = (p_mAS[nK+3]-u_m_3)*iS33*(p_mAS[nK+3]-u_m_3) +\
+                                (p_mAS[nK]-u_m_0)*(iS00*(p_mAS[nK]-u_m_0) + \
+                                                   iS01*(p_mAS[nK+1]-u_m_1) + \
+                                                   iS02*(p_mAS[nK+2]-u_m_2) + \
+                                                   iS03*(p_mAS[nK+3]-u_m_3))+\
+                                (p_mAS[nK+1]-u_m_1)*(iS11*(p_mAS[nK+1]-u_m_1) + \
+                                                     iS12*(p_mAS[nK+2]-u_m_2) + \
+                                                     iS13*(p_mAS[nK+3]-u_m_3))+\
+                                (p_mAS[nK+2]-u_m_2)*(iS22*(p_mAS[nK+2]-u_m_2) + \
+                                                     iS23*(p_mAS[nK+3]-u_m_3))
+
+                p_qdrSPC[mNn] = (pfrm - p_xASr[n])*(pfrm - p_xASr[n])*piq2rm
+
+                p_exp_arg[mNn] = pkFRr_m + mkNrms_m - 0.5*(p_qdrSPC[mNn] + p_qdrMKS[mNn])
+
+# @cython.boundscheck(False)
+# @cython.wraparound(False)
+# def full_qdrtcs_K4_diag(double[:, ::1] pkFRr, double [:, ::1] mkNrms, double[:, ::1] exp_arg, double[:, ::1] fr, double [:, ::1] xASr, double[:, ::1] iq2r, double [:, ::1] qdrSPC, double[:, :, ::1] v, double[:, :, ::1] iSg, double[:, ::1] qdrMKS, int M, int N, int k):
+#     #  fxs       M x fss   
+#     #  fxrux     Nupx    
+#     #  f_intgrd  Nupx
+#     cdef int n, m, mNk, mkk, nk, ik, mNk_nk, mN, mNn
+
+#     cdef double *p_v   = &v[0, 0, 0]
+#     cdef double *p_iSg = &iSg[0, 0, 0]
+#     cdef double *p_qdrMKS = &qdrMKS[0, 0]
+
+#     cdef double pfrm
+#     cdef double piq2rm
+#     cdef double *p_qdrSPC   = &qdrSPC[0, 0]
+#     cdef double *p_fr       = &fr[0, 0]
+#     cdef double *p_xASr     = &xASr[0, 0]
+#     cdef double *p_iq2r     = &iq2r[0, 0]
+
+#     cdef double *p_pkFRr       = &pkFRr[0, 0]
+#     cdef double *p_mkNrms     = &mkNrms[0, 0]
+#     cdef double *p_exp_arg       = &exp_arg[0, 0]
+#     cdef double pkFRr_m, mkNrms_m
+
+#     cdef double iS00
+#     cdef double iS11
+#     cdef double iS22
+#     cdef double iS33
+
+#     with nogil:
+#         for 0 <= m < M:
+#             mkk  = m*k*k
+#             mN   = m*N
+#             mNk   = m*N*k
+#             #  write output to p_qdr[m, n].  (xn - um)iSg_m (xn - um)
+
+#             iS00 = p_iSg[mkk]
+#             iS11 = p_iSg[mkk+k+1]
+#             iS22 = p_iSg[mkk+2*k+2]
+#             iS33 = p_iSg[mkk+3*k+3]
+
+#             pfrm = p_fr[m]
+#             piq2rm= p_iq2r[m]
+
+#             pkFRr_m = p_pkFRr[m]
+#             mkNrms_m = p_mkNrms[m]
+
+#             for n in range(N):
+#                 mNk_nk = mNk + n*k
+#                 mNn    = mN+n
+#                 p_qdrMKS[mNn] = p_v[mNk_nk+3]*iS33*p_v[mNk_nk+3] + \
+#                                 p_v[mNk_nk]*iS00*p_v[mNk_nk] + \
+#                                 p_v[mNk_nk+1]*iS11*p_v[mNk_nk+1] + \
+#                                 p_v[mNk_nk+2]*iS22*p_v[mNk_nk+2]
+
+#                 p_qdrSPC[mNn] = (pfrm - p_xASr[n])*(pfrm - p_xASr[n])*piq2rm
+
+#                 p_exp_arg[mNn] = pkFRr_m + mkNrms_m - 0.5*(p_qdrSPC[mNn] + p_qdrMKS[mNn])
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def full_qdrtcs_K4_diag(double[:, ::1] pkFRr, double [:, ::1] mkNrms, double[:, ::1] exp_arg, double[:, ::1] fr, double [:, ::1] xASr, double[:, ::1] iq2r, double [:, ::1] qdrSPC, double[:, ::1] mAS, double [:, ::1] u, double[:, :, ::1] iSg, double[:, ::1] qdrMKS, int M, int N, int k):
+    #  fxs       M x fss   
+    #  fxrux     Nupx    
+    #  f_intgrd  Nupx
+    cdef int n, m, mNk, mkk, nk, ik, mNk_nk, mN, mNn, mK, nK
+
+    cdef double *p_mAS   = &mAS[0, 0]
+    cdef double *p_u     = &u[0, 0]
+    #cdef double *p_v   = &v[0, 0, 0]
+    cdef double *p_iSg = &iSg[0, 0, 0]
+    cdef double *p_qdrMKS = &qdrMKS[0, 0]
+
+    cdef double pfrm
+    cdef double piq2rm
+    cdef double *p_qdrSPC   = &qdrSPC[0, 0]
+    cdef double *p_fr       = &fr[0, 0]
+    cdef double *p_xASr     = &xASr[0, 0]
+    cdef double *p_iq2r     = &iq2r[0, 0]
+
+    cdef double *p_pkFRr       = &pkFRr[0, 0]
+    cdef double *p_mkNrms     = &mkNrms[0, 0]
+    cdef double *p_exp_arg       = &exp_arg[0, 0]
+    cdef double pkFRr_m, mkNrms_m
+
+    cdef double iS00
+    cdef double iS11
+    cdef double iS22
+    cdef double iS33
+    cdef double u_m_0
+    cdef double u_m_1
+    cdef double u_m_2
+    cdef double u_m_3
+
+    with nogil:#, parallel(num_threads=2):
+        for 0 <= m < M:
+        #for m in prange(M):
+            mkk  = m*k*k
+            mN   = m*N
+            #mNk   = m*N*k
+            mK =   m*k
+            #  write output to p_qdr[m, n].  (xn - um)iSg_m (xn - um)
+
+            iS00 = p_iSg[mkk]
+            iS11 = p_iSg[mkk+k+1]
+            iS22 = p_iSg[mkk+2*k+2]
+            iS33 = p_iSg[mkk+3*k+3]
+
+            u_m_0 = p_u[mK]
+            u_m_1 = p_u[mK + 1]
+            u_m_2 = p_u[mK + 2]
+            u_m_3 = p_u[mK + 3]
+
+            pfrm = p_fr[m]
+            piq2rm= p_iq2r[m]
+
+            pkFRr_m = p_pkFRr[m]
+            mkNrms_m = p_mkNrms[m]
+
+            for n in range(N):
+                #mNk_nk = mNk + n*k
+                mNn    = mN+n
+                nK     = n*k
+                # p_qdrMKS[mNn] = p_v[mNk_nk+3]*iS33*p_v[mNk_nk+3] + \
+                #                 p_v[mNk_nk]*iS00*p_v[mNk_nk] + \
+                #                 p_v[mNk_nk+1]*iS11*p_v[mNk_nk+1] + \
+                #                 p_v[mNk_nk+2]*iS22*p_v[mNk_nk+2]
+                p_qdrMKS[mNn] = (p_mAS[nK+3]-u_m_3)*iS33*(p_mAS[nK+3]-u_m_3) +\
+                                (p_mAS[nK]-u_m_0)*iS00*(p_mAS[nK]-u_m_0) + \
+                                (p_mAS[nK+1]-u_m_1)*iS11*(p_mAS[nK+1]-u_m_1) + \
+                                (p_mAS[nK+2]-u_m_2)*iS22*(p_mAS[nK+2]-u_m_2)
+
+                p_qdrSPC[mNn] = (pfrm - p_xASr[n])*(pfrm - p_xASr[n])*piq2rm
+
+                p_exp_arg[mNn] = pkFRr_m + mkNrms_m - 0.5*(p_qdrSPC[mNn] + p_qdrMKS[mNn])
+
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def multi_qdrtcs_par_func2(double[:, :, ::1] v, double[:, :, ::1] iSg, double[:, ::1] qdr, int M, int N, int k, int nthrds=4):
@@ -285,6 +560,8 @@ def multi_qdrtcs_par_func2(double[:, :, ::1] v, double[:, :, ::1] iSg, double[:,
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def exp_on_arr(double[:, ::1] inp, double[:, ::1] out, long M, long N):
+    #  exp(- qdrspc - qdrmk - nrm - offset)   - get occupation ratios.
+    #  offset so that most likely cluster has ratio == 1
     cdef double *p_inp  = &inp[0, 0]
     cdef double *p_out  =  &out[0, 0]
     cdef long m, n, mN = 0
@@ -293,13 +570,11 @@ def exp_on_arr(double[:, ::1] inp, double[:, ::1] out, long M, long N):
         for 0 <= m < M:
             mN = m*N
             for 0 <= n < N:
-                p_out[mN + n] = exp(p_inp[mN + n])
-
-
-#    M1 = rat[1:] >= rnds       
-#    M2 = rat[0:-1] <= rnds
-#    gz[it] = (M1&M2).T
-
+                #p_out[mN + n] = exp(p_inp[mN + n])
+                #  most of the time, we're evaluating exp(VERY NEGATIVE).
+                #  instead of wasting time evaluating this, just set these
+                #  ones to 0.  assignment ratio is << exp(0), practically 0.
+                p_out[mN+n] = 0 if (p_inp[mN+n] < -10) else exp(p_inp[mN + n])
 
 
 @cython.boundscheck(False)
@@ -311,26 +586,66 @@ def set_occ(double[:, ::1] crats, double[::1] rnds, char[:, ::1] gz, long M, lon
     #gz = (M1&M2)
     # in python to occupation binary vector gz with 0 or 1s,
     #  call this function (with call to gz.fill(0) before calling set_occ)
-    cdef long n, im, nind, m
+    cdef long n, im, #nind, m
     cdef double* p_crats = &crats[0, 0]
     cdef double* p_rnds  = &rnds[0]
-    cdef char* p_gz = &gz[0, 0]
+    cdef char* p_gz = &gz[0, 0]   #  N x M    different than c_rats
     cdef double rnd
 
     with nogil:
         for n in xrange(N):
             im = 0
-            nind = im*N+n
             rnd  = p_rnds[n]
-            while rnd >= p_crats[nind]:   #  crats
+            while rnd >= p_crats[im*N+n]:   #  crats
                 # rnds[0] = 0.1  crats = [0, 0.2]    i expect gz[0, n] = 1
-                #p_gz[im*N+n] = 0 
-                p_gz[nind] = 0 
                 im += 1
-                nind += N
-            p_gz[(im-1)*N+ n] = 1
+            p_gz[n*M + im-1] = 1
 
             #  actually slower than calling gz.fill(0) before call to srch_occ
             # for im*N+n <= m < M*N+n by N:
             #     p_gz[m] = 0
                 
+def multiple_mat_dot_v(double[:, :, ::1] mat, double[:, ::1] vec, double[:, ::1] out, long M, long K):
+    ##  mat is M x K x K
+    ##  vec is M x K
+    ##  out is M x K
+    cdef long m, k, mKK, mK, iK, i, j
+    cdef double* p_mat = &mat[0, 0, 0]
+    cdef double* p_vec = &vec[0, 0]
+    cdef double* p_out = &out[0, 0]
+
+    with nogil:
+        for 0 <= m < M:
+            mKK = m*K*K
+            mK  = m*K
+            for i in xrange(K):
+                iK = i*K
+                p_out[mK+ i] = 0
+                for k in xrange(K):
+                    p_out[mK+ i] += p_mat[mKK+ iK+ k] * p_vec[mK + k]
+
+@cython.cdivision(True)
+def mean_random_indices(double[:, ::1] vs, long[::1] inds, double[::1] out, long I, long K):
+    cdef long i, k, indsK
+    cdef double* p_out = &out[0]
+    cdef double* p_vs  = &vs[0, 0]
+    cdef long* p_inds = &inds[0]
+    cdef double iI     = 1./I
+
+    with nogil:
+        for 0 <= k < K:
+            p_out[k] = 0
+
+        for 0 <= i < I:
+            indsK = p_inds[i]*K
+            for 0 <= k < K:
+                p_out[k] += p_vs[indsK + k] 
+
+        for 0 <= k < K:
+            p_out[k] *= iI
+
+def test3(double[:, :, ::1] vs):
+    cdef double* p_vs
+
+def test2(double[:, ::1] vs):
+    cdef double* p_vs

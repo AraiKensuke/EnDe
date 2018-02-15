@@ -14,11 +14,11 @@ import pickle
 from posteriorUtil import MAPvalues2
 from filter import gauKer
 import gibbsApprMxMutil as gAMxMu
-import stochasticAssignment as _sA
-import cdf_smp_tbl as _cdfs
-#import cdf_smp as _cdfs
+import stochasticAssignment_new as _sA
+#import cdf_smp_tbl as _cdfs
+import cdf_smp as _cdfs
 import ig_from_cdf_pkg as _ifcp
-
+import fastnum as _fm
 import clrs 
 import compress_gz as c_gz
 import conv_gau as _gct
@@ -265,6 +265,7 @@ class MarkAndRF:
 
                 l0, f, q2, u, Sg        = gAMxMu.copy_slice_params(M_use, l0_M, f_M, q2_M, u_M, Sg_M)
                 _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI        = gAMxMu.copy_slice_hyp_params(M_use, _l0_a_M, _l0_B_M, _f_u_M, _f_q2_M, _q2_a_M, _q2_B_M, _u_u_M, _u_Sg_M, _Sg_nu_M, _Sg_PSI_M)
+
                 l0_exp_px = _N.array(l0_exp_px_M[0:M_use], copy=True)
 
                 fr = f.reshape((M_use, 1))
@@ -380,15 +381,19 @@ class MarkAndRF:
             iiq2 = 1./q2
             iiq2r= iiq2.reshape((M_use, 1))
 
+            mcs = _N.empty((M_use, K))   # cluster sample means
+            outs1 = _N.empty((M_use, K))
+            outs2 = _N.empty((M_use, K))
+
             for itr in xrange(ITERS):
                 #ttsw1 = _tm.time()
                 iSg = _N.linalg.inv(Sg)
-
+                #ttsw2 = _tm.time()
                 if (itr % 100) == 0:    
                     print "-------itr  %(i)d" % {"i" : itr}
 
                 _sA.stochasticAssignment(oo, epc, itr, M_use, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mAS, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, ((epc > 0) and (itr == 0)), diag_cov, nthrds=oo.nThrds)
-                #ttsw2 = _tm.time()
+                #ttsw3 = _tm.time()
                 ###############  FOR EACH CLUSTER
                 for m in xrange(M_use):   #  get the minds
                     minds = _N.where(gz[itr, :, m] == 1)[0]  
@@ -397,37 +402,51 @@ class MarkAndRF:
                     cls_str_ind[m+1] = L + cls_str_ind[m]
                     clstsz[m]        = L
                     v_sts[cls_str_ind[m]:cls_str_ind[m+1]] = sts
-
-                #ttsw3 = _tm.time()
-                mcs = _N.empty((M_use, K))   # cluster sample means
+                clstsz_rr  = clstsz.reshape(M_use, 1, 1)
+                clstsz_r  = clstsz.reshape(M_use, 1)
 
                 #ttsw4 = _tm.time()
 
                 ###############
                 ###############     u
                 ###############
-                for m in xrange(M_use):
+                _N.copyto(u_Sg_, _N.linalg.inv(_iu_Sg + clstsz_rr*iSg))
+                #_fm.multiple_mat_dot_v(_iu_Sg, _u_u, outs)  # M x K x K   dot   M x K
+
+                for m in xrange(M_use):  
+                    #  elapsed time ratios
+                    #  inv  9.1, clstx   3.1,    mean   6.5,  einsum  5.2
                     if clstsz[m] > 0:   # >= K causes Cholesky to fail at times.
-                        u_Sg_[m] = _N.linalg.inv(_iu_Sg[m] + clstsz[m]*iSg[m])
+                        #u_Sg_[m] = _N.linalg.inv(_iu_Sg[m] + clstsz[m]*iSg[m])
                         clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
 
                         mcs[m]       = _N.mean(clstx, axis=0)
-                        u_u_[m] = _N.einsum("jk,k->j", u_Sg_[m], _N.dot(_iu_Sg[m], _u_u[m]) + clstsz[m]*_N.dot(iSg[m], mcs[m]))
+                        #_fm.mean_random_indices(mks, v_sts[cls_str_ind[m]:cls_str_ind[m+1]], mcs[m], clstsz[m], K)
+                        #clst_wv_mn   = 
+
+                        #u_u_[m] = _N.einsum("jk,k->j", u_Sg_[m], _N.dot(_iu_Sg[m], _u_u[m]) + clstsz[m]*_N.dot(iSg[m], mcs[m]))
+                        #u_u_[m] = _N.dot(u_Sg_[m], _N.dot(_iu_Sg[m], _u_u[m]) + clstsz[m]*_N.dot(iSg[m], mcs[m]))
                         ########  POSITION
                         ##  mean of posterior distribution of cluster means
                         #  sigma^2 and mu are the current Gibbs-sampled values
                         ##  mean of posterior distribution of cluster means
                         # print "for cluster %(m)d with size %(sz)d" % {"m" : m, "sz" : clstsz[m]}
                     else:
-                        u_Sg_[m] = _N.array(_u_Sg[m])
-                        u_u_[m] = _N.array(_u_u[m])
+                        mcs[m] = 0
+                        #u_Sg_[m] = _N.array(_u_Sg[m])
+                        #u_u_[m] = _N.array(_u_u[m])
                         # if (epc == 1) and (itr < 10):
                         #     print "u_Sg_[%d]" % m
                         #     print u_Sg_[m]
                         #     print "u_u_[%d]" % m
                         #     print u_u_[m]
-
+                _fm.multiple_mat_dot_v(_iu_Sg, _u_u, outs1, M_use, K)
+                _fm.multiple_mat_dot_v(iSg, mcs, outs2, M_use, K)
+                _fm.multiple_mat_dot_v(u_Sg_, outs1 + clstsz_r*outs2, u_u_, M_use, K)
+                
+                #ttsw5 = _tm.time()
                 ucmvnrms= _N.random.randn(M_use, K)
+
                 try:
                     C       = _N.linalg.cholesky(u_Sg_)
                 except _N.linalg.linalg.LinAlgError:
@@ -445,7 +464,7 @@ class MarkAndRF:
                 smp_mk_hyps[oo.ky_h_u_Sg][:, :, itr] = u_Sg_.T
 
 
-                #ttsw5 = _tm.time()
+                #ttsw6 = _tm.time()
                 ###############
                 ###############  Conditional f
                 ###############
@@ -464,7 +483,7 @@ class MarkAndRF:
                 #f[0] = 0
                 smp_sp_prms[oo.ky_p_f, itr] = f
 
-                #ttsw6 = _tm.time()
+                #ttsw7 = _tm.time()
                 ##############
                 ##############  VARIANCE, COVARIANCE
                 ##############
@@ -537,7 +556,7 @@ class MarkAndRF:
                 smp_mk_hyps[oo.ky_h_Sg_nu][0, itr] = Sg_nu_
                 smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, itr] = Sg_PSI_.T
 
-                #ttsw7 = _tm.time()
+                #ttsw8 = _tm.time()
                 ##############
                 ##############  SAMPLE SPATIAL VARIANCE
                 ##############
@@ -553,7 +572,7 @@ class MarkAndRF:
                     _Dq2_a = _q2_a
                     _Dq2_B = _q2_B
 
-                #ttsw8 = _tm.time()
+                #ttsw9 = _tm.time()
 
                 _cdfs.smp_q2(M_use, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _Dq2_a, _Dq2_B, m_rnds, epc)
                 # if epc == 1:
@@ -562,7 +581,7 @@ class MarkAndRF:
 
                 smp_sp_prms[oo.ky_p_q2, itr]   = q2
 
-                #ttsw9 = _tm.time()
+                #ttsw10 = _tm.time()
 
                 ###############
                 ###############  CONDITIONAL l0
@@ -610,7 +629,7 @@ class MarkAndRF:
 
                     #l0 = _N.ones(M)#_ss.gamma.rvs(l0_a_, scale=(1/l0_B_))  #  check
                 except ValueError:
-                    print "problem with l0"
+                    print "problem with l0    %d" % itr
                     print l0_exp_px
                     print l0_a_
                     print l0_B_
@@ -623,19 +642,19 @@ class MarkAndRF:
 
                 smp_sp_prms[oo.ky_p_l0, itr] = l0
 
-                #ttsw10 = _tm.time()
+                #ttsw11 = _tm.time()
                 # print "#timing start"
                 # print "nt+= 1"
-                # print "t2t1+=%.4e" % (ttsw2-ttsw1)
-                # print "t3t2+=%.4e" % (ttsw3-ttsw2)
-                # print "t4t3+=%.4e" % (ttsw4-ttsw3)
-                # print "t5t4+=%.4e" % (ttsw5-ttsw4)
-                # print "t6t5+=%.4e" % (ttsw6-ttsw5)
-                # print "t7t6+=%.4e" % (ttsw7-ttsw6)  # slow
-                # print "t8t7+=%.4e" % (ttsw8-ttsw7)
-                # print "t9t8+=%.4e" % (ttsw9-ttsw8)
-                # print "t10t9+=%.4e" % (ttsw10-ttsw9)
-                # print "#timing end  %.5f" % (ttsw10-ttsw1)
+                # print "t2t1+=%.4e" % (#ttsw2-#ttsw1)
+                # print "t3t2+=%.4e" % (#ttsw3-#ttsw2)
+                # print "t4t3+=%.4e" % (#ttsw4-#ttsw3)
+                # print "t5t4+=%.4e" % (#ttsw5-#ttsw4)
+                # print "t6t5+=%.4e" % (#ttsw6-#ttsw5)
+                # print "t7t6+=%.4e" % (#ttsw7-#ttsw6)  # slow
+                # print "t8t7+=%.4e" % (#ttsw8-#ttsw7)
+                # print "t9t8+=%.4e" % (#ttsw9-#ttsw8)
+                # print "t10t9+=%.4e" % (#ttsw10-#ttsw9)
+                # print "#timing end  %.5f" % (#ttsw10-#ttsw1)
 
 
             ttB = _tm.time()

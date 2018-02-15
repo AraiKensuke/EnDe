@@ -48,8 +48,9 @@ def hc_sub_2_vec_K4(double[:, ::1] mAS, double [:, ::1] u, double [:, :, ::1] ou
 
     cdef double u_m_0, u_m_1, u_m_2, u_m_3  # u[m, 0] to u[m, 3]
 
-    with nogil:
+    with nogil:#, parallel(num_threads=2):
         for 0 <= m < M:
+        #for m in prange(M):
             mK = m*K
             mKN= mK*N
 

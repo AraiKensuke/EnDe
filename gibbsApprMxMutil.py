@@ -195,7 +195,12 @@ def declare_prior_hyp_params(M, clstrs, K, x, mks, Asts, t0, priors, labS, labH)
 
     #_u_Sg   = _N.tile(_N.identity(K), M).T.reshape((M, K, K))  #  this 
     priors._u_u = _N.array(_u_u)
-    _u_Sg = _N.array(_N.tile(allSg*2*2, M).T.reshape((M, K, K)))  #  I want to visit most of the possible space
+
+    _u_Sg = _N.empty((M, K, K))
+    for m in xrange(M):
+        _u_Sg[m] = allSg*2*2
+
+    #_u_Sg = _N.array(_N.tile(allSg*2*2, M).T.reshape((M, K, K)))  #  I want to visit most of the possible space    ---   creates non-contiguous array
     priors._u_Sg = _N.array(_u_Sg)
     _u_iSg  = _N.linalg.inv(_u_Sg)
 

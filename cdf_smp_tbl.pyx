@@ -268,6 +268,7 @@ def smp_q2(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
 
 
 
+
 ########################################################################
 @cython.cdivision(True)
 cdef double pdfIG(double q2c, double fxd_f, double a, double B, double* p_riemann_x, double *p_px, long Nupx, double ibnsz, double dt, double l0, double dSilenceX, double xL, double xH):
@@ -303,7 +304,8 @@ cdef double pdfIG(double q2c, double fxd_f, double a, double B, double* p_rieman
     cdef double tab_sI = dt*l0*_cpt.conv_px(fxd_f, sd)
 
     return -(a + 1)*log(q2c) - B/q2c+tab_sI
-"""
+
+
 ########################################################################
 @cython.cdivision(True)
 cdef double pdfNRM(double fc, double fxd_q2, double fxd_IIQ2, double Mc, double Sigma2c, double *p_riemann_x, double *p_px, long Nupx, double ibnsz, double dt, double l0, double dSilenceX, double xL, double xH):
@@ -311,7 +313,7 @@ cdef double pdfNRM(double fc, double fxd_q2, double fxd_IIQ2, double Mc, double 
     cdef double tab_sI = dt*l0*_cpt.conv_px(fc, sd)
 
     return -0.5*(fc-Mc)*(fc-Mc)/Sigma2c+tab_sI
-
+"""
 
 ########################################################################
 @cython.cdivision(True)

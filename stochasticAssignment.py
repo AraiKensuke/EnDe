@@ -317,13 +317,13 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     ####  outside cmp2Existing here
     #   (Mx1) + (Mx1) - (MxN + MxN)
     #cont       = pkFRr + mkNrms - 0.5*(qdrSPC + qdrMKS)
-    cont = _N.empty((M, N))
-    _hcb.hc_qdr_sum(pkFRr, mkNrms, qdrSPC, qdrMKS, cont, M, N)
+    exp_arg = _N.empty((M, N))
+    _hcb.hc_qdr_sum(pkFRr, mkNrms, qdrSPC, qdrMKS, exp_arg, M, N)
     #ttt8       = _tm.time()   
-    mcontr     = _N.max(cont, axis=0).reshape((1, nSpks))  #  1 x N
-    cont       -= mcontr     #  M x N
+    mx_exp_argr     = _N.max(exp_arg, axis=0).reshape((1, nSpks))  #  1 x N
+    exp_arg       -= mx_exp_argr     #  M x N
     #ttt9       = _tm.time()
-    _fm.exp_on_arr(cont, econt, M, N)   # _N.exp(cont, out=econt)  
+    _fm.exp_on_arr(exp_arg, econt, M, N)   # _N.exp(cont, out=econt)  
     #ttt10       = _tm.time()
     for m in xrange(M):  #  rat is (M x N)
         rat[m+1] = rat[m] + econt[m]
@@ -361,6 +361,7 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
 
 
     # print "#st timing start"
+    # print "nt+= 1"
     # print "it2t1+=%.4e" % (#ttt2-#ttt1)
     # print "it3t2+=%.4e" % (#ttt3-#ttt2) 
     # print "it4t3+=%.4e" % (#ttt4-#ttt3) # slowest 0.12
