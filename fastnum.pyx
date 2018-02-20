@@ -644,8 +644,31 @@ def mean_random_indices(double[:, ::1] vs, long[::1] inds, double[::1] out, long
         for 0 <= k < K:
             p_out[k] *= iI
 
-def test3(double[:, :, ::1] vs):
-    cdef double* p_vs
+def Sg_PSI(long[::1] cls_str_ind, long[::1] clstsz, long[::1] v_sts, double[:, ::1] mks, double[:, :, ::1] _Sg_PSI, double[:, :, ::1] Sg_PSI_, double[:, ::1] u, long M, long K):
+    cdef long K2, non_cnt_ind, m, k, n, nSpks, mK, i0
+    cdef long* p_cls_str_ind = &cls_str_ind[0]
+    cdef long* p_clstsz      = &clstsz[0]
+    cdef long* p_v_sts       = &v_sts[0]
+    cdef double* p_mks       = &mks[0, 0]
+    cdef double* p_u         = &u[0, 0]
+    cdef double* p_Sg_PSI_   = &Sg_PSI_[0, 0, 0]
+    cdef double* p__Sg_PSI   = &_Sg_PSI[0, 0, 0]
+    K2 = K*K
+    cdef double tot
 
-def test2(double[:, ::1] vs):
-    cdef double* p_vs
+    with nogil:
+        for 0 <= m < M:
+            nSpks = p_cls_str_ind[m+1] - p_cls_str_ind[m]
+            i0    = p_cls_str_ind[m]
+            mK    = m*K
+            for 0 <= k < K:
+                uk = p_u[mK+k]
+                tot = 0
+
+                for 0 <= n < nSpks:
+                    non_cnt_ind = p_v_sts[i0 + n]
+
+                    tot += (p_mks[non_cnt_ind*K + k]-uk)*(p_mks[non_cnt_ind*K + k]-uk)
+                p_Sg_PSI_[m*K2+k*K + k] = p__Sg_PSI[m*K2+k*K + k] + tot*0.5
+
+

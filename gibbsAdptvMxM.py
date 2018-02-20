@@ -147,7 +147,7 @@ class MarkAndRF:
         else:
             oo.dat[:, 0] += nz_pth*_N.random.randn(len(oo.dat[:, 0]))
         x      = oo.dat[:, 0]
-        mks    = oo.dat[:, 2:]
+        mks    = _N.array(oo.dat[:, 2:])
         if nz_pth > 0:
             _N.savetxt(resFN("nzyx.txt", dir=oo.outdir), x, fmt="%.4f")
 
@@ -238,10 +238,16 @@ class MarkAndRF:
                 smp_mk_prms = [_N.zeros((K, ITERS, M_use)), 
                                _N.zeros((K, K, ITERS, M_use))]
                 #  need mark hyp params cuz I calculate prior hyp from sampled hyps, unlike where I fit a distribution to sampled parameters and find best hyps from there.  Is there a better way?
-                smp_mk_hyps = [_N.zeros((K, ITERS, M_use)),   
-                               _N.zeros((K, K, ITERS, M_use)),
-                               _N.zeros((1, ITERS, M_use)), 
-                               _N.zeros((K, K, ITERS, M_use))]
+                if diag_cov:
+                    smp_mk_hyps = [_N.zeros((K, ITERS, M_use)),   
+                                   _N.zeros((K, K, ITERS, M_use)),
+                                   _N.zeros((ITERS, M_use)), 
+                                   _N.zeros((K, K, ITERS, M_use))]
+                else:
+                    smp_mk_hyps = [_N.zeros((K, ITERS, M_use)),   
+                                   _N.zeros((K, K, ITERS, M_use)),
+                                   _N.zeros((1, ITERS, M_use)), 
+                                   _N.zeros((K, K, ITERS, M_use))]
                 oo.smp_sp_prms = smp_sp_prms
                 oo.smp_mk_prms = smp_mk_prms
                 oo.smp_mk_hyps = smp_mk_hyps
@@ -311,10 +317,16 @@ class MarkAndRF:
                 smp_sp_prms = _N.zeros((3, ITERS, M_use))  
                 smp_mk_prms = [_N.zeros((K, ITERS, M_use)), 
                                _N.zeros((K, K, ITERS, M_use))]
-                smp_mk_hyps = [_N.zeros((K, ITERS, M_use)),   
-                               _N.zeros((K, K, ITERS, M_use)),
-                               _N.zeros((1, ITERS, M_use)), 
-                               _N.zeros((K, K, ITERS, M_use))]
+                if diag_cov:
+                    smp_mk_hyps = [_N.zeros((K, ITERS, M_use)),   
+                                   _N.zeros((K, K, ITERS, M_use)),
+                                   _N.zeros((ITERS, M_use)), 
+                                   _N.zeros((K, K, ITERS, M_use))]
+                else:
+                    smp_mk_hyps = [_N.zeros((K, ITERS, M_use)),   
+                                   _N.zeros((K, K, ITERS, M_use)),
+                                   _N.zeros((1, ITERS, M_use)), 
+                                   _N.zeros((K, K, ITERS, M_use))]
 
                 oo.smp_sp_prms = smp_sp_prms
                 oo.smp_mk_prms = smp_mk_prms
@@ -360,6 +372,7 @@ class MarkAndRF:
 
             _iu_Sg = _N.array(_u_Sg)
             for m in xrange(M_use):
+                print _u_Sg[m]
                 _iu_Sg[m] = _N.linalg.inv(_u_Sg[m])
 
             ttA = _tm.time()
@@ -465,19 +478,27 @@ class MarkAndRF:
                 # tt6c = 0
                 
                 if diag_cov:
+                    Sg_nu_ = _Sg_nu + clstsz
+
+                    _fm.Sg_PSI(cls_str_ind, clstsz, v_sts, mks, _Sg_PSI, Sg_PSI_, u, M_use, K)
+                    # print "*************************"
+                    # print Sg_PSI_
+                    # print "-------------------------"
                     for m in xrange(M_use):
-                        #infor = _tm.time()
-                        Sg_nu_[m] = _Sg_nu[m, 0] + clstsz[m]
-                        ur = u[m].reshape((1, K))
-                        clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
-                        #tt6a += (_tm.time()-infor)
-                        #  dot((clstx-ur).T, (clstx-ur))==ZERO(K) when clstsz ==0
-                        Sg_PSI_[m] = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
-                        #tt6b += (_tm.time()-infor)
+                        # #infor = _tm.time()
+
+                        # ur = u[m].reshape((1, K))
+                        # clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
+                        # #tt6a += (_tm.time()-infor)
+                        # #  dot((clstx-ur).T, (clstx-ur))==ZERO(K) when clstsz ==0
+                        # Sg_PSI_[m] = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
+                        # #print Sg_PSI_[m]
+                        # #tt6b += (_tm.time()-infor)
                         Sg[m] = 0
 
                         for ik in xrange(K):
-                            Sg[m, ik, ik] = _ifcp.sampIG_single(Sg_nu_[m], Sg_PSI_[m, ik, ik])
+                            Sg[m, ik, ik] = _ifcp.sampIG_single(Sg_nu_[m]*0.5, Sg_PSI_[m, ik, ik])
+                    #print "^^^^^^^^^^^^^^^"
                 else:
                     for m in xrange(M_use):
                         #infor = _tm.time()
@@ -502,8 +523,10 @@ class MarkAndRF:
                         Sg[m] = _ss.invwishart.rvs(df=Sg_nu_[m], scale=Sg_PSI_[m])
                         #tt6c += (_tm.time()-infor)
 
+
                 smp_mk_prms[oo.ky_p_Sg][:, :, itr] = Sg.T
-                smp_mk_hyps[oo.ky_h_Sg_nu][0, itr] = Sg_nu_
+                #smp_mk_hyps[oo.ky_h_Sg_nu][0, itr] = Sg_nu_
+                smp_mk_hyps[oo.ky_h_Sg_nu][itr] = Sg_nu_
                 smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, itr] = Sg_PSI_.T
 
                 #ttsw8 = _tm.time()
@@ -593,6 +616,7 @@ class MarkAndRF:
             gAMxMu.contiguous_inuse(M_use, M_max, K, freeClstr, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_prms, smp_mk_prms, oo.sp_prmPstMd, oo.mk_prmPstMd, gz, priors)
             gAMxMu.copy_back_params(M_use, l0, f, q2, u, Sg, M_max, l0_M, f_M, q2_M, u_M, Sg_M)
             gAMxMu.copy_back_hyp_params(M_use, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, M_max, _l0_a_M, _l0_B_M, _f_u_M, _f_q2_M, _q2_a_M, _q2_B_M, _u_u_M, _u_Sg_M, _Sg_nu_M, _Sg_PSI_M)
+            
             #  MAP of nzclstr
             if saveSamps:
                 pcklme["smp_sp_prms"] = smp_sp_prms

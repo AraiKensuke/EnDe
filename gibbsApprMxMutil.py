@@ -194,22 +194,27 @@ def declare_prior_hyp_params(M, clstrs, K, x, mks, Asts, t0, priors, labS, labH)
         _u_u    = _N.tile(_N.zeros(K), M).T.reshape((M, K))
 
     #_u_Sg   = _N.tile(_N.identity(K), M).T.reshape((M, K, K))  #  this 
-    priors._u_u = _N.array(_u_u)
+    priors._u_u = _N.array(_u_u[0])
 
     _u_Sg = _N.empty((M, K, K))
     for m in xrange(M):
         _u_Sg[m] = allSg*2*2
 
     #_u_Sg = _N.array(_N.tile(allSg*2*2, M).T.reshape((M, K, K)))  #  I want to visit most of the possible space    ---   creates non-contiguous array
-    priors._u_Sg = _N.array(_u_Sg)
+    priors._u_Sg = _N.array(_u_Sg[0])
     _u_iSg  = _N.linalg.inv(_u_Sg)
 
     ##  prior of _Sg_PSI
     ############
-    _Sg_nu  = _N.ones((M, 1))*(K*2.01)   #  we're reasonably sure about width of clusters in make space
+    #_Sg_nu  = _N.ones((M, 1))*(K*2.01)   #  we're reasonably sure about width of clusters in make space
+    _Sg_nu  = _N.ones(M)*(K*2.01)   #  we're reasonably sure about width of clusters in make space
     print "prior ---------  Sg"
     print allSg
-    _Sg_PSI = _N.tile(allSg/(K*2.01), M).T.reshape((M, K, K))
+    #_Sg_PSI = _N.tile(allSg/(K*2.01), M).T.reshape((M, K, K))
+    _Sg_PSI = _N.empty((M, K, K))
+
+    for m in xrange(M):
+        _Sg_PSI[m] = allSg/(K*2.01)
     
     priors._Sg_nu = _N.array(_Sg_nu[0])
     priors._Sg_PSI = _N.array(_Sg_PSI[0])
@@ -337,7 +342,7 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
         _u_Sg[m]   = _N.median(smp_mk_hyps[oo.ky_h_u_Sg][:, :, frm:, m], axis=2)
 
         #_Sg_nu[m]  = _N.mean(smp_mk_hyps[oo.ky_h_Sg_nu][0, frm:, m], axis=0)
-        _Sg_nu[m]  = _N.median(smp_mk_hyps[oo.ky_h_Sg_nu][0, frm:, m], axis=0)
+        _Sg_nu[m]  = _N.median(smp_mk_hyps[oo.ky_h_Sg_nu][frm:, m], axis=0)
         #_Sg_PSI[m] = _N.mean(smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, frm:, m], axis=2)
         _Sg_PSI[m] = _N.median(smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, frm:, m], axis=2)
         # oo.mk_hypPstMd[oo.ky_h_u_u][epc, m]   = _u_u[m]
@@ -459,8 +464,8 @@ def reset_cluster(epc, m, l0, f, q2, freeClstr, _q2_a, _q2_B, _f_u, _f_q2, _l0_a
     _f_q2[m] = priors._f_q2[iclstr]
     _l0_a[m] = priors._l0_a[iclstr]
     _l0_B[m] = priors._l0_B[iclstr]
-    _u_u[m]  = priors._u_u[0]
-    _u_Sg[m]  = priors._u_Sg[0]
+    _u_u[m]  = priors._u_u
+    _u_Sg[m]  = priors._u_Sg
     _Sg_nu[m]  = priors._Sg_nu
     _Sg_PSI[m]  = priors._Sg_PSI
                 
@@ -559,9 +564,9 @@ def contiguous_inuse(M_use, M_max, K, freeClstr, l0, f, q2, u, Sg, _l0_a, _l0_B,
                     _q2_B[inuseIDs[imu]]        = priors._q2_B[1]
 
                     _u_u[freeIDs[imf]]        = _u_u[inuseIDs[imu]]
-                    _u_u[inuseIDs[imu]]        = priors._u_u[0]
+                    _u_u[inuseIDs[imu]]        = priors._u_u#[0]
                     _u_Sg[freeIDs[imf]]        = _u_Sg[inuseIDs[imu]]
-                    _u_Sg[inuseIDs[imu]]        = priors._u_Sg[0]
+                    _u_Sg[inuseIDs[imu]]        = priors._u_Sg#[0]
 
                     _Sg_nu[freeIDs[imf]]        = _Sg_nu[inuseIDs[imu]]
                     _Sg_nu[inuseIDs[imu]]        = priors._Sg_nu
