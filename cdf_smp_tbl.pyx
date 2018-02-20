@@ -271,7 +271,7 @@ def smp_q2(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
 
 ########################################################################
 @cython.cdivision(True)
-cdef double pdfIG(double q2c, double fxd_f, double a, double B, double* p_riemann_x, double *p_px, long Nupx, double ibnsz, double dt, double l0, double dSilenceX, double xL, double xH):
+cdef double pdfIG_o(double q2c, double fxd_f, double a, double B, double* p_riemann_x, double *p_px, long Nupx, double ibnsz, double dt, double l0, double dSilenceX, double xL, double xH):
     #  
     cdef double hlfIIQ2 = -0.5/q2c
     cdef double sptlIntgrl = 0.0
@@ -296,10 +296,11 @@ cdef double pdfIG(double q2c, double fxd_f, double a, double B, double* p_rieman
     return -(a + 1)*log(q2c) - B/q2c-sptlIntgrl
     #return -(a + 1)*log(q2c) - B/q2c+tab_sI
 
-"""
+
 ########################################################################
 @cython.cdivision(True)
-cdef double pdfIG(double q2c, double fxd_f, double a, double B, double* p_riemann_x, double *p_px, long Nupx, double ibnsz, double dt, double l0, double dSilenceX, double xL, double xH):
+#cdef double pdfIG(double q2c, double fxd_f, double a, double B, double* p_riemann_x, double *p_px, long Nupx, double ibnsz, double dt, double l0, double dSilenceX, double xL, double xH):
+cdef double pdfIG(double q2c, double fxd_f, double a, double B, double l0, double dt):
     cdef double sd = sqrt(q2c)
     cdef double tab_sI = dt*l0*_cpt.conv_px(fxd_f, sd)
 
@@ -308,12 +309,12 @@ cdef double pdfIG(double q2c, double fxd_f, double a, double B, double* p_rieman
 
 ########################################################################
 @cython.cdivision(True)
-cdef double pdfNRM(double fc, double fxd_q2, double fxd_IIQ2, double Mc, double Sigma2c, double *p_riemann_x, double *p_px, long Nupx, double ibnsz, double dt, double l0, double dSilenceX, double xL, double xH):
+cdef double pdfNRM(double fc, double fxd_q2, double Mc, double Sigma2c, double l0, double dt):
     cdef double sd = sqrt(fxd_q2)
     cdef double tab_sI = dt*l0*_cpt.conv_px(fc, sd)
 
     return -0.5*(fc-Mc)*(fc-Mc)/Sigma2c+tab_sI
-"""
+
 
 ########################################################################
 @cython.cdivision(True)
@@ -415,12 +416,13 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
     cdef int istepbck = 0
 
     cdef double Mc, Sigma2c, q2_cnd_on, a, B, f_cnd_on, iq2_cnd_on
+    cdef double temp_d
 
     if dist == __NRM:
         Mc        = p_params[0]
         Sigma2c   = p_params[1]
         q2_cnd_on = p_params[2]
-        iq2_cnd_on= 1./q2_cnd_on
+        #iq2_cnd_on= 1./q2_cnd_on
     else:
         a         = p_params[0]
         B         = p_params[1]
@@ -428,11 +430,13 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
 
     #initial point, set pmax, gmax
     if dist == __NRM:
-        getOccDens(q2_cnd_on, &Nupx, &iStart, &dSilenceX, &ibnsz)
-        p_cond_pstr[0] = pdfNRM(p_gx[0], q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, &p_riemann_xs[iStart], &p_px_all[iStart], Nupx, ibnsz, dt, l0, dSilenceX, x_Lo, x_Hi)
+        #getOccDens(q2_cnd_on, &Nupx, &iStart, &dSilenceX, &ibnsz)
+        #p_cond_pstr[0] = pdfNRM(p_gx[0], q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, &p_riemann_xs[iStart], &p_px_all[iStart], Nupx, ibnsz, dt, l0, dSilenceX, x_Lo, x_Hi)
+        p_cond_pstr[0] = pdfNRM(p_gx[0], q2_cnd_on, Mc, Sigma2c, l0, dt)
     elif dist == __IG:
         getOccDens(p_gx[0], &Nupx, &iStart, &dSilenceX, &ibnsz)
         p_cond_pstr[0] = pdfIG(p_gx[0], f_cnd_on, a, B, &p_riemann_xs[iStart], &p_px_all[iStart], Nupx, ibnsz, dt, l0, dSilenceX, x_Lo, x_Hi)
+        p_cond_pstr[0] = pdfIG(p_gx[0], f_cnd_on, a, B, l0, dt)
     pmax = p_cond_pstr[0]
     gmax = pmax
     imax = 0
@@ -466,9 +470,9 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
             #   - Sigma2c (likelihood + prior) width of observation
             #   prior
 
-            getOccDens(q2_cnd_on, &Nupx, &iStart, &dSilenceX, &ibnsz)
+            #getOccDens(q2_cnd_on, &Nupx, &iStart, &dSilenceX, &ibnsz)
             for strt <= ix < stop+1 by skp:
-                p_cond_pstr[ix] = pdfNRM(p_gx[ix], q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, &p_riemann_xs[iStart], &p_px_all[iStart], Nupx, ibnsz, dt, l0, dSilenceX, x_Lo, x_Hi)
+                p_cond_pstr[ix] = pdfNRM(p_gx[ix], q2_cnd_on, Mc, Sigma2c, l0, dt)
 
                 if p_cond_pstr[ix] > pmax:
                     pmax = p_cond_pstr[ix]   # pmax updated each time grid made finer
@@ -479,8 +483,10 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
             #   prior
             #   p_gx[ix]   values of q2
             for strt <= ix < stop+1 by skp:
-                getOccDens(p_gx[ix], &Nupx, &iStart, &dSilenceX, &ibnsz)
-                p_cond_pstr[ix] = pdfIG(p_gx[ix], f_cnd_on, a, B, &p_riemann_xs[iStart], &p_px_all[iStart], Nupx, ibnsz, dt, l0, dSilenceX, x_Lo, x_Hi)
+                #getOccDens(p_gx[ix], &Nupx, &iStart, &dSilenceX, &ibnsz)
+                #p_cond_pstr[ix] = pdfIG(p_gx[ix], f_cnd_on, a, B, &p_riemann_xs[iStart], &p_px_all[iStart], Nupx, ibnsz, dt, l0, dSilenceX, x_Lo, x_Hi)
+
+                p_cond_pstr[0] = pdfIG(p_gx[0], f_cnd_on, a, B, l0, dt)
 
                 if p_cond_pstr[ix] > pmax:
                     pmax = p_cond_pstr[ix]   # pmax updated each time grid made finer

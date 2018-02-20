@@ -671,4 +671,61 @@ def Sg_PSI(long[::1] cls_str_ind, long[::1] clstsz, long[::1] v_sts, double[:, :
                     tot += (p_mks[non_cnt_ind*K + k]-uk)*(p_mks[non_cnt_ind*K + k]-uk)
                 p_Sg_PSI_[m*K2+k*K + k] = p__Sg_PSI[m*K2+k*K + k] + tot*0.5
 
+@cython.cdivision(True)
+def find_mcs(long[::1] clstsz, long[::1] v_sts, long[::1] cls_str_ind, double[:, ::1] mks, double [:, ::1] mcs, long M_use, long K):
+    cdef long m, n, nSpks, i0, mK, k
+    cdef long* p_clstsz = &clstsz[0]
+    cdef double* p_mcs   = &mcs[0, 0]
+    cdef double* p_mks   = &mks[0, 0]
+    cdef long* p_v_sts   = &v_sts[0]
+    cdef long* p_cls_str_ind   = &cls_str_ind[0]
 
+    with nogil:
+        for 0 <= m < M_use:
+            nSpks = p_cls_str_ind[m+1] - p_cls_str_ind[m]
+            i0    = p_cls_str_ind[m]
+            mK    = m*K
+
+            for 0 <= k < K:
+                p_mcs[mK+k] = 0
+            for 0 <= n < nSpks:
+                #  elapsed time ratios
+                for 0 <= k < K:
+                    p_mcs[mK+k] += p_mks[p_v_sts[i0+n]*K + k]
+
+            if nSpks > 0:
+                for 0 <= k < K:
+                    p_mcs[mK+k] /= nSpks
+
+
+
+def cluster_bounds(long[::1] clstsz, long[::1] Asts, long[::1] cls_str_ind, long[::1] v_sts, gz, long t0, long M_use):
+    ###############  FOR EACH CLUSTER
+    cdef long i0 = 0
+    cdef long[::1] mv_minds
+    cdef long* p_minds
+    cdef long* p_clstsz = &clstsz[0]
+    cdef long* p_cls_str_ind = &cls_str_ind[0]
+    cdef long* p_v_sts = &v_sts[0]
+    cdef long* p_Asts = &Asts[0]
+    p_cls_str_ind[0]         = i0
+
+    #print "-----------------------------    %d" % t0
+    #print v_sts.shape
+    for m in xrange(M_use):   #  get the minds
+        minds = _N.where(gz[:, m] == 1)[0]  
+        nSpks    = minds.shape[0]
+        p_clstsz[m]    = nSpks
+
+        if nSpks > 0:
+            #print minds.shape
+            #print minds.flags
+            #print "%(1)d   %(2)d" % {"1" : i0, "2" : i0+nSpks}
+            mv_minds = minds
+            p_minds      = &mv_minds[0]
+
+            p_cls_str_ind[m+1]         = i0 + nSpks
+
+            for 0 <= n < nSpks:
+                p_v_sts[i0+n]  = p_Asts[p_minds[n]] + t0 # sts is in absolute time
+            i0 += nSpks

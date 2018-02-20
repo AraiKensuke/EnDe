@@ -15,8 +15,8 @@ from posteriorUtil import MAPvalues2
 from filter import gauKer
 import gibbsApprMxMutil as gAMxMu
 import stochasticAssignment_new as _sA
-#import cdf_smp_tbl as _cdfs
-import cdf_smp as _cdfs
+import cdf_smp_tbl as _cdfs
+#import cdf_smp as _cdfs
 import ig_from_cdf_pkg as _ifcp
 import fastnum as _fm
 import clrs 
@@ -200,7 +200,7 @@ class MarkAndRF:
                 iq2s= 1./(qs*qs)
 
                 cnts, xbns = _N.histogram(xt0t1, bins=_N.linspace(-6, 6, Ngrd+1), normed=False)
-                tbl = _gct.build_gau_pxdx_tbl(cnts, x_grid, xt0t1, fs, iq2s, i0, k, oo.f_L, oo.f_H, usepx=True)
+                tbl = _gct.build_gau_pxdx_tbl(cnts, x_grid, xt0t1, fs, iq2s, i0, k, oo.f_L, oo.f_H)
 
                 print "tab:   min  %(min).3f    max  %(max).3f" % {"min" : _N.min(_gct._tab), "max" : _N.max(_gct._tab)}
 
@@ -395,6 +395,7 @@ class MarkAndRF:
             iiq2r= iiq2.reshape((M_use, 1))
 
             mcs = _N.empty((M_use, K))   # cluster sample means
+            mcsT = _N.empty((M_use, K))   # cluster sample means
             outs1 = _N.empty((M_use, K))
             outs2 = _N.empty((M_use, K))
 
@@ -408,6 +409,7 @@ class MarkAndRF:
 
                 _sA.stochasticAssignment(oo, epc, itr, M_use, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mAS, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, ((epc > 0) and (itr == 0)), diag_cov, nthrds=oo.nThrds)
                 #ttsw3 = _tm.time()
+                #_fm.cluster_bounds(clstsz, Asts, cls_str_ind, v_sts, gz[itr], t0, M_use)    # _fm.cluser_bounds provides no improvement
                 ###############  FOR EACH CLUSTER
                 for m in xrange(M_use):   #  get the minds
                     minds = _N.where(gz[itr, :, m] == 1)[0]  
@@ -426,12 +428,13 @@ class MarkAndRF:
                 ###############
                 _N.copyto(u_Sg_, _N.linalg.inv(_iu_Sg + clstsz_rr*iSg))
 
-                for m in xrange(M_use):  
-                    #  elapsed time ratios
-                    #  inv  9.1, clstx   3.1,    mean   6.5,  einsum  5.2
-                    if clstsz[m] > 0:   # >= K causes Cholesky to fail at times.
-                        clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
-                        mcs[m]       = _N.mean(clstx, axis=0)
+                # for m in xrange(M_use):  
+                #     #  elapsed time ratios
+                #     #  inv  9.1, clstx   3.1,    mean   6.5,  einsum  5.2
+                #     if clstsz[m] > 0:   # >= K causes Cholesky to fail at times.
+                #         clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
+                #         mcs[m]       = _N.mean(clstx, axis=0)
+                _fm.find_mcs(clstsz, v_sts, cls_str_ind, mks, mcs, M_use, K)
                 _fm.multiple_mat_dot_v(_iu_Sg, _u_u, outs1, M_use, K)
                 _fm.multiple_mat_dot_v(iSg, mcs, outs2, M_use, K)
                 _fm.multiple_mat_dot_v(u_Sg_, outs1 + clstsz_r*outs2, u_u_, M_use, K)
@@ -485,15 +488,6 @@ class MarkAndRF:
                     # print Sg_PSI_
                     # print "-------------------------"
                     for m in xrange(M_use):
-                        # #infor = _tm.time()
-
-                        # ur = u[m].reshape((1, K))
-                        # clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
-                        # #tt6a += (_tm.time()-infor)
-                        # #  dot((clstx-ur).T, (clstx-ur))==ZERO(K) when clstsz ==0
-                        # Sg_PSI_[m] = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
-                        # #print Sg_PSI_[m]
-                        # #tt6b += (_tm.time()-infor)
                         Sg[m] = 0
 
                         for ik in xrange(K):
@@ -604,6 +598,7 @@ class MarkAndRF:
                 # print "t8t7+=%.4e" % (#ttsw8-#ttsw7)
                 # print "t9t8+=%.4e" % (#ttsw9-#ttsw8)
                 # print "t10t9+=%.4e" % (#ttsw10-#ttsw9)
+                # print "t11t10+=%.4e" % (#ttsw11-#ttsw10)
                 # print "#timing end  %.5f" % (#ttsw10-#ttsw1)
 
 
@@ -634,5 +629,3 @@ class MarkAndRF:
             dmp = open(resFN("posteriors_%d.dmp" % epc, dir=oo.outdir), "wb")
             pickle.dump(pcklme, dmp, -1)
             dmp.close()
-
-######  Hi Eric
