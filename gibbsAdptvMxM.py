@@ -14,7 +14,7 @@ import pickle
 from posteriorUtil import MAPvalues2
 from filter import gauKer
 import gibbsApprMxMutil as gAMxMu
-import stochasticAssignment_new as _sA
+import stochasticAssignment as _sA
 import cdf_smp_tbl as _cdfs
 #import cdf_smp as _cdfs
 import ig_from_cdf_pkg as _ifcp
@@ -407,17 +407,17 @@ class MarkAndRF:
                 if (itr % 100) == 0:    
                     print "-------itr  %(i)d" % {"i" : itr}
 
-                _sA.stochasticAssignment(oo, epc, itr, M_use, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mAS, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, ((epc > 0) and (itr == 0)), diag_cov, nthrds=oo.nThrds)
+                _sA.stochasticAssignment(oo, epc, itr, M_use, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mAS, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, ((epc > 0) and (itr == 0)), diag_cov, clstsz)
                 #ttsw3 = _tm.time()
-                #_fm.cluster_bounds(clstsz, Asts, cls_str_ind, v_sts, gz[itr], t0, M_use)    # _fm.cluser_bounds provides no improvement
-                ###############  FOR EACH CLUSTER
-                for m in xrange(M_use):   #  get the minds
-                    minds = _N.where(gz[itr, :, m] == 1)[0]  
-                    sts  = Asts[minds] + t0   #  sts is in absolute time
-                    L    = len(sts)
-                    cls_str_ind[m+1] = L + cls_str_ind[m]
-                    clstsz[m]        = L
-                    v_sts[cls_str_ind[m]:cls_str_ind[m+1]] = sts
+                _fm.cluster_bounds2(clstsz, Asts, cls_str_ind, v_sts, gz[itr], t0, M_use, nSpks)    # _fm.cluser_bounds provides no improvement
+                # ###############  FOR EACH CLUSTER
+                # for m in xrange(M_use):   #  get the minds
+                #     minds = _N.where(gz[itr, :, m] == 1)[0]  
+                #     sts  = Asts[minds] + t0   #  sts is in absolute time
+                #     L    = len(sts)
+                #     cls_str_ind[m+1] = L + cls_str_ind[m]
+                #     clstsz[m]        = L
+                #     v_sts[cls_str_ind[m]:cls_str_ind[m+1]] = sts
                 clstsz_rr  = clstsz.reshape(M_use, 1, 1)
                 clstsz_r  = clstsz.reshape(M_use, 1)
 

@@ -17,7 +17,7 @@ import pickle
 twpi = 2*_N.pi
 wdSpc = 1
 
-def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mAS, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, cmp2Existing, diag_cov, nthrds=1):
+def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mAS, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, cmp2Existing, diag_cov, clstsz):
     #  Msc   Msc signal clusters
     #  M     all clusters, including nz clstr.  M == Msc when not using nzclstr
     #  Gibbs sampling
@@ -341,7 +341,7 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     # M1 = rat[1:] >= rnds
     # M2 = rat[0:-1] <= rnds
     # gz[it] = (M1&M2).T
-    _fm.set_occ(rat, rnds, gz[it], M, N)            
+    _fm.set_occ(clstsz, rat, rnds, gz[it], M, N)            
     # print "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
     # print gz[it, :, 3]
     # print gz[it, :, 8]

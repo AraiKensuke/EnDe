@@ -579,7 +579,7 @@ def exp_on_arr(double[:, ::1] inp, double[:, ::1] out, long M, long N):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def set_occ(double[:, ::1] crats, double[::1] rnds, char[:, ::1] gz, long M, long N):
+def set_occ(long[::1] clstsz, double[:, ::1] crats, double[::1] rnds, char[:, ::1] gz, long M, long N):
     #  instead of doing the following:
     #M1 = crat[1:] >= rnds
     #M2 = crat[0:-1] <= rnds
@@ -588,11 +588,14 @@ def set_occ(double[:, ::1] crats, double[::1] rnds, char[:, ::1] gz, long M, lon
     #  call this function (with call to gz.fill(0) before calling set_occ)
     cdef long n, im, #nind, m
     cdef double* p_crats = &crats[0, 0]
+    cdef long*   p_clstsz= &clstsz[0]
     cdef double* p_rnds  = &rnds[0]
     cdef char* p_gz = &gz[0, 0]   #  N x M    different than c_rats
     cdef double rnd
 
     with nogil:
+        for m in xrange(M):
+            clstsz[m] = 0
         for n in xrange(N):
             im = 0
             rnd  = p_rnds[n]
@@ -600,6 +603,7 @@ def set_occ(double[:, ::1] crats, double[::1] rnds, char[:, ::1] gz, long M, lon
                 # rnds[0] = 0.1  crats = [0, 0.2]    i expect gz[0, n] = 1
                 im += 1
             p_gz[n*M + im-1] = 1
+            p_clstsz[im-1] += 1
 
             #  actually slower than calling gz.fill(0) before call to srch_occ
             # for im*N+n <= m < M*N+n by N:
@@ -729,3 +733,29 @@ def cluster_bounds(long[::1] clstsz, long[::1] Asts, long[::1] cls_str_ind, long
             for 0 <= n < nSpks:
                 p_v_sts[i0+n]  = p_Asts[p_minds[n]] + t0 # sts is in absolute time
             i0 += nSpks
+
+
+def cluster_bounds2(long[::1] clstsz, long[::1] Asts, long[::1] cls_str_ind, long[::1] v_sts, char[:, ::1] gz, long t0, long M_use, long N):
+    ###############  FOR EACH CLUSTER
+    cdef long i0 = 0
+    cdef long[::1] mv_minds
+    cdef long* p_minds
+    cdef long* p_clstsz = &clstsz[0]
+    cdef long* p_cls_str_ind = &cls_str_ind[0]
+    cdef long* p_v_sts = &v_sts[0]
+    cdef long* p_Asts = &Asts[0]
+    cdef char* p_gz   = &gz[0, 0]
+    cdef long ns, n, m
+    
+    p_cls_str_ind[0]         = i0
+
+    with nogil:
+        for 0 <= m < M_use:   #  get the minds
+            p_cls_str_ind[m+1]         = i0 + p_clstsz[m]
+            if p_clstsz[m] > 0:
+                ns = 0
+                for 0 <= n < N:
+                    if p_gz[n*M_use + m] == 1:
+                        p_v_sts[i0+ns] = p_Asts[n] + t0
+                        ns += 1
+            i0 += p_clstsz[m]

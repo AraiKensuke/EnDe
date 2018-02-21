@@ -435,8 +435,9 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
         p_cond_pstr[0] = pdfNRM(p_gx[0], q2_cnd_on, Mc, Sigma2c, l0, dt)
     elif dist == __IG:
         getOccDens(p_gx[0], &Nupx, &iStart, &dSilenceX, &ibnsz)
-        p_cond_pstr[0] = pdfIG(p_gx[0], f_cnd_on, a, B, &p_riemann_xs[iStart], &p_px_all[iStart], Nupx, ibnsz, dt, l0, dSilenceX, x_Lo, x_Hi)
-        p_cond_pstr[0] = pdfIG(p_gx[0], f_cnd_on, a, B, l0, dt)
+        p_cond_pstr[0] = pdfIG_o(p_gx[0], f_cnd_on, a, B, &p_riemann_xs[iStart], &p_px_all[iStart], Nupx, ibnsz, dt, l0, dSilenceX, x_Lo, x_Hi)
+        #p_cond_pstr[0] = pdfIG(p_gx[0], f_cnd_on, a, B, l0, dt)
+        #print "%(1).4f  %(2).4f" % {"1" : p_cond_pstr[0], "2" : temp_d}
     pmax = p_cond_pstr[0]
     gmax = pmax
     imax = 0
@@ -483,10 +484,10 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
             #   prior
             #   p_gx[ix]   values of q2
             for strt <= ix < stop+1 by skp:
-                #getOccDens(p_gx[ix], &Nupx, &iStart, &dSilenceX, &ibnsz)
-                #p_cond_pstr[ix] = pdfIG(p_gx[ix], f_cnd_on, a, B, &p_riemann_xs[iStart], &p_px_all[iStart], Nupx, ibnsz, dt, l0, dSilenceX, x_Lo, x_Hi)
+                getOccDens(p_gx[ix], &Nupx, &iStart, &dSilenceX, &ibnsz)
+                p_cond_pstr[ix] = pdfIG_o(p_gx[ix], f_cnd_on, a, B, &p_riemann_xs[iStart], &p_px_all[iStart], Nupx, ibnsz, dt, l0, dSilenceX, x_Lo, x_Hi)
 
-                p_cond_pstr[0] = pdfIG(p_gx[0], f_cnd_on, a, B, l0, dt)
+                #p_cond_pstr[ix] = pdfIG(p_gx[ix], f_cnd_on, a, B, l0, dt)
 
                 if p_cond_pstr[ix] > pmax:
                     pmax = p_cond_pstr[ix]   # pmax updated each time grid made finer
