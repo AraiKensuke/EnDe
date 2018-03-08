@@ -113,7 +113,6 @@ def initClusters(oo, M_max, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=
 
         MS     = int(clstrs[1]) 
         MS = MS + 5
-        #MS = MS + 15
         M_use      = clstrs[0] + MS
         print "------------"
         print "hash clusters %d" % clstrs[0]
@@ -261,7 +260,7 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
     tt2 = _tm.time()
 
     #frms = _pU.stationary_from_Z(smp_sp_prms)
-    frms = _pU.find_good_clstrs_and_stationary_from(M_use, smp_sp_prms)
+    frms = _pU.find_good_clstrs_and_stationary_from(M_use, smp_sp_prms[:, 0:ITERS])
 
     print "frms------------------"
     print frms
@@ -271,13 +270,10 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
         occ   = _N.empty(M_use)
         for m in xrange(M_use):
            #occ[m]   = _N.mean(_N.sum(gz[frms[m]:ITERS-1:10, :, m], axis=1), axis=0)
-            occ[m]   = _N.mean(_N.sum(gz[frms[m]:, :, m], axis=1), axis=0)
-            print "occupation for m=%(m)d   %(o)d" % {"m" : m, "o" : occ[m]}
+            occ[m]   = _N.mean(_N.sum(gz[frms[m]:ITERS, :, m], axis=1), axis=0)
+            print "occupation for m=%(m)d   %(o)f" % {"m" : m, "o" : occ[m]}
 
     ##  
-    oo.smp_sp_prms = smp_sp_prms
-    oo.smp_mk_prms = smp_mk_prms
-
     l_trlsNearMAP = []
     
     skp = 2
@@ -285,17 +281,17 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
     #  marginal posteriors of the spatial and cluster params
     for m in xrange(M_use):
         frm       = frms[m]
-        f_smps    = smp_sp_prms[1, frm::skp, m]
+        f_smps    = smp_sp_prms[1, frm:ITERS:skp, m]
         _f_u[m]      = _N.mean(f_smps)
         _f_q2[m]     = _N.std(f_smps)**2
         #  hyper params to be copied to _f_u, _f_s
         
         ##########################
-        _l0_a[m], _l0_B[m] = _pU.gam_inv_gam_dist_ML(smp_sp_prms[0, frm::skp, m], dist=_pU._GAMMA, clstr=m)
+        _l0_a[m], _l0_B[m] = _pU.gam_inv_gam_dist_ML(smp_sp_prms[0, frm:ITERS:skp, m], dist=_pU._GAMMA, clstr=m)
         #print "ML fit of smps  _l0_a[%(m)d] %(a).3f  _l0_B[%(m)d] %(B).3f" % {"m" : m, "a" : _l0_a[m], "B" : _l0_B[m]}
 
         ##########################
-        _q2_a[m], _q2_B[m] = _pU.gam_inv_gam_dist_ML(smp_sp_prms[2, frm::skp, m], dist=_pU._INV_GAMMA, clstr=m)
+        _q2_a[m], _q2_B[m] = _pU.gam_inv_gam_dist_ML(smp_sp_prms[2, frm:ITERS:skp, m], dist=_pU._INV_GAMMA, clstr=m)
         #print "ML fit of smps  _q2_a[%(m)d] %(a).3f  _q2_B[%(m)d] %(B).3f" % {"m" : m, "a" : _q2_a[m], "B" : _q2_B[m]}
 
     #  modes
@@ -329,22 +325,16 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
 
     for m in xrange(M_use):
         frm  = frms[m]
-        #u[m] = _N.mean(smp_mk_prms[0][:, frm:, m], axis=1)
-        u[m] = _N.median(smp_mk_prms[0][:, frm:, m], axis=1)
+        u[m] = _N.median(smp_mk_prms[0][:, frm:ITERS, m], axis=1)
 
-        #Sg[m] = _N.mean(smp_mk_prms[1][:, :, frm:, m], axis=2)
-        Sg[m] = _N.median(smp_mk_prms[1][:, :, frm:, m], axis=2)
+        Sg[m] = _N.median(smp_mk_prms[1][:, :, frm:ITERS, m], axis=2)
         oo.mk_prmPstMd[oo.ky_p_u][m] = u[m]
         oo.mk_prmPstMd[oo.ky_p_Sg][m]= Sg[m]
-        #_u_u[m]    = _N.mean(smp_mk_hyps[oo.ky_h_u_u][:, frm:, m], axis=1)
-        _u_u[m]    = _N.median(smp_mk_hyps[oo.ky_h_u_u][:, frm:, m], axis=1)
-        #_u_Sg[m]   = _N.mean(smp_mk_hyps[oo.ky_h_u_Sg][:, :, frm:, m], axis=2)
-        _u_Sg[m]   = _N.median(smp_mk_hyps[oo.ky_h_u_Sg][:, :, frm:, m], axis=2)
+        _u_u[m]    = _N.median(smp_mk_hyps[oo.ky_h_u_u][:, frm:ITERS, m], axis=1)
+        _u_Sg[m]   = _N.median(smp_mk_hyps[oo.ky_h_u_Sg][:, :, frm:ITERS, m], axis=2)
 
-        #_Sg_nu[m]  = _N.mean(smp_mk_hyps[oo.ky_h_Sg_nu][0, frm:, m], axis=0)
-        _Sg_nu[m]  = _N.median(smp_mk_hyps[oo.ky_h_Sg_nu][frm:, m], axis=0)
-        #_Sg_PSI[m] = _N.mean(smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, frm:, m], axis=2)
-        _Sg_PSI[m] = _N.median(smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, frm:, m], axis=2)
+        _Sg_nu[m]  = _N.median(smp_mk_hyps[oo.ky_h_Sg_nu][frm:ITERS, m], axis=0)
+        _Sg_PSI[m] = _N.median(smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, frm:ITERS, m], axis=2)
         # oo.mk_hypPstMd[oo.ky_h_u_u][epc, m]   = _u_u[m]
         # oo.mk_hypPstMd[oo.ky_h_u_Sg][epc, m]  = _u_Sg[m]
         # oo.mk_hypPstMd[oo.ky_h_Sg_nu][epc, m] = _Sg_nu[m]
@@ -379,55 +369,50 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
             #  nothing about the mark distribution.  That is why f, q2
             #  are updated when there are no spikes, but u and Sg are not.
 
+            breset = False
             bBad = (_l0_a[m] is None) or (_l0_B[m] is None) or _N.isnan(_l0_a[m]) or _N.isnan(_l0_B[m]) or (_q2_a[m] is None) or (_q2_B[m] is None) or _N.isnan(_q2_a[m]) or _N.isnan(_q2_B[m])
             if bBad:
+                breset = True
                 if not _N.isnan(occ[m]):
-                    print "cluster who's posterior difficult to estimate found.   occupancy %.3f" % occ[m]
+                    print "cluster %(m)d posterior difficult to estimate found.   occupancy %(o).3f" % {"m" : m, "o" : occ[m]}
                 else:
-                    print "cluster who's posterior difficult to estimate found.   occupancy was nan"
-            # if bBad or ((occ[m] < minAss) and (l0[m] / _N.sqrt(twpi*q2[m]) < 0.5)) or \
-            #    (f[m] < oo.xLo-sq25[m]) or (f[m] > oo.xHi+sq25[m]) or \
-            #    ((_f_q2[m] > 4) and q2[m] < 2) or (q2[m] < 0.001):
-
-            #if ((occ[m] < 4*K) and (bBad or (f[m] < oo.xLo-sq25[m]) or (f[m] > oo.xHi+sq25[m]) or \
-            #   ((_f_q2[m] > 4) and (q2[m] < 2)) or (ITERS - frms[m] < 3000))) or \
-            #    ((q2[m] < 1e-4) or (freeClstr[m] and occ[m] < K)):
-            if ((occ[m] < 4*K) and (bBad or (oo.sp_prmPstMd[oo.ky_p_f+3*m] < oo.xLo-sq25[m]) or (oo.sp_prmPstMd[oo.ky_p_f+3*m] > oo.xHi+sq25[m]) or \
-               ((_f_q2[m] > 4) and (oo.sp_prmPstMd[oo.ky_p_q2+3*m] < 2)) or (ITERS - frms[m] < 3000))) or \
-                (bBad or ((oo.sp_prmPstMd[oo.ky_p_q2+3*m] < 1e-4) or (freeClstr[m] and occ[m] < K))):
-
-                # last 2 conditions:  uncertainty of center high relative to width of cluster
-                #  cluster TOO narrow
-                             
-                print "resetting cluster %(m)d  with o %(o)d" % {"m" : m, "o" : occ[m]}
+                    print "cluster %d posterior difficult to estimate found.   occupancy was nan" % m
+            v1 = _f_q2[m] / oo.sp_prmPstMd[oo.ky_p_q2+3*m]
+            v2 = ITERS - frms[m]
+            v3 = oo.sp_prmPstMd[oo.ky_p_q2+3*m]
+            if (oo.sp_prmPstMd[oo.ky_p_f+3*m] < oo.xLo-sq25[m]) or (oo.sp_prmPstMd[oo.ky_p_f+3*m] > oo.xHi+sq25[m]):
+                breset = True
+                print "spatial cener too far away from edges  %d" % m
+            elif v1 > 3.:
+                breset = True
+                print "high uncertainty relative to width  %d" % m
+            elif v2 < 4000:
+                breset = True
+                print "not long enough stationarity %d" % m
+            elif (v3 < 1e-4) and (occ[m] < K):
+                breset = True
+                print "too narrow %d" % m
+            elif (oo.sp_prmPstMd[oo.ky_p_q2+3*m] > 2) and (oo.sp_prmPstMd[oo.ky_p_l0+3*m]/_N.sqrt(oo.sp_prmPstMd[oo.ky_p_q2+3*m]) < 1.25) and occ[m] < K:
+                breset = True
+                print "too low firing rate %d" % m
+            elif (freeClstr[m] and occ[m] < K):
+                breset = True
+                print "free cluster and not enough occupancy %d" % m
+            if breset:
+                print "****RESET cluster %(m)d  with o %(o)f" % {"m" : m, "o" : occ[m]}
                 reset_cluster(epc, m, l0, f, q2, freeClstr, _q2_a, _q2_B, _f_u, _f_q2, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, oo, priors, m1stSignalClstr)
-                # print "resetting  cluster %(m)d   %(l0).3f  %(f).3f" % {"m" : m, "l0" : (l0[m] / _N.sqrt(twpi*q2[m])), "f" : f[m]}
-                # iclstr = 1 if m >= m1stSignalClstr else 0
-                # _q2_a[m] = priors._q2_a[iclstr]
-                # _q2_B[m] = priors._q2_B[iclstr]
-                # _f_u[m]  = priors._f_u[iclstr]
-                # _f_q2[m] = priors._f_q2[iclstr]
-                # _l0_a[m] = priors._l0_a[iclstr]
-                # _l0_B[m] = priors._l0_B[iclstr]
-                # _u_u[m]  = priors._u_u
-                # _u_Sg[m]  = priors._u_Sg[0]
-                # _Sg_nu[m]  = priors._Sg_nu
-                # _Sg_PSI[m]  = priors._Sg_PSI
-                
-                # oo.sp_prmPstMd[epc, oo.ky_p_l0+3*m] = 0   # no effect on decode
-                # oo.sp_prmPstMd[epc, oo.ky_p_q2+3*m] = 10000.
-
-                # freeClstr[m] = True
             else:
+                print "****NO RESET cl %(m)d.   occ %(o).3f   %(1).3e  %(2).3e  %(3).3e" % {"o" : occ[m], "1" : v1, "2" : v2, "3" : v3, "m" : m}
+
                 freeClstr[m] = False
 
     
-    rsmp_sp_prms = smp_sp_prms.swapaxes(1, 0).reshape(ITERS, 3*M_use, order="F")
+    #rsmp_sp_prms = smp_sp_prms.swapaxes(1, 0).reshape(ITERS, 3*M_use, order="F")
 
     print "freeClstr---------------"
     print freeClstr
 
-    _N.savetxt(resFN("posParams_%d.dat" % epc, dir=oo.outdir), rsmp_sp_prms, fmt=("%.4f %.4f %.4f " * M_use))   #  the params for the non-noise
+    #_N.savetxt(resFN("posParams_%d.dat" % epc, dir=oo.outdir), rsmp_sp_prms, fmt=("%.4f %.4f %.4f " * M_use))   #  the params for the non-noise
     #_N.savetxt(resFN("posHypParams.dat", dir=oo.outdir), smp_sp_hyps[:, :, 0].T, fmt="%.4f %.4f %.4f %.4f %.4f %.4f")
 
 
@@ -526,8 +511,6 @@ def contiguous_inuse(M_use, M_max, K, freeClstr, l0, f, q2, u, Sg, _l0_a, _l0_B,
 
         #iclstr = 1 if m >= m1stSignalClstr else 0
 
-        print "b4 cont"
-        print freeClstr[0:M_use]
         for imu in xrange(Lu-1, -1, -1):
             imf += 1
 

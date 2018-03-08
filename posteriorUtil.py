@@ -9,6 +9,9 @@ _GAMMA         = 0
 _INV_GAMMA     = 1
 
 def find_good_clstrs_and_stationary_from(M, smps):
+    #  treat narrow and wide cluster differently because the correlation
+    #  timescale of sequential samples are quite different between slow
+    #  and wide clusers
     frm_narrow = stationary_from_Z_bckwd(smps, blksz=200)
     frm_wide   = stationary_from_Z_bckwd(smps, blksz=500)
     ITERS      = smps.shape[1]
@@ -24,7 +27,8 @@ def find_good_clstrs_and_stationary_from(M, smps):
     frms[wd_clstrs] = frm_wide[wd_clstrs]
 
     return frms
-    
+
+"""    
 def stationary_from_Z_bckwd(smps, blksz=200):
     #  Detect when stationarity reached in Gibbs sampling
     #  Also, detect whether cluster is switching between local extremas
@@ -83,6 +87,80 @@ def stationary_from_Z_bckwd(smps, blksz=200):
                 sameDist += 1
 
             if (i - lastWinSame > 1) and (sameDist <= 3):
+                #print "reset  %d" % i
+                sameDist = 0   #  reset
+                win1stFound = (wins_m1-1)*blksz
+
+        frms[m] = win1stFound
+
+    return frms+blksz
+"""
+
+def stationary_from_Z_bckwd(smps, blksz=200):
+    #  Detect when stationarity reached in Gibbs sampling
+    #  Also, detect whether cluster is switching between local extremas
+    #
+    SMPS, M   = smps.shape[1:]   #  smp_sp_prms = _N.zeros((3, ITERS, M_use))  
+
+    wins         = SMPS/blksz
+    wins_m1      = wins - 1
+
+    frms      = _N.empty(M, dtype=_N.int)  # current start of stationarity
+
+    reparam     = _N.empty((2, SMPS, M))   #  reparameterized
+    reparam[0]  = smps[1]
+    reparam[1]  = smps[0] / _N.sqrt(smps[2])
+
+    rshpd     = reparam.reshape((2, wins, blksz, M))
+
+
+    mrshpd    = _N.median(rshpd, axis=2)   #  2 x wins_m1+1 x M
+    sdrshpd   = _N.std(rshpd, axis=2)
+
+    print mrshpd.shape
+    mLst                =         mrshpd[:, wins_m1].reshape(2, 1, M)
+    sdLst               =         sdrshpd[:, wins_m1].reshape(2, 1, M)
+    sdNLst               =         sdrshpd[:, 0:-1].reshape(2, wins_m1, M)
+
+    zL                =         (mrshpd[:, 0:-1] - mLst)/sdLst
+    zNL               =         (mrshpd[:, 0:-1] - mLst)/sdNLst
+
+    #  mn, std in each win
+    #  u1=0.3, sd1=0.9      u2=0.4, sd2=0.8
+    #  (u2-u1)/sd1  
+
+    #  detect sudden changes
+
+    for m in xrange(M):
+        win1stFound=(wins_m1-1)*blksz
+        sameDist = 0
+        i = 0
+
+        thisWinSame     = False
+        lastWinSame     = 0#wins_m1
+
+        #  want 3 consecutive windows where distribution looks different
+        while (sameDist <= 2) and (i < wins_m1-1):
+            i += 1
+            it0 = i*blksz
+            it1 = (i+1)*blksz
+
+            thisWinSame = 0
+
+            for d in xrange(2):
+                if ((zL[d, i, m] < 0.75) and (zL[d, i, m] > -0.75)) and \
+                   ((zNL[d, i, m] < 0.75) and (zNL[d, i, m] > -0.75)):
+                    
+                    thisWinSame += 1
+
+            if thisWinSame == 2:
+                if sameDist == 0:
+                    win1stFound = it0
+                lastWinSame = i
+
+                sameDist += 1
+
+            if (i - lastWinSame > 1) and (sameDist <= 2):
                 #print "reset  %d" % i
                 sameDist = 0   #  reset
                 win1stFound = (wins_m1-1)*blksz

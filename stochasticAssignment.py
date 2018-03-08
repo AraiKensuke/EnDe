@@ -55,13 +55,13 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     qdrSPC     = _N.empty((M, N))
     #_fm.multi_qdrtcs_par_func_sym(dmu, iSg, qdrMKS, M, N, K, nthrds=1)
     exp_arg = _N.empty((M, N))    
+    #ttt5       = _tm.time()
     if diag_cov:
        _fm.full_qdrtcs_K4_diag(pkFRr, mkNrms, exp_arg, fr, xASr, iq2r, \
                                qdrSPC, mAS, u, iSg, qdrMKS, M, N, K)
     else:
        _fm.full_qdrtcs_K4(pkFRr, mkNrms, exp_arg, fr, xASr, iq2r, \
                           qdrSPC, mAS, u, iSg, qdrMKS, M, N, K)
-    #ttt5       = _tm.time()
     #ttt6       = _tm.time()
 
     cmp2Existing = False
@@ -304,22 +304,14 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
         dmp.close()
         fp.close()
 
-    #ttt7       = _tm.time()
-    ####  outside cmp2Existing here
-    #   (Mx1) + (Mx1) - (MxN + MxN)
-    #cont       = pkFRr + mkNrms - 0.5*(qdrSPC + qdrMKS)
-    #exp_arg = _N.empty((M, N))
-    #_hcb.hc_qdr_sum(pkFRr, mkNrms, qdrSPC, qdrMKS, exp_arg, M, N)
-    #ttt8       = _tm.time()   
     mx_exp_argr     = _N.max(exp_arg, axis=0).reshape((1, nSpks))  #  1 x N
     exp_arg       -= mx_exp_argr     #  M x N
-    #ttt9       = _tm.time()
+    #ttt7       = _tm.time()
     _fm.exp_on_arr(exp_arg, econt, M, N)   # _N.exp(cont, out=econt)  
-    #ttt10       = _tm.time()
+    #ttt8       = _tm.time()
     for m in xrange(M):  #  rat is (M x N)
         rat[m+1] = rat[m] + econt[m]
 
-    #rat /= rat[M]
     rnds *= rat[M]   #  used to be     #rat /= rat[M] (more # of computations)
     # if (epc == 1) and (it > 2):
     #     qdr = qdrSPC + qdrMKS
@@ -337,7 +329,7 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     """
 
     # print rat
-    #ttt11       = _tm.time()
+    #ttt9       = _tm.time()
     # M1 = rat[1:] >= rnds
     # M2 = rat[0:-1] <= rnds
     # gz[it] = (M1&M2).T
@@ -361,7 +353,7 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
         # print rat[:, 158]
         # print gz[it, 158]
 
-    #ttt12       = _tm.time()
+    #ttt10       = _tm.time()
 
 
     # print "#st timing start"
@@ -375,8 +367,6 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     # print "it8t7+=%.4e" % (#ttt8-#ttt7)  
     # print "it9t8+=%.4e" % (#ttt9-#ttt8)  # slow 0.02
     # print "it10t9+=%.4e" % (#ttt10-#ttt9)  # slow 0.08
-    # print "it11t10+=%.4e" % (#ttt11-#ttt10)  # slow 0.02
-    # print "it12t11+=%.4e" % (#ttt12-#ttt11)  # slow 0.02
     # print "#st timing end"
 
     if cmp2Existing and (M > 1):

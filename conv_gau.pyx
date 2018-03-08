@@ -6,23 +6,18 @@ cimport cython
 
 #  convolution    p(x) x N(x - u) dx
 
-cdef double _k
+cdef double _k, _2ik
 cdef long _i0
-cdef long _Nf, _Nq2
+cdef long _Nf, _Nq2, _Nfm1
 cdef double _f_L
 cdef double _f_H
+cdef double _f_H_m__f_L
 _tab = None
 cdef double *p_tab
+cdef double _isqrt2pi = 0.3989422804014327
 
-
-#def build_gau_pxdx_tbl(long[::1] px, x_grid, x_path, fs, iq2s, i0, k, f_L, f_H, usepx=False):
-def build_gau_pxdx_tbl(px, x_grid, x_path, double[::1] fs, double[::1] iq2s, i0, k, f_L, f_H, usepx=False):
-    global _k, _i0, _Nf, _Nq2, _f_L, _f_H, _tab, p_tab
-    cdef long fi, qi
-    cdef double f, iq2, fi_Nq2
-    cdef double* p_fs   = &fs[0]
-    cdef double* p_iq2s   = &iq2s[0]
-
+def build_gau_pxdx_tbl(px, x_grid, x_path, fs, iq2s, i0, k, f_L, f_H, usepx=True):
+    global _k, _i0, _Nf, _Nq2, _f_L, _f_H, _tab, p_tab, _Nfm1, _2ik, _f_H_m__f_L, _isqrt2pi
     # fs from [100 x 100]
     #cdef double *gau_occ_table
     _Nf  = fs.shape[0]
@@ -32,31 +27,27 @@ def build_gau_pxdx_tbl(px, x_grid, x_path, double[::1] fs, double[::1] iq2s, i0,
     _tab = _N.empty((_Nf, _Nq2))
     cdef double[:, ::1] v_tab = _tab
     p_tab        = &v_tab[0, 0]
-
     
-    #fi = -1
 
-    cdef double isqrt2pi = 1./sqrt(2*_N.pi)
+    cdef long fi, qi
+    cdef double f, iq2
+    fi = -1
 
-    #for f in fs:
-    for 0 <= fi < _Nf:
-        #fi += 1
-        fi_Nq2 = fi*Nq2
-        f = p_fs[fi]
+    for f in fs:
+        fi += 1
 
         if usepx:
             dd2 = (f-x_grid)*(f-x_grid)
         else:
             dd2 = (f-x_path)*(f-x_path)
-        #qi = -1
-        #for iq2 in iq2s:
-            #qi += 1
-        for 0 <= qi < _Nq2:
-            iq2 = p_iq2s[qi]
+        qi = -1
+        fi_Nq2 = fi*_Nq2
+        for iq2 in iq2s:
+            qi += 1
             if usepx:
-                p_tab[fi_Nq2 + qi] = -_N.sum(sqrt(iq2)*isqrt2pi*_N.exp(-0.5*dd2*iq2)*px)
+                p_tab[fi_Nq2 + qi] = -sqrt(iq2)*_isqrt2pi*_N.sum(_N.exp(-0.5*dd2*iq2)*px)
             else:
-                p_tab[fi_Nq2 + qi] = -_N.sum(sqrt(iq2)*isqrt2pi*_N.exp(-0.5*dd2*iq2))
+                p_tab[fi_Nq2 + qi] = -sqrt(iq2)*_isqrt2pi*_N.sum(_N.exp(-0.5*dd2*iq2))
 
     # pcklme = {}
     # pcklme["info"] = "build table of convolutions of Gaussians with a range of means and variances with the spatial occupation density p(x)."
@@ -69,9 +60,12 @@ def build_gau_pxdx_tbl(px, x_grid, x_path, double[::1] fs, double[::1] iq2s, i0,
     # pcklme["xpath"] = x_path
     # pcklme["tbl"] = nmpy_gau_occ_table
     _k  = k
+    _2ik = 2./_k
     _i0 = i0
     _f_L= f_L
     _f_H= f_H
+    _f_H_m__f_L = _f_H - _f_L
+    _Nfm1 = _Nf-1
 
 
     # dmp = open("conv_tbl.dmp", "wb")
@@ -98,7 +92,7 @@ def init():
 
 @cython.cdivision(True)
 cdef double conv_px(double f, double q) nogil:
-    global _k, _i0, _Nf, _f_L, _f_H, _tab, p_tab
+    global _i0, _Nf, _f_L, _f_H, _tab, p_tab, _Nfm1, _2ik, _f_H_m__f_L
     #  read from table of pre-calculated convolutions 
     #  of p(x) [the spatial occupancy] with N(x | f, q**2)
 
@@ -109,12 +103,15 @@ cdef double conv_px(double f, double q) nogil:
 
     #qi_r = (2./k)*_N.log(q) - i0    
 
-    cdef double qi_r = (2/_k)*log(q) + _i0    
+    cdef double qi_r = _2ik*log(q) + _i0    
+
+    #cdef double qi_r = (2/_k)*log(q) + _i0    
 
     cdef long qi   = <long>qi_r
     cdef double p_qi_r  = qi_r - qi
 
-    cdef double fi_r    = (_Nf-1)*((f - _f_L) / (_f_H - _f_L))
+    cdef double fi_r    = _Nfm1*((f - _f_L) / _f_H_m__f_L)
+    #cdef double fi_r    = (_Nf-1)*((f - _f_L) / (_f_H - _f_L))
     cdef long fi   = <long>fi_r
     #print "----  %(q).3f  %(f).3f" % {"q" : qi_r, "f" : fi_r}
     cdef double p_fi_r= fi_r - fi
