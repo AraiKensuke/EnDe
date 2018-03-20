@@ -11,7 +11,7 @@ t10t9=0
 t11t10=0
 t12t11=0
 
-exf("gibbsBenchOUT2.py")
+exf("gibbsBenchOUT3.py")
 
 m_t2t1 = t2t1/nt
 m_t3t2 = t3t2/nt

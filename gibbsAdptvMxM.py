@@ -59,6 +59,8 @@ class MarkAndRF:
     outdir   = None
     polyFit  = True
 
+    rotate   = False
+
     Nupx      = 200
 
     #  l0, q2      Sig    f, u
@@ -96,10 +98,46 @@ class MarkAndRF:
         # bFN = fn[0:-4]
         oo.outdir = outdir
 
+
+
+        #  rotation about axis 1
+        th1 = _N.pi/4
+        rot1  = _N.array([[1, 0, 0,            0],
+                          [0, 1, 0,            0],
+                          [0, 0, _N.cos(th1),  _N.sin(th1)],
+                          [0, 0, -_N.sin(th1), _N.cos(th1)]])
+
+        #  roation about axis 4
+        th4  = (54.738/180.)*_N.pi
+        rot4  = _N.array([[1, 0, 0,            0],
+                          [0, _N.cos(th4), _N.sin(th4), 0],
+                          [0, -_N.sin(th4), _N.cos(th4), 0],
+                          [0,            0,      0, 1]])
+
+
+        th3   = (60.0/180.)*_N.pi
+        rot3  = _N.array([[_N.cos(th3), _N.sin(th3), 0, 0],
+                          [-_N.sin(th3), _N.cos(th3), 0, 0],
+                          [0,            0,      1, 0],
+                          [0,            0,      0, 1]]
+        )
+
         # if not os.access(bFN, os.F_OK):
         #     os.mkdir(bFN)
 
-        oo.dat    = _N.loadtxt("%s.dat" % datFN(fn, create=False))
+        _dat    = _N.loadtxt("%s.dat" % datFN(fn, create=False))
+        oo.rotate = rotate
+        if not rotate:
+            oo.dat  = _dat
+        else:
+            K = _dat.shape[1] - 2
+            oo.dat  = _N.empty((_dat.shape[0], 2+2*K))
+            oo.dat[:, 0:2+K] = _dat
+    
+            sts = _N.where(oo.dat[:, 1] == 1)[0]
+            for n in sts:
+                oo.dat[n, 2+K:] = _N.dot(rot3, _N.dot(rot4, oo.dat[n, 2:2+K]))
+
         #oo.datprms= _N.loadtxt("%s_prms.dat" % datFN(fn, create=False))
 
         intvs     = _N.loadtxt("%s.dat" % datFN(intvfn, create=False))
@@ -117,7 +155,6 @@ class MarkAndRF:
         """
         print "gibbs   %.5f" % _N.random.rand()
         oo = self
-        oo.nThrds = nThrds
         oo.earliest=earliest
         twpi     = 2*_N.pi
         pcklme   = {}
@@ -150,7 +187,15 @@ class MarkAndRF:
         else:
             oo.dat[:, 0] += nz_pth*_N.random.randn(len(oo.dat[:, 0]))
         x      = oo.dat[:, 0]
-        mks    = _N.array(oo.dat[:, 2:])
+
+
+        if oo.rotate:
+            init_mks    = _N.array(oo.dat[:, 2:2+K])  #  init using non-rot
+            fit_mks    = _N.array(oo.dat[:, 2+K:])  #  fit to rotated
+        else:
+            init_mks    = _N.array(oo.dat[:, 2:2+K])  #  init using non-rot
+            fit_mks    = init_mks
+
         if nz_pth > 0:
             _N.savetxt(resFN("nzyx.txt", dir=oo.outdir), x, fmt="%.4f")
 
@@ -220,10 +265,14 @@ class MarkAndRF:
             
             #pxr      = px.reshape((1, oo.Nupx))
 
+
             Asts    = _N.where(oo.dat[t0:t1, 1] == 1)[0]   #  based at 0
 
             if epc == ep1:   ###  initialize
-                labS, labH, flatlabels, M_use, hashthresh, nHSclusters = gAMxMu.initClusters(oo, M_max, K, x, mks, t0, t1, Asts, doSepHash=doSepHash, xLo=oo.xLo, xHi=oo.xHi, oneCluster=oo.oneCluster)
+                print "Asts" 
+                print  "t0   %(0)d     t1  %(1)d" % {"0" : t0, "1" : t1}
+                
+                labS, labH, flatlabels, M_use, hashthresh, nHSclusters = gAMxMu.initClusters(oo, M_max, K, x, init_mks, t0, t1, Asts, doSepHash=doSepHash, xLo=oo.xLo, xHi=oo.xHi, oneCluster=oo.oneCluster)
 
                 m1stSignalClstr = 0 if oo.oneCluster else nHSclusters[0]
 
@@ -264,7 +313,7 @@ class MarkAndRF:
                 l0_M, f_M, q2_M, u_M, Sg_M = gAMxMu.declare_params(M_max, K)   #  nzclstr not inited  # sized to include noise cluster if needed
                 l0_exp_px_M = _N.empty(M_max)
                 _l0_a_M, _l0_B_M, _f_u_M, _f_q2_M, _q2_a_M, _q2_B_M, _u_u_M, \
-                    _u_Sg_M, _Sg_nu_M, _Sg_PSI_M = gAMxMu.declare_prior_hyp_params(M_max, nHSclusters, K, x, mks, Asts, t0, priors, labS, labH)
+                    _u_Sg_M, _Sg_nu_M, _Sg_PSI_M = gAMxMu.declare_prior_hyp_params(M_max, nHSclusters, K, x, fit_mks, Asts, t0, priors, labS, labH)
 
                 l0, f, q2, u, Sg        = gAMxMu.copy_slice_params(M_use, l0_M, f_M, q2_M, u_M, Sg_M)
                 _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI        = gAMxMu.copy_slice_hyp_params(M_use, _l0_a_M, _l0_B_M, _f_u_M, _f_q2_M, _q2_a_M, _q2_B_M, _u_u_M, _u_Sg_M, _Sg_nu_M, _Sg_PSI_M)
@@ -273,7 +322,7 @@ class MarkAndRF:
 
                 fr = f.reshape((M_use, 1))
                 gAMxMu.init_params_hyps(oo, M_use, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, \
-                    _Sg_PSI, Asts, t0, x, mks, flatlabels, nHSclusters)
+                    _Sg_PSI, Asts, t0, x, fit_mks, flatlabels, nHSclusters)
 
                 U   = _N.empty(M_use)
 
@@ -338,7 +387,7 @@ class MarkAndRF:
             _cdfs.dSilenceX = (NSexp/float(oo.Nupx))*(oo.xHi-oo.xLo)
 
             xAS  = x[Asts + t0]   #  position @ spikes.  creates new copy
-            mAS  = mks[Asts + t0]   #  position @ spikes
+            mAS  = fit_mks[Asts + t0]   #  position @ spikes
             xASr = xAS.reshape((1, nSpks))
             #mASr = mAS.reshape((1, nSpks, K))
             econt = _N.empty((M_use, nSpks))
@@ -403,7 +452,7 @@ class MarkAndRF:
                     ###############
                     _N.copyto(u_Sg_, _N.linalg.inv(_iu_Sg + clstsz_rr*iSg))
 
-                    _fm.find_mcs(clstsz, v_sts, cls_str_ind, mks, mcs, M_use, K)
+                    _fm.find_mcs(clstsz, v_sts, cls_str_ind, fit_mks, mcs, M_use, K)
                     _fm.multiple_mat_dot_v(_iu_Sg, _u_u, outs1, M_use, K)
                     _fm.multiple_mat_dot_v(iSg, mcs, outs2, M_use, K)
                     _fm.multiple_mat_dot_v(u_Sg_, outs1 + clstsz_r*outs2, u_u_, M_use, K)
@@ -451,7 +500,7 @@ class MarkAndRF:
 
                     Sg_nu_ = _Sg_nu + clstsz                
                     if diag_cov:
-                        _fm.Sg_PSI(cls_str_ind, clstsz, v_sts, mks, _Sg_PSI, Sg_PSI_, u, M_use, K)
+                        _fm.Sg_PSI(cls_str_ind, clstsz, v_sts, fit_mks, _Sg_PSI, Sg_PSI_, u, M_use, K)
                         # print "*************************"
                         # print Sg_PSI_
                         # print "-------------------------"
@@ -469,10 +518,9 @@ class MarkAndRF:
                             #Sg_nu_[m] = _Sg_nu[m, 0] + clstsz[m]
                             ##  dof of posterior distribution of cluster covariance
                             ur = u[m].reshape((1, K))
-                            clstx    = mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
                             #tt6a += (_tm.time()-infor)
                             #infor = _tm.time()
-                            #clstx    = l_sts[m]]
+                            clstx    = fit_mks[v_sts[cls_str_ind[m]:cls_str_ind[m+1]]]
                             #  dot((clstx-ur).T, (clstx-ur))==ZERO(K) when clstsz ==0
                             Sg_PSI_[m] = _Sg_PSI[m] + _N.dot((clstx - ur).T, (clstx-ur))
                             #tt6b += (_tm.time()-infor)
@@ -594,6 +642,7 @@ class MarkAndRF:
                 pcklme["freeClstr"]           = freeClstr
             pcklme["nz_pth"]         = nz_pth
             pcklme["M"]           = M_use
+            pcklme["rotate"]      = oo.rotate
 
                 
             dmp = open(resFN("posteriors_%d.dmp" % epc, dir=oo.outdir), "wb")

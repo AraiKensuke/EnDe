@@ -1,8 +1,8 @@
 import EnDedirs as _edd
 #  in terms of relative length
-firstT   = 3.
-minT     = 0.5
-maxT     = 2.5
+firstT   = 0.9
+minT     = 0.3
+maxT     = 0.8
 
 epochs   = 30
 

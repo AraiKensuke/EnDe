@@ -386,9 +386,12 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
             elif v1 > 3.:
                 breset = True
                 print "high uncertainty relative to width  %d" % m
-            elif v2 < 4000:
-                breset = True
-                print "not long enough stationarity %d" % m
+                
+            elif (v2 < 4000):
+                if (v1 > 1.) and (occ[m] < K):
+                    breset = True
+                    print "not long enough stationarity %d" % m
+                #  else very clean 
             elif (v3 < 1e-4) and (occ[m] < K):
                 breset = True
                 print "too narrow %d" % m
