@@ -83,7 +83,7 @@ def evalAtFxdMks_new(fxdMks, l0, us, Sgs, iSgs, i2pidcovsr):
 
     zs = _N.sum(l0*cmps, axis=0)
 
-    return zs
+    return zs   #  should be size Nx.  1 fiing rate at each Nx
     """
 
     fld = fxdMks[:, 0].reshape(Nx, 1)    #  fld is (Nx, 1)

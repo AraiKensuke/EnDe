@@ -314,6 +314,9 @@ class GoFfuncs:
         l0s = []
         us  = []
         covs= []
+        fs  = []
+        q2s= []
+
         M   = []
         iSgs= []
         i2pidcovs = []
@@ -325,10 +328,15 @@ class GoFfuncs:
                 l0s.append(prms[nt][uFE][0])
                 us.append(prms[nt][uFE][1])
                 covs.append(prms[nt][uFE][2])
+                fs.append(prms[nt][uFE][3])
+                iq2s.append(1./prms[nt][uFE][4])
+                fs_us.append(prms[nt][uFE][5])
+                q2s_covs.append(prms[nt][uFE][6])
+
                 M.append(covs[nt].shape[0])
 
-                iSgs.append(_N.linalg.inv(covs[nt]))
-                i2pidcovs.append((1/_N.sqrt(2*_N.pi))**(oo.mdim+1)*(1./_N.sqrt(_N.linalg.det(covs[nt]))))
+                iSgs.append(_N.linalg.inv(q2s_covs[nt]))
+                i2pidcovs.append((1/_N.sqrt(2*_N.pi))**(oo.mdim+1)*(1./_N.sqrt(_N.linalg.det(q2s_covs[nt]))))
                 #i2pidcovsr.append(i2pidcovs.reshape((M, 1)))
                 oo.svMkIntnsty.append([])
             l0sr = _N.array(l0s[0][:, 0])  # for nt==0
@@ -392,7 +400,7 @@ class GoFfuncs:
                                         p_mk[:, 1] = mrngs[nt, 0, ii0]
                                         p_mk[:, 2] = mrngs[nt, 1, ii1]
 
-                                        mkint = _hb.evalAtFxdMks_new(mk, l0sr, usnt, iSgsnt, i2pidcovsnt, Msnt, oo.Nx, oo.mdim + 1)*oo.dt
+                                        mkint = _hb.evalAtFxdMks_new(mk, l0sr, usnt, fsnt, iSgsnt, i2pidcovsnt, Msnt, oo.Nx, oo.mdim + 1)*oo.dt
                                         O[ii0, ii1] = _N.sum(mkint[disc_pos_t0t1])
                         else:
                             for ii0 in xrange(i0_l, i0_h):

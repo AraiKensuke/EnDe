@@ -266,8 +266,9 @@ class GoFfuncs:
         if not kde:
             for nt in xrange(oo.nTets):
                 l0s.append(prms[nt][uFE][0])
-                us.append(prms[nt][uFE][1])
-                covs.append(prms[nt][uFE][2])
+                us.append(prms[nt][uFE][5])
+                covs.append(prms[nt][uFE][6])
+
                 M.append(covs[nt].shape[0])
 
                 print covs[nt]
@@ -325,6 +326,8 @@ class GoFfuncs:
         l0s = []
         us  = []
         covs= []
+        fs  = []
+        q2s = []
         M   = []
         iSgs= []
         i2pidcovs = []
@@ -339,13 +342,18 @@ class GoFfuncs:
                 l0s.append(prms[nt][uFE][0])
                 us.append(prms[nt][uFE][1])
                 covs.append(prms[nt][uFE][2])
+                fs.append(prms[nt][uFE][3])
+                q2s.append(prms[nt][uFE][4])
+                #fs_us.append(prms[nt][uFE][5])
+                #q2s_covs.append()
+
                 M.append(covs[nt].shape[0])
 
-                iSgs.append(_N.linalg.inv(covs[nt]))
-                i2pidcovs.append((1/_N.sqrt(2*_N.pi))**(oo.mdim+1)*(1./_N.sqrt(_N.linalg.det(covs[nt]))))
+                iSgs.append(_N.linalg.inv(prms[nt][uFE][6]))
+                i2pidcovs.append((1/_N.sqrt(2*_N.pi))**(oo.mdim+1)*(1./_N.sqrt(_N.linalg.det(prms[nt][uFE][6]))))
                 #i2pidcovsr.append(i2pidcovs.reshape((M, 1)))
                 oo.svMkIntnsty.append([])
-            l0sr = _N.array(l0s[0][:, 0])  # for nt==0
+            l0dt = _N.array(l0s[0][:, 0]*oo.dt)  # for nt==0
         else:
             ibx2   = 1. / (oo.bx * oo.bx)
             for nt in xrange(oo.nTets):
@@ -385,10 +393,13 @@ class GoFfuncs:
             mv_O4   = O
             p_O    = &mv_O4[0, 0, 0, 0]
 
-        mk = _N.empty((oo.Nx, oo.mdim+1))
-        mk[:, 0] = oo.xp
-        cdef double[:, ::1] mv_mk = mk
-        cdef double* p_mk         = &mv_mk[0, 0]
+        #mk = _N.empty((oo.Nx, oo.mdim+1))
+        mk = _N.empty(oo.mdim)
+        #mk[:, 0] = oo.xp
+        cdef double[::1] mv_mk = mk
+        cdef double* p_mk         = &mv_mk[0]
+        cdef double[::1] mv_xp    = oo.xp
+        cdef double* p_xp         = &mv_xp[0]
 
         #  temp
         mxval = _N.zeros((g_M, oo.Nx))
@@ -399,24 +410,47 @@ class GoFfuncs:
         cdef long[::1] mv_disc_pos_t0t1 = disc_pos_t0t1
         cdef long* p_disc_pos_t0t1      = &mv_disc_pos_t0t1[0]
 
+
         cdef long ooNx = oo.Nx
         cdef long Mnt
         cdef long pmdim = oo.mdim + 1
+        cdef long mdim = oo.mdim
         cdef double ddt = oo.dt
         if iskde == 0:
             usnt          = _N.array(us[nt])
             iSgsnt        = _N.array(iSgs[nt])
+            iCovsnt        = _N.linalg.inv(covs[nt])
             i2pidcovsnt   = _N.array(i2pidcovs[nt])
+            fsnt          = _N.array(fs[nt])
+            iq2snt          = _N.array(1./q2s[nt])
             Mnt             = M[nt]
+
+        qdr_mk    = _N.empty(Mnt)
+        cdef double[::1] mv_qdr_mk = qdr_mk
+        cdef double* p_qdr_mk      = &mv_qdr_mk[0]
+        qdr_sp    = _N.empty((Mnt, oo.Nx))
+        cdef double[:, ::1] mv_qdr_sp = qdr_sp
+        cdef double* p_qdr_sp      = &mv_qdr_sp[0, 0]
+
         cdef double[:, ::1] mv_usnt = usnt
         cdef double* p_usnt   = &mv_usnt[0, 0]
+        cdef double[::1] mv_fsnt = fsnt
+        cdef double* p_fsnt   = &mv_fsnt[0]
+        cdef double[::1] mv_iq2snt = iq2snt
+        cdef double* p_iq2snt   = &mv_iq2snt[0]
+
         cdef double[:, :, ::1] mv_iSgsnt = iSgsnt
         cdef double* p_iSgsnt   = &mv_iSgsnt[0, 0, 0]
         cdef double[::1] mv_i2pidcovsnt = i2pidcovsnt
         cdef double* p_i2pidcovsnt   = &mv_i2pidcovsnt[0]
+        print "---------"
+        print i2pidcovsnt
+        print "---------"
+        cdef double[:, :, ::1] mv_iCovsnt = iCovsnt
+        cdef double* p_iCovsnt   = &mv_iCovsnt[0, 0, 0]
 
-        cdef double[::1] mv_l0sr = l0sr
-        cdef double* p_l0sr      = &mv_l0sr[0]
+        cdef double[::1] mv_l0dt = l0dt
+        cdef double* p_l0dt      = &mv_l0dt[0]
 
         LLcrnr = mrngs[nt, :, 0]   # lower left hand corner
 
@@ -437,7 +471,6 @@ class GoFfuncs:
         cdef double mrngs0, mrngs1, mrngs2, mrngs3
         cdef long icnt 
 
-
         if (smpld_marks is not None) and (oo.mdim > 1):
             tt0 = _tm.time()
             sN = smpld_marks.shape[0]   #  smpld_mks   Nx x mdim
@@ -449,13 +482,13 @@ class GoFfuncs:
                 ttt0 = _tm.time()
                 #inds = _N.array((smpld_marks[s] - LLcrnr) / dm, dtype=_N.int)
 
-                i0 = <long>((p_smpld_marks[s*oo.mdim] - LLcrnr[0]) / p_dm[0])
-                i1 = <long>((p_smpld_marks[s*oo.mdim+1] - LLcrnr[1]) / p_dm[1])
-                i2 = <long>((p_smpld_marks[s*oo.mdim+2] - LLcrnr[2]) / p_dm[2])
-                i3 = <long>((p_smpld_marks[s*oo.mdim+3] - LLcrnr[3]) / p_dm[3])
+                i0 = <long>((p_smpld_marks[s*mdim] - LLcrnr[0]) / p_dm[0])
+                i1 = <long>((p_smpld_marks[s*mdim+1] - LLcrnr[1]) / p_dm[1])
+                i2 = <long>((p_smpld_marks[s*mdim+2] - LLcrnr[2]) / p_dm[2])
+                i3 = <long>((p_smpld_marks[s*mdim+3] - LLcrnr[3]) / p_dm[3])
 
                 if p_O01[i0*g_M3+ i1*g_M2+ i2*g_M+ i3] == 0:
-                    p_O01[i0*g_M3+ i1*g_M2+ i2*g_M+ i3] = 1
+                    #p_O01[i0*g_M3+ i1*g_M2+ i2*g_M+ i3] = 1   #  we'll do this one later
                     i0_l = i0 - rad if i0 >= rad else 0
                     i0_h = i0 + rad+1 if i0 + rad < g_M else g_M
                     i1_l = i1 - rad if i1 >= rad else 0
@@ -476,25 +509,14 @@ class GoFfuncs:
                                                 p_O01[ii] = 1
                                                 icnt += 1
                                                 #  mrngs   # nTets x mdim x g_M
-                                                mrngs0 = p_mrngs[ii0]
-                                                mrngs1 = p_mrngs[g_M + ii1]
-                                                mrngs2 = p_mrngs[2*g_M + ii2]
-                                                mrngs3 = p_mrngs[3*g_M + ii3]
-                                                for nx in xrange(ooNx):
-                                                    p_mk[nx*pmdim + 1] = mrngs0
-                                                    p_mk[nx*pmdim + 2] = mrngs1
-                                                    p_mk[nx*pmdim + 3] = mrngs2
-                                                    p_mk[nx*pmdim + 4] = mrngs3
-                                                # mk[:, 1] = p_mrngs[ii0]
-                                                # mk[:, 2] = p_mrngs[g_M+ ii1]
-                                                # mk[:, 3] = p_mrngs[2*g_M+ ii2]
-                                                # mk[:, 4] = p_mrngs[3*g_M+ ii3]
-                                                _hb.CIFatFxdMks_nogil(p_mk, p_l0sr, p_usnt, p_iSgsnt, p_i2pidcovsnt, p_CIF_at_grid_mks, p_mxval, Mnt, ooNx, pmdim, ddt)
-
+                                                p_mk[0] = p_mrngs[ii0]
+                                                p_mk[1] = p_mrngs[g_M + ii1]
+                                                p_mk[2] = p_mrngs[2*g_M + ii2]
+                                                p_mk[3] = p_mrngs[3*g_M + ii3]
+                                                _hb.CIFatFxdMks_nogil(p_mk, p_xp, p_l0dt, p_usnt, p_iCovsnt, p_fsnt, p_iq2snt, p_i2pidcovsnt, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, Mnt, ooNx, mdim, ddt)
                                                 p_O[ii] = 0
                                                 for tt in xrange(0, t1-t0-1):
                                                     p_O[ii] += p_CIF_at_grid_mks[p_disc_pos_t0t1[tt]]
-                                            #printf("%.5f\n", p_O[ii])
                 ttt1 = _tm.time()
                 print "%(1).3f     %(icnt)d" % {"1" : (ttt1-ttt0), "icnt" : icnt}
 

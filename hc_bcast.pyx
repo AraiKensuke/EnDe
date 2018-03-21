@@ -2,6 +2,7 @@
 cimport cython
 from cython.parallel import parallel, prange
 from libc.stdlib cimport abort, malloc, free
+from libc.stdio cimport printf
 from libc.math cimport exp
 import numpy as _N
 cimport numpy as _N
@@ -156,6 +157,7 @@ def hc_qdr_sum(double[:, ::1] pkFRr, double [:, ::1] mkNrms, double[:, ::1] qdrS
                 #p_cont[mNn] = norm - 0.5*(p_qdrSpc[mNn] + p_qdrMKS[mNn])
                 p_cont[mN+n] = pkFRr_m + mkNrms_m - 0.5*(p_qdrSpc[mN+n] + p_qdrMKS[mN+n])
 
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def evalAtFxdMks_new(double[:, ::1] fxdMks, double[::1] l0, double[:, ::1] us, double[:, :, ::1] iSgs, double[::1] i2pidcovs, int M, int Nx, int pmdim):
@@ -219,18 +221,18 @@ def evalAtFxdMks_new(double[:, ::1] fxdMks, double[::1] l0, double[:, ::1] us, d
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef void CIFatFxdMks_nogil(double* p_fxdMks, double* p_l0, double* p_us, double* p_iSgs, double* p_i2pidcovs, double* p_zs, double* p_mxval, long M, long Nx, long pmdim, double dt) nogil:
-    #   fxdMks:  Nx x (mdim+1)
+cdef void CIFatFxdMks_nogil(double *p_fxdMk, double* p_x, double* p_l0dt, double* p_us, double* p_iSgs, double* p_f, double *p_iq2, double* p_i2pidcovs, double* p_zs, double* p_qdr_mk, double* p_qdr_sp, long M, long Nx, long mdim, double dt) nogil:
+    #   x:       Nx
+    #   fxdMks:  mdim
     #   l0s   :  M
-    #   us    :  M x (mdim + 1)
-    #   iSgs  :  M x (mdim + 1) x (mdim + 1)
+    #   us    :  M x mdim
+    #   fs    :  M
+    #   iSgs  :  M x mdim x mdim
     #   i2pidcovs  :  M x (mdim + 1) x (mdim + 1)
     #   zs:      Nx
     
     #cdef double zs
-    cdef int mNx, jpmdim, mpmdim, mpmdim2, ixpmdim, i, j, k, ix, m
-
-
+    cdef int mNx, cmdim, cmdim2, i, j, k, ix, m, c, cNx
 
     cdef int mNxix
     cdef double outer, tmp
@@ -239,29 +241,41 @@ cdef void CIFatFxdMks_nogil(double* p_fxdMks, double* p_l0, double* p_us, double
 
     #  cmps is spatial contribution due to component m.  
 
-    for 0 <= m < M:
-        mNx = m*Nx
-        mpmdim = m*pmdim
-        mpmdim2= mpmdim*pmdim
+    cdef double fc, iq2c
+    for 0 <= c < M:
+        iq2c = p_iq2[c]
+        fc = p_f[c]
+        #printf("c %d   %.5e", c, p_i2pidcovs[c])
+        #if p_iq2[c] < 0:
+        #    printf("iq2[%d] < 0:  %.5e", c, p_iq2[c])
+        #p_qdr_mk[c] = 0
+        tmp = 0
+        cmdim  = c*mdim
+        cmdim2 = cmdim*mdim
+        cNx    = c*Nx
 
-        for 0 <= ix < Nx:
-            ixpmdim = ix*pmdim
-            mNxix = mNx + ix
-            tmp = 0
-            for 0 <= j < pmdim:
-                jpmdim = j*pmdim
-                outer = p_fxdMks[ixpmdim+j]-p_us[mpmdim+j]
-                #for 0 <= k < pmdim:
-                k = j
-                tmp += outer*p_iSgs[mpmdim2 + jpmdim + k]*(p_fxdMks[ixpmdim+k]-p_us[mpmdim+k])
-                for j+1 <= k < pmdim:
-                    tmp += 2*outer*p_iSgs[mpmdim2 + jpmdim + k]*(p_fxdMks[ixpmdim+k]-p_us[mpmdim+k])
-                p_mxval[mNxix] = tmp
+        for 0 <= j < mdim:
+            for 0 <= k < mdim:
+                #  fxdMk[j]  us[c, j]
+                tmp += (p_fxdMk[j]-p_us[cmdim+j]) * p_iSgs[cmdim2 + j*mdim + k] * (p_fxdMk[k]-p_us[cmdim+k])
+        p_qdr_mk[c] = tmp
 
-        #  cmps = i2pidcovsr*_N.exp(-0.5*_N.einsum("xmj,xmj->mx", fxdMksr-us, _N.einsum("mjk,xmk->xmj", iSgs, fxdMksr - us)))
+        for ix in xrange(Nx):
+            p_qdr_sp[cNx + ix] = (p_x[ix] - fc)*(p_x[ix] - fc)*iq2c
+    #printf("\n")
+
     for 0 <= ix < Nx:
-        for 0 <= m < M:
-            p_zs[ix] += p_l0[m] * p_i2pidcovs[m] * exp(-0.5*p_mxval[m*Nx+ix])
-            #p_zs[ix] += l0[m] * i2pidcovs[m] * _N.exp(-0.5*mxval[m, ix])
-        p_zs[ix] *= dt
+        #p_zs[ix] = 0
+        tmp = 0
+        for 0 <= c < M:
+            #p_zs[ix] += exp(-0.5*p_qdr_sp[cNx+ix]*p_qdr_mk[c])
+            tmp += p_l0dt[c]*p_i2pidcovs[c]*exp(-0.5*(p_qdr_sp[c*Nx+ix]+p_qdr_mk[c]))
+            #if p_qdr_sp[cNx+ix] < 0:
+            #     printf("sp < 0   c %d   %.4e  %.4e\n", c, p_qdr_sp[cNx+ix], p_iq2[c])
+            # if p_qdr_mk[c] < 0:
+            #     printf("mk < 0\n")                
+            #tmp += dt*exp(-0.5*p_qdr_sp[cNx+ix]*p_qdr_mk[c])
+        p_zs[ix] = tmp
+        #p_zs[ix] = tmp * dt * p_l0[c] * p_i2pidcovs[c]
+        #printf("***%.4e    %.4e   %.4e  %.4e  %.4e\n",  p_zs[ix], tmp, dt, p_l0[c], p_i2pidcovs[c])
 

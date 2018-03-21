@@ -221,16 +221,16 @@ class mkdecoder:
                 oo.xTrs[:, i] /= A
         elif maze == mz_RNDWLK:
             for i in xrange(oo.Nx):
-                oo.xTrs[i, i] = 0.994
+                oo.xTrs[i, i] = 0.99
                 if (i > 0) and (i != oo.Nx - 1):
-                    oo.xTrs[i, i-1] = 0.003
-                    oo.xTrs[i-1, i] = 0.003
+                    oo.xTrs[i, i-1] = 0.005
+                    oo.xTrs[i-1, i] = 0.005
                 elif i == 0:
-                    oo.xTrs[i, oo.Nx - 1] = 0.003
-                    oo.xTrs[oo.Nx - 1, i] = 0.003
+                    oo.xTrs[i, oo.Nx - 1] = 0.005
+                    oo.xTrs[oo.Nx - 1, i] = 0.005
                 elif i == oo.Nx - 1:
-                    oo.xTrs[i, 0] = 0.003
-                    oo.xTrs[0, i] = 0.003
+                    oo.xTrs[i, 0] = 0.005
+                    oo.xTrs[0, i] = 0.005
         
     def init_pX_Nm(self, t):
         oo = self
