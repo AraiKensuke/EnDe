@@ -37,6 +37,7 @@ def initClusters(oo, M_max, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=
         lab      = _N.array(labS.tolist() + (labH + clstrs[0]).tolist())
         M        = 1
         MF       = 1
+        M_use    = 1
         flatlabels = _N.zeros(len(Asts), dtype=_N.int)
     else:
         if not doSepHash:

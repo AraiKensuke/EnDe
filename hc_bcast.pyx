@@ -230,16 +230,11 @@ cdef void CIFatFxdMks_nogil(double *p_fxdMk, double* p_x, double* p_l0dt_i2pidco
     #   iSgs  :  M x mdim x mdim
     #   i2pidcovs  :  M x (mdim + 1) x (mdim + 1)
     #   zs:      Nx
-    
+
     #cdef double zs
-    cdef int mNx, cmdim, cmdim2, i, j, k, ix, m, c, cNx
-
-    cdef int mNxix
-    cdef double outer, tmp
-
-    #  fxdMks is a 
-
-    #  cmps is spatial contribution due to component m.  
+    cdef long cmdim, cmdim2, i, j, k, ix, c, cNx
+    cdef double tmp
+    cdef double qdr_sp
 
     cdef double fc, iq2c
     for 0 <= c < M:
@@ -250,10 +245,6 @@ cdef void CIFatFxdMks_nogil(double *p_fxdMk, double* p_x, double* p_l0dt_i2pidco
         cmdim2 = cmdim*mdim
         cNx    = c*Nx
 
-        # for 0 <= j < mdim:
-        #     for 0 <= k < mdim:
-        #         tmp += (p_fxdMk[j]-p_us[cmdim+j]) * p_iSgs[cmdim2 + j*mdim + k] * (p_fxdMk[k]-p_us[cmdim+k])
-
         for 0 <= j < mdim:
             k = j
             tmp += (p_fxdMk[j]-p_us[cmdim+j]) * p_iSgs[cmdim2 + j*mdim + k] * (p_fxdMk[k]-p_us[cmdim+k])
@@ -262,12 +253,16 @@ cdef void CIFatFxdMks_nogil(double *p_fxdMk, double* p_x, double* p_l0dt_i2pidco
 
         p_qdr_mk[c] = tmp
 
-        for ix in xrange(Nx):
-            p_qdr_sp[cNx + ix] = (p_x[ix] - fc)*(p_x[ix] - fc)*iq2c
+        #for ix in xrange(Nx):
+        #    p_qdr_sp[cNx + ix] = (p_x[ix] - fc)*(p_x[ix] - fc)*iq2c
 
     for 0 <= ix < Nx:
         tmp = 0
         for 0 <= c < M:
-            if (p_qdr_sp[c*Nx+ix]+p_qdr_mk[c]) < 16:  #  if mk 
-                tmp += p_l0dt_i2pidcovs[c]*exp(-0.5*(p_qdr_sp[c*Nx+ix]+p_qdr_mk[c]))
+            #p_qdr_sp[c*Nx + ix] = (p_x[ix] - p_f[c])*(p_x[ix] - p_f[c])*p_iq2[c]
+            qdr_sp = (p_x[ix] - p_f[c])*(p_x[ix] - p_f[c])*p_iq2[c]
+            #if (p_qdr_sp[c*Nx+ix]+p_qdr_mk[c]) < 16:  #  if mk 
+            if (qdr_sp+p_qdr_mk[c]) < 16:  #  if mk 
+                #tmp += p_l0dt_i2pidcovs[c]*exp(-0.5*(p_qdr_sp[c*Nx+ix]+p_qdr_mk[c]))
+                tmp += p_l0dt_i2pidcovs[c]*exp(-0.5*(qdr_sp+p_qdr_mk[c]))
         p_zs[ix] = tmp

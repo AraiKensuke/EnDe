@@ -15,8 +15,8 @@ import posteriorUtil as _pU
 from filter import gauKer
 import gibbsApprMxMutil as gAMxMu
 import stochasticAssignment as _sA
-import cdf_smp_tbl as _cdfs
-#import cdf_smp as _cdfs
+#import cdf_smp_tbl as _cdfs
+import cdf_smp as _cdfs
 import ig_from_cdf_pkg as _ifcp
 import fastnum as _fm
 import clrs 
@@ -149,7 +149,7 @@ class MarkAndRF:
         oo.xLo = xLo
         oo.xHi = xHi
 
-    def gibbs(self, ITERS, K, priors, ep1=0, ep2=None, saveSamps=True, saveOcc=True, doSepHash=True, nz_pth=0., smth_pth_ker=100, f_STEPS=13, q2_STEPS=13, f_SMALL=10, q2_SMALL=10, f_cldz=10, q2_cldz=10, minSmps=20, diag_cov=False, earliest=20000, ):
+    def gibbs(self, ITERS, K, priors, ep1=0, ep2=None, saveSamps=True, saveOcc=True, doSepHash=True, nz_pth=0., smth_pth_ker=0, f_STEPS=13, q2_STEPS=13, f_SMALL=10, q2_SMALL=10, f_cldz=10, q2_cldz=10, minSmps=20, diag_cov=False, earliest=20000, ):
         """
         gtdiffusion:  use ground truth center of place field in calculating variance of center.  Meaning of diffPerMin different
         """
@@ -179,13 +179,13 @@ class MarkAndRF:
         #  grid over which conditional probability of q2 adaptively sampled
 
         freeClstr = None
-        if smth_pth_ker > 0:
-            gk     = gauKer(smth_pth_ker) # 0.1s  smoothing of motion
-            gk     /= _N.sum(gk)
-            xf     = _N.convolve(oo.dat[:, 0], gk, mode="same")
-            oo.dat[:, 0] = xf + nz_pth*_N.random.randn(len(oo.dat[:, 0]))
-        else:
-            oo.dat[:, 0] += nz_pth*_N.random.randn(len(oo.dat[:, 0]))
+        # if smth_pth_ker > 0:
+        #     gk     = gauKer(smth_pth_ker) # 0.1s  smoothing of motion
+        #     gk     /= _N.sum(gk)
+        #     xf     = _N.convolve(oo.dat[:, 0], gk, mode="same")
+        #     oo.dat[:, 0] = xf + nz_pth*_N.random.randn(len(oo.dat[:, 0]))
+        # else:
+        #     oo.dat[:, 0] += nz_pth*_N.random.randn(len(oo.dat[:, 0]))
         x      = oo.dat[:, 0]
 
 
@@ -226,14 +226,14 @@ class MarkAndRF:
             posbins  = _N.linspace(oo.xLo, oo.xHi, oo.Nupx+1)
             #  _N.sum(px)*(xbns[1]-xbns[0]) = 1
 
-            ##  smooth the positions
-            smthd_pos = x[t0:t1] + oo.Bx*_N.random.randn(t1-t0)
-            ltL = _N.where(smthd_pos < oo.xLo)[0]
-            smthd_pos[ltL] += 2*(oo.xLo - smthd_pos[ltL])
-            gtR = _N.where(smthd_pos > oo.xHi)[0]
-            smthd_pos[gtR] += 2*(oo.xHi - smthd_pos[gtR])
+            # ##  smooth the positions
+            # smthd_pos = x[t0:t1] + oo.Bx*_N.random.randn(t1-t0)
+            # ltL = _N.where(smthd_pos < oo.xLo)[0]
+            # smthd_pos[ltL] += 2*(oo.xLo - smthd_pos[ltL])
+            # gtR = _N.where(smthd_pos > oo.xHi)[0]
+            # smthd_pos[gtR] += 2*(oo.xHi - smthd_pos[gtR])
             
-            xt0t1 = smthd_pos
+            xt0t1 = x[t0:t1]#smthd_pos
 
             if oo.use_conv_tabl:
                 Nf  = 1000
@@ -381,7 +381,20 @@ class MarkAndRF:
             xt0t1 = _N.array(x[t0:t1])
 
             nSpks    = len(Asts)
-            gz   = _N.zeros((ITERS, nSpks, M_use), dtype=_N.uint8)
+            v_sts = _N.empty(len(Asts), dtype=_N.int)
+            cls_str_ind = _N.zeros(M_use+1, dtype=_N.int)
+            #cls_len      = _N.zeros(M_use, dtype=_N.int)
+            clstsz = _N.zeros(M_use, dtype=_N.int)
+
+            if M_use > 1:
+                gz   = _N.zeros((ITERS, nSpks, M_use), dtype=_N.uint8)
+            else:
+                gz   = _N.ones((ITERS, nSpks, M_use), dtype=_N.uint8)
+                cls_str_ind[0] = 0
+                cls_str_ind[1] = nSpks
+                #cls_len[0] = nSpks
+                v_sts = Asts
+                clstsz[0] = nSpks
             oo.gz=gz
 
             _cdfs.dSilenceX = (NSexp/float(oo.Nupx))*(oo.xHi-oo.xLo)
@@ -396,17 +409,12 @@ class MarkAndRF:
             qdrMKS = _N.empty((M_use, nSpks))
             ################################  GIBBS ITERS ITERS ITERS
 
-            clstsz = _N.zeros(M_use, dtype=_N.int)
-
             _iu_Sg = _N.array(_u_Sg)
             for m in xrange(M_use):
                 _iu_Sg[m] = _N.linalg.inv(_u_Sg[m])
 
             ttA = _tm.time()
 
-            v_sts = _N.empty(len(Asts), dtype=_N.int)
-            cls_str_ind = _N.zeros(M_use+1, dtype=_N.int)
-            cls_len      = _N.zeros(M_use, dtype=_N.int)
 
             l0_a_is0    = _N.where(_l0_a == 0)[0]
             l0_a_Init   = _N.where(_l0_a >  0)[0]
@@ -438,10 +446,14 @@ class MarkAndRF:
                     #ttsw2 = _tm.time()
                     if (itr % 500) == 0:    
                         print "-------itr  %(i)d" % {"i" : itr}
-
-                    _sA.stochasticAssignment(oo, epc, itr, M_use, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mAS, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, ((epc > 0) and (itr == 0)), diag_cov, clstsz)
+                        
+                    if M_use > 1:
+                        _sA.stochasticAssignment(oo, epc, itr, M_use, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _f_q2, _u_Sg, Asts, t0, mAS, xASr, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, ((epc > 0) and (itr == 0)), diag_cov, clstsz)
+                        _fm.cluster_bounds2(clstsz, Asts, cls_str_ind, v_sts, gz[itr], t0, M_use, nSpks)    # _fm.cluser_bounds provides no improvement
                     #ttsw3 = _tm.time()
-                    _fm.cluster_bounds2(clstsz, Asts, cls_str_ind, v_sts, gz[itr], t0, M_use, nSpks)    # _fm.cluser_bounds provides no improvement
+
+                    #  Asts are all spike times in order they appear
+                    #  v_sts[cls_str_ind[mmm]:cls_str_ind[mmm+1]] - spk times for mmm-th cluster
                     clstsz_rr  = clstsz.reshape(M_use, 1, 1)
                     clstsz_r  = clstsz.reshape(M_use, 1)
 
@@ -487,6 +499,7 @@ class MarkAndRF:
                     m_rnds = _N.random.rand(M_use)
 
                     _cdfs.smp_f(M_use, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _f_u, q2pr, m_rnds)
+                    #f   = _N.array([6.33])
                     smp_sp_prms[oo.ky_p_f, itr] = f
 
                     #ttsw7 = _tm.time()
@@ -556,6 +569,7 @@ class MarkAndRF:
                     #ttsw9 = _tm.time()
 
                     _cdfs.smp_q2(M_use, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _Dq2_a, _Dq2_B, m_rnds, epc)
+                    #q2 = _N.array([1.21])
 
                     smp_sp_prms[oo.ky_p_q2, itr]   = q2
 
@@ -590,7 +604,8 @@ class MarkAndRF:
 
 
                     try:   #  if there is no prior, if a cluster 
-                        l0 = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_), size=M_use)  #  check
+                        #l0 = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_), size=M_use)  #  check
+                        l0 = _N.array([900.])
                     except ValueError:
                         print "problem with l0    %d" % itr
                         print l0_exp_px

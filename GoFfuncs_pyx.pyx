@@ -470,7 +470,7 @@ class GoFfuncs:
         cdef long tt, ii, ii0, ii1, ii2, ii3
         cdef long nx
         cdef double mrngs0, mrngs1, mrngs2, mrngs3
-        cdef long icnt 
+        cdef long icnt, cum_icnt 
 
         if (smpld_marks is not None) and (oo.mdim > 1):
             tt0 = _tm.time()
@@ -478,7 +478,6 @@ class GoFfuncs:
             mv_smpld_marks  = smpld_marks
             p_smpld_marks   = &mv_smpld_marks[0, 0]
             for s in xrange(sN):
-                print "s  %d" % s
                 icnt = 0
                 ttt0 = _tm.time()
                 #inds = _N.array((smpld_marks[s] - LLcrnr) / dm, dtype=_N.int)
@@ -518,8 +517,9 @@ class GoFfuncs:
                                                 p_O[ii] = 0
                                                 for tt in xrange(0, t1-t0-1):
                                                     p_O[ii] += p_CIF_at_grid_mks[p_disc_pos_t0t1[tt]]
-                ttt1 = _tm.time()
-                print "%(1).3f     %(icnt)d" % {"1" : (ttt1-ttt0), "icnt" : icnt}
+                cum_icnt += icnt
+                if icnt > 0:  #  in "for s in xrange(sN):"
+                    print "spk %(s)d out of %(t)d,   cum mk spc smps %(c)d" % {"s" : s, "t" : sN, "c" : cum_icnt}
 
         tt1 = _tm.time()
         print "done   %.4f" % (tt1-tt0)
