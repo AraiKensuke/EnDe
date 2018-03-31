@@ -102,7 +102,7 @@ class MarkAndRF:
         oo.xLo = xLo
         oo.xHi = xHi
 
-    def gibbs(self, ITERS, K, priors, ep1=0, ep2=None, saveSamps=True, saveOcc=True, doSepHash=True, nz_pth=0., smth_pth_ker=0, f_STEPS=13, q2_STEPS=13, f_SMALL=10, q2_SMALL=10, f_cldz=10, q2_cldz=10, minSmps=20, diag_cov=False, earliest=20000, ):
+    def gibbs(self, ITERS, K, priors, ep1=0, ep2=None, saveSamps=True, saveOcc=True, doSepHash=True, nz_pth=0., smth_pth_ker=0, f_STEPS=13, q2_STEPS=13, f_SMALL=10, q2_SMALL=10, f_cldz=10, q2_cldz=10, minSmps=20, diag_cov=False, earliest=20000, cmprs=1):
         """
         gtdiffusion:  use ground truth center of place field in calculating variance of center.  Meaning of diffPerMin different
         """
@@ -159,7 +159,7 @@ class MarkAndRF:
             
             xt0t1 = x[t0:t1]#smthd_pos
             cmp_Nt0t1 = (t1-t0) / cmprs
-            cmp_xt0t1 = _N.array(x[t0:t1:cmprs]
+            cmp_xt0t1 = _N.array(x[t0:t1:cmprs])
 
             _cdfs.change_occ_px(xt0t1, oo.xLo, oo.xHi)
 
@@ -237,7 +237,7 @@ class MarkAndRF:
 
                     m_rnds = _N.random.rand(M_use)
 
-                    _cdfs.smp_f(M_use, clstsz, cls_str_ind, v_sts, cmp_xt0t1, cmprs, t0, f, q2, l0, _f_u, q2pr, m_rnds)
+                    _cdfs.smp_f(M_use, clstsz, cls_str_ind, v_sts, xt0t1, cmp_xt0t1, cmprs, t0, f, q2, l0, _f_u, q2pr, m_rnds)
                     #f   = _N.array([6.33])
                     smp_sp_prms[oo.ky_p_f, itr] = f
 
@@ -256,7 +256,7 @@ class MarkAndRF:
                         _Dq2_a = _q2_a
                         _Dq2_B = _q2_B
 
-                    _cdfs.smp_q2(M_use, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _Dq2_a, _Dq2_B, m_rnds)
+                    _cdfs.smp_q2(M_use, clstsz, cls_str_ind, v_sts, xt0t1, cmp_xt0t1, cmprs, t0, f, q2, l0, _Dq2_a, _Dq2_B, m_rnds)
 
                     smp_sp_prms[oo.ky_p_q2, itr]   = q2
 
@@ -264,7 +264,7 @@ class MarkAndRF:
                     ###############  CONDITIONAL l0
                     ###############
                     #  _ss.gamma.rvs.  uses k, theta  k is 1/B (B is our thing)
-                    _cdfs.l0_spatial(xt0t1, M_use, oo.dt, f, q2, l0_exp_px)
+                    _cdfs.l0_spatial(cmp_xt0t1, cmprs, M_use, oo.dt, f, q2, l0_exp_px)
 
                     BL  = l0_exp_px    #  dim M
 

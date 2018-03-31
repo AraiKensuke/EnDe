@@ -219,9 +219,9 @@ def smp_f(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def smp_q2(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts, 
-           double[::1] xt0t1, int t0, 
+           double[::1] xt0t1, double[::1] cmp_xt0t1, double cmprs, int t0, 
            double[::1] f, double[::1] q2, double[::1] l0, 
-           double[::1] _q2_a, double[::1] _q2_B, double[::1] m_rands, int ep):
+           double[::1] _q2_a, double[::1] _q2_B, double[::1] m_rands):
     cdef int m
     cdef double tmp, fm
     cdef double* _p_q2_a = &_q2_a[0]
@@ -262,7 +262,7 @@ def smp_q2(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
         p_adtv_pdf_params[1] = SL_B
         p_adtv_pdf_params[2] = fm
 
-        adtvInds, N = adtv_support_pdf_sum(qx2, cpq22, q2_STEPS, f_cldz, f_SMALL, dt, l0[m], _IG, adtv_pdf_params, xt0t1, Nt0t1)
+        adtvInds, N = adtv_support_pdf_sum(qx2, cpq22, q2_STEPS, f_cldz, f_SMALL, dt, l0[m], _IG, adtv_pdf_params, cmp_xt0t1, cmprs)
         p_q2[m] = adtv_smp_cdf_interp(qx2[adtvInds], cpq22[adtvInds], N, m, m_rands)
         dat = _N.empty((len(adtvInds), 2))
         dat[:, 0] = qx2[adtvInds]
@@ -273,7 +273,7 @@ def smp_q2(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
 
 ########################################################################
 @cython.cdivision(True)
-cdef double pdfIGsum(double *p_xt0t1, int Nt0t1, double cmprs, double q2c, double fxd_f, double a, double B, double dt, double l0) nogil:
+cdef double pdfIGsum(double *p_cmp_xt0t1, int cmp_Nt0t1, double cmprs, double q2c, double fxd_f, double a, double B, double dt, double l0) nogil:
     #  
     cdef double hlfIIQ2 = -0.5/q2c
     cdef double sptlIntgrl = 0.0
@@ -282,8 +282,8 @@ cdef double pdfIGsum(double *p_xt0t1, int Nt0t1, double cmprs, double q2c, doubl
     cdef double sd = sqrt(q2c)
 
     #for n in xrange(Nupx):   #  spatial integral
-    for 0 <= n < Nt0t1:    #  integrate
-        dd = fxd_f-p_xt0t1[n]
+    for 0 <= n < cmp_Nt0t1:    #  integrate
+        dd = fxd_f-p_cmp_xt0t1[n]
         sptlIntgrl += exp(dd*dd*hlfIIQ2)
     sptlIntgrl *= ((dt*l0)/sqrt(twpi*q2c))
     
@@ -291,7 +291,7 @@ cdef double pdfIGsum(double *p_xt0t1, int Nt0t1, double cmprs, double q2c, doubl
 
 ########################################################################
 @cython.cdivision(True)
-cdef double pdfNRMsum(double *p_xt0t1, int Nt0t1, double cmprs, double fc, double fxd_q2, double fxd_IIQ2, double Mc, double Sigma2c, double dt, double l0) nogil:
+cdef double pdfNRMsum(double *p_cmp_xt0t1, int cmp_Nt0t1, double cmprs, double fc, double fxd_q2, double fxd_IIQ2, double Mc, double Sigma2c, double dt, double l0) nogil:
     #  Value of pdf @ fc.  
     #  fxd_IIQ2    1./q2_c
     #  Mc          - spiking + prior  mean
@@ -305,8 +305,8 @@ cdef double pdfNRMsum(double *p_xt0t1, int Nt0t1, double cmprs, double fc, doubl
     
     ##  calculate 
     #for n in xrange(Nupx):    #  integrate
-    for 0 <= n < Nt0t1:    #  integrate
-        dd = fc - p_xt0t1[n]
+    for 0 <= n < cmp_Nt0t1:    #  integrate
+        dd = fc - p_cmp_xt0t1[n]
         sptlIntgrl += exp(dd*dd*hlfIIQ2)
     sptlIntgrl *= ((dt*l0)/sqrt(twpi*fxd_q2))
 
@@ -322,7 +322,7 @@ cdef double pdfNRMsum(double *p_xt0t1, int Nt0t1, double cmprs, double fc, doubl
 
 ########################################################################
 @cython.cdivision(True)
-def l0_spatial(double[::1] xt0t1, double cmprs, long M, double dt, double[::1] v_fxd_fc, double[::1] v_fxd_q2, double[::1] v_l0_exp_px):
+def l0_spatial(double[::1] cmp_xt0t1, double cmprs, long M, double dt, double[::1] v_fxd_fc, double[::1] v_fxd_q2, double[::1] v_l0_exp_px):
     #  Value of pdf @ fc.  
     #  fxd_IIQ2    1./q2_c
     #  Mc          - spiking + prior  mean
@@ -340,8 +340,8 @@ def l0_spatial(double[::1] xt0t1, double cmprs, long M, double dt, double[::1] v
     cdef double *p_l0_exp_px = &v_l0_exp_px[0]
     cdef double *p_fxd_fc    = &v_fxd_fc[0]
     cdef double *p_fxd_q2    = &v_fxd_q2[0]
-    cdef double *p_xt0t1     = &xt0t1[0]
-    cdef int Nt0t1           = xt0t1.shape[0]
+    cdef double *p_cmp_xt0t1     = &cmp_xt0t1[0]
+    cdef int cmp_Nt0t1           = cmp_xt0t1.shape[0]
 
     ##  calculate 
     for m in xrange(M):
@@ -352,8 +352,8 @@ def l0_spatial(double[::1] xt0t1, double cmprs, long M, double dt, double[::1] v
         sd = sqrt(q2c)
 
         #for n in xrange(Nupx):
-        for 0 <= n < Nt0t1:
-            sptlIntgrl += exp(((p_xt0t1[n]-fc)*(p_xt0t1[n]-fc))*hlfIIQ2)
+        for 0 <= n < cmp_Nt0t1:
+            sptlIntgrl += exp(((p_cmp_xt0t1[n]-fc)*(p_cmp_xt0t1[n]-fc))*hlfIIQ2)
         sptlIntgrl *= (dt/sqrt(twpi*q2c))
         p_l0_exp_px[m] = sptlIntgrl*cmprs
 
