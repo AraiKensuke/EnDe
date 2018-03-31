@@ -598,14 +598,13 @@ class MarkAndRF:
                         _Dl0_a = _l0_a
                         _Dl0_B = _l0_B
 
-                    aL  = clstsz
+                    aL  = clstsz + 1
                     l0_a_ = aL + _Dl0_a
                     l0_B_ = BL + _Dl0_B
 
-
                     try:   #  if there is no prior, if a cluster 
-                        #l0 = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_), size=M_use)  #  check
-                        l0 = _N.array([900.])
+                        l0 = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_), size=M_use)  #  check
+                        #l0 = _N.array([900.])
                     except ValueError:
                         print "problem with l0    %d" % itr
                         print l0_exp_px
