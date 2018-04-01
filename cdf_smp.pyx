@@ -18,9 +18,6 @@ cdef double x_Hi
 cdef int __NRM = 0
 cdef int __IG  = 1
 
-cdef int __SUM_SILENCE = 0
-cdef int __CNVLV_SILENCE = 1    #  use convolusion
-
 cdef double twpi = 6.283185307
 
 cdef double[::1] v_cpf2
@@ -30,10 +27,9 @@ cdef double[::1] v_qx2
 
 #####  variables for changing resolution of occupation function
 cdef double *p_riemann_xs, 
-cdef double *p_px_all
+cdef double *p_hist_all
 cdef double *p_ibinszs
 cdef double *p_q2_thr
-cdef double *dSilenceXs
 cdef int minSmps
 
 cdef long *Nupxs
@@ -64,7 +60,6 @@ f_hi = None
 q2_lo = None
 q2_hi = None
 dt    = None
-#dSilenceX= None
 
 adtv_pdf_params = _N.empty(3)
 
@@ -169,7 +164,7 @@ def smp_f(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
 #          double[::1] fx, double[::1] pxO_full, 
           double[::1] xt0t1, int t0, 
           double[::1] f, double[::1] q2, double[::1] l0, 
-          double[::1] _f_u, double[::1] _f_q2, double[::1] m_rands, int SLNC_TRM_CALC):
+          double[::1] _f_u, double[::1] _f_q2, double[::1] m_rands):
     global f_STEPS, f_SMALL, f_cldz
     """
     f     parameter f
@@ -219,7 +214,7 @@ def smp_f(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
 def smp_q2(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts, 
            double[::1] xt0t1, int t0, 
            double[::1] f, double[::1] q2, double[::1] l0, 
-           double[::1] _q2_a, double[::1] _q2_B, double[::1] m_rands, int ep):
+           double[::1] _q2_a, double[::1] _q2_B, double[::1] m_rands):
     cdef int m
     cdef double tmp, fm
     cdef double* _p_q2_a = &_q2_a[0]
@@ -270,7 +265,7 @@ def smp_q2(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
 
 ########################################################################
 @cython.cdivision(True)
-cdef double pdfIG(double q2c, double fxd_f, double a, double B, double* p_riemann_x, double *p_px, long Nupx, double ibnsz, double dt, double l0, double dSilenceX, double xL, double xH) nogil:
+cdef double pdfIG(double q2c, double fxd_f, double a, double B, double* p_riemann_x, double *p_hist, long Nupx, double ibnsz, double dt, double l0, double xL, double xH) nogil:
     #  
     cdef double hlfIIQ2 = -0.5/q2c
     cdef double sptlIntgrl = 0.0
@@ -278,22 +273,22 @@ cdef double pdfIG(double q2c, double fxd_f, double a, double B, double* p_rieman
     cdef int n, iL, iR
     cdef double sd = sqrt(q2c)
 
-    iL = int((fxd_f-6*sd-xL)*ibnsz)
-    iR = int((fxd_f+6*sd-xL)*ibnsz)
+    iL = int((fxd_f-7*sd-xL)*ibnsz)
+    iR = int((fxd_f+7*sd-xL)*ibnsz)
     iL = iL if iL >= 0 else 0
     iR = iR if iR <= Nupx else Nupx
 
     #for n in xrange(Nupx):   #  spatial integral
     for iL <= n < iR:    #  integrate
         dd = fxd_f-p_riemann_x[n]
-        sptlIntgrl += exp(dd*dd*hlfIIQ2)*p_px[n]
-    sptlIntgrl *= ((dt*l0)/sqrt(twpi*q2c))*dSilenceX
+        sptlIntgrl += exp(dd*dd*hlfIIQ2)*p_hist[n]
+    sptlIntgrl *= ((dt*l0)/sqrt(twpi*q2c))
     
     return -(a + 1)*log(q2c) - B/q2c-sptlIntgrl
 
 ########################################################################
 @cython.cdivision(True)
-cdef double pdfNRM(double fc, double fxd_q2, double fxd_IIQ2, double Mc, double Sigma2c, double *p_riemann_x, double *p_px, long Nupx, double ibnsz, double dt, double l0, double dSilenceX, double xL, double xH) nogil:
+cdef double pdfNRM(double fc, double fxd_q2, double fxd_IIQ2, double Mc, double Sigma2c, double *p_riemann_x, double *p_hist, long Nupx, double ibnsz, double dt, double l0, double xL, double xH) nogil:
     #  Value of pdf @ fc.  
     #  fxd_IIQ2    1./q2_c
     #  Mc          - spiking + prior  mean
@@ -306,8 +301,8 @@ cdef double pdfNRM(double fc, double fxd_q2, double fxd_IIQ2, double Mc, double 
     cdef int n, iL, iR, iL_, iR_
     cdef double sd = sqrt(fxd_q2)
     
-    iL = int((fc-6*sd-xL)*ibnsz)
-    iR = int((fc+6*sd-xL)*ibnsz)
+    iL = int((fc-7*sd-xL)*ibnsz)
+    iR = int((fc+7*sd-xL)*ibnsz)
     iL = iL if iL >= 0 else 0
     iR = iR if iR <= Nupx else Nupx
 
@@ -315,37 +310,7 @@ cdef double pdfNRM(double fc, double fxd_q2, double fxd_IIQ2, double Mc, double 
     #for n in xrange(Nupx):    #  integrate
     for iL <= n < iR:    #  integrate
         dd = fc-p_riemann_x[n]
-        sptlIntgrl += exp(dd*dd*hlfIIQ2)*p_px[n]
-    sptlIntgrl *= ((dt*l0)/sqrt(twpi*fxd_q2))*dSilenceX
-
-    # if iDBG == 1:
-    #     iL_ = int((fc-6*sd-xL)*ibnsz)
-    #     iR_ = int((fc+6*sd-xL)*ibnsz)
-    #     printf("Nupx---  %d", Nupx)
-    #     printf("sptlIntgrl----  %d  %d    %.4f   %d %d\n", iL, iR, sptlIntgrl, iL_, iR_)
-    #     printf("fc %.4e   sd %.4e    Mc %.4e  Sigma2c %.4e\n", fc, sd, Mc, Sigma2c)
-
-    return -0.5*(fc-Mc)*(fc-Mc)/Sigma2c-sptlIntgrl
-
-########################################################################
-@cython.cdivision(True)
-cdef double pdfNRMsum(double fc, double fxd_q2, double fxd_IIQ2, double Mc, double Sigma2c, double *p_xt0t1, long Nt0t1, double ibnsz, double dt, double l0, double dSilenceX, double xL, double xH) nogil:
-    #  Value of pdf @ fc.  
-    #  fxd_IIQ2    1./q2_c
-    #  Mc          - spiking + prior  mean
-    #  Sigma2c     - spiking + prior  variance
-    #  p_riemann_x - points at which integral discretized
-    #  p_px        - occupancy
-    cdef double hlfIIQ2 = -0.5*fxd_IIQ2
-    cdef double sptlIntgrl = 0.0
-    cdef double dd = 0
-    cdef double sd = sqrt(fxd_q2)
-    
-    ##  calculate 
-    #for n in xrange(Nupx):    #  integrate
-    for 0 <= n < Nt0t1:    #  integrate
-        dd = fc-p - p_xt0t1[n]
-        sptlIntgrl += exp(dd*dd*hlfIIQ2)
+        sptlIntgrl += exp(dd*dd*hlfIIQ2)*p_hist[n]
     sptlIntgrl *= ((dt*l0)/sqrt(twpi*fxd_q2))
 
     # if iDBG == 1:
@@ -360,22 +325,22 @@ cdef double pdfNRMsum(double fc, double fxd_q2, double fxd_IIQ2, double Mc, doub
 
 ########################################################################
 @cython.cdivision(True)
-def l0_spatial(long M, double dt, double[::1] v_fxd_fc, double[::1] v_fxd_q2, double[::1] v_l0_exp_px):
+def l0_spatial(long M, double dt, double[::1] v_fxd_fc, double[::1] v_fxd_q2, double[::1] v_l0_exp_hist):
     #  Value of pdf @ fc.  
     #  fxd_IIQ2    1./q2_c
     #  Mc          - spiking + prior  mean
     #  Sigma2c     - spiking + prior  variance
     #  p_riemann_x - points at which integral discretized
     #  p_px        - occupancy
-    global p_riemann_xs;      global p_px_all
+    global p_riemann_xs;      global p_hist_all
     global x_Lo, x_Hi
 
     cdef double hlfIIQ2
     cdef double sptlIntgrl = 0.0
     cdef long Nupx, iStart
     cdef int n, m, iL, iR
-    cdef double dSilenceX, ibnsz, sd
-    cdef double *p_l0_exp_px = &v_l0_exp_px[0]
+    cdef double ibnsz, sd
+    cdef double *p_l0_exp_hist = &v_l0_exp_hist[0]
     cdef double *p_fxd_fc    = &v_fxd_fc[0]
     cdef double *p_fxd_q2    = &v_fxd_q2[0]
 
@@ -383,22 +348,22 @@ def l0_spatial(long M, double dt, double[::1] v_fxd_fc, double[::1] v_fxd_q2, do
     for m in xrange(M):
         fc = p_fxd_fc[m]
         q2c= p_fxd_q2[m]
-        getOccDens(q2c, &Nupx, &iStart, &dSilenceX, &ibnsz)
+        getOccHist(q2c, &Nupx, &iStart, &ibnsz)
         sptlIntgrl = 0.0
         hlfIIQ2 = -0.5/q2c
         sd = sqrt(q2c)
 
-        iL = int((fc-6*sd-x_Lo)*ibnsz)
+        iL = int((fc-7*sd-x_Lo)*ibnsz)
 
-        iR = int((fc+6*sd-x_Lo)*ibnsz)
+        iR = int((fc+7*sd-x_Lo)*ibnsz)
         iL = iL if iL >= 0 else 0
         iR = iR if iR <= Nupx else Nupx
 
         #for n in xrange(Nupx):
         for iL <= n < iR:
-            sptlIntgrl += exp(((p_riemann_xs[iStart+n]-fc)*(p_riemann_xs[iStart+n]-fc))*hlfIIQ2)*p_px_all[iStart+n]
-        sptlIntgrl *= (dt/sqrt(twpi*q2c))*dSilenceX
-        p_l0_exp_px[m] = sptlIntgrl
+            sptlIntgrl += exp(((p_riemann_xs[iStart+n]-fc)*(p_riemann_xs[iStart+n]-fc))*hlfIIQ2)*p_hist_all[iStart+n]
+        sptlIntgrl *= (dt/sqrt(twpi*q2c))
+        p_l0_exp_hist[m] = sptlIntgrl
 
 
 ########################################################################
@@ -437,7 +402,7 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
 
     #cldz = 5   # current level of discretization.  initl_skp  = 2**cldz
     #  Skip sizes go like 8 8 4 2.   2**
-    global p_riemann_xs;      global p_px_all;      global p_ibinszs
+    global p_riemann_xs;      global p_hist_all;      global p_ibinszs
     global x_Lo, x_Hi
     global minSmps
 
@@ -479,7 +444,7 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
     ####  likelihood terms :  f_c
     cdef double fc = 0
     cdef long Nupx, iStart
-    cdef double dSilenceX, ibnsz
+    cdef double ibnsz
     cdef int istepbck = 0
 
     cdef double Mc, Sigma2c, q2_cnd_on, a, B, f_cnd_on, iq2_cnd_on
@@ -496,11 +461,11 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
 
     #initial point, set pmax, gmax
     if dist == __NRM:
-        getOccDens(q2_cnd_on, &Nupx, &iStart, &dSilenceX, &ibnsz)
-        p_cond_pstr[0] = pdfNRM(p_gx[0], q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, &p_riemann_xs[iStart], &p_px_all[iStart], Nupx, ibnsz, dt, l0, dSilenceX, x_Lo, x_Hi)
+        getOccHist(q2_cnd_on, &Nupx, &iStart, &ibnsz)
+        p_cond_pstr[0] = pdfNRM(p_gx[0], q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, &p_riemann_xs[iStart], &p_hist_all[iStart], Nupx, ibnsz, dt, l0, x_Lo, x_Hi)
     elif dist == __IG:
-        getOccDens(p_gx[0], &Nupx, &iStart, &dSilenceX, &ibnsz)
-        p_cond_pstr[0] = pdfIG(p_gx[0], f_cnd_on, a, B, &p_riemann_xs[iStart], &p_px_all[iStart], Nupx, ibnsz, dt, l0, dSilenceX, x_Lo, x_Hi)
+        getOccHist(p_gx[0], &Nupx, &iStart, &ibnsz)
+        p_cond_pstr[0] = pdfIG(p_gx[0], f_cnd_on, a, B, &p_riemann_xs[iStart], &p_hist_all[iStart], Nupx, ibnsz, dt, l0, x_Lo, x_Hi)
     pmax = p_cond_pstr[0]
     gmax = pmax
     imax = 0
@@ -534,9 +499,9 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
             #   - Sigma2c (likelihood + prior) width of observation
             #   prior
 
-            getOccDens(q2_cnd_on, &Nupx, &iStart, &dSilenceX, &ibnsz)
+            getOccHist(q2_cnd_on, &Nupx, &iStart, &ibnsz)
             for strt <= ix < stop+1 by skp:
-                p_cond_pstr[ix] = pdfNRM(p_gx[ix], q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, &p_riemann_xs[iStart], &p_px_all[iStart], Nupx, ibnsz, dt, l0, dSilenceX, x_Lo, x_Hi)
+                p_cond_pstr[ix] = pdfNRM(p_gx[ix], q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, &p_riemann_xs[iStart], &p_hist_all[iStart], Nupx, ibnsz, dt, l0, x_Lo, x_Hi)
 
                 if p_cond_pstr[ix] > pmax:
                     pmax = p_cond_pstr[ix]   # pmax updated each time grid made finer
@@ -547,8 +512,8 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
             #   prior
             #   p_gx[ix]   values of q2
             for strt <= ix < stop+1 by skp:
-                getOccDens(p_gx[ix], &Nupx, &iStart, &dSilenceX, &ibnsz)
-                p_cond_pstr[ix] = pdfIG(p_gx[ix], f_cnd_on, a, B, &p_riemann_xs[iStart], &p_px_all[iStart], Nupx, ibnsz, dt, l0, dSilenceX, x_Lo, x_Hi)
+                getOccHist(p_gx[ix], &Nupx, &iStart, &ibnsz)
+                p_cond_pstr[ix] = pdfIG(p_gx[ix], f_cnd_on, a, B, &p_riemann_xs[iStart], &p_hist_all[iStart], Nupx, ibnsz, dt, l0, x_Lo, x_Hi)
 
                 if p_cond_pstr[ix] > pmax:
                     pmax = p_cond_pstr[ix]   # pmax updated each time grid made finer
@@ -661,12 +626,12 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
         #     print narr_FM
         #     print "offending val %(pcp).3e @ %(x).3e " % {"pcp" : p_cond_pstr[l], "x" : p_gx[l]}
 
-        #     getOccDens(p_gx[l], &Nupx, &iStart, &dSilenceX, &ibnsz)            
+        #     getOccHist(p_gx[l], &Nupx, &iStart, &dSilenceX, &ibnsz)            
         #     print iStart
         #     print dSilenceX
         #     print ibnsz
         #     print Nupx
-        #     tryagain = pdfIG(p_gx[l], f_cnd_on, a, B, &p_riemann_xs[iStart], &p_px_all[iStart], Nupx, ibnsz, dt, l0, dSilenceX, x_Lo, x_Hi)
+        #     tryagain = pdfIG(p_gx[l], f_cnd_on, a, B, &p_riemann_xs[iStart], &p_hist_all[iStart], Nupx, ibnsz, dt, l0, dSilenceX, x_Lo, x_Hi)
         #     print "try again val %.3e" % tryagain
         #     p_cond_pstr[l] = tryagain
         #     gpmax = tryagain
@@ -694,10 +659,9 @@ def init_occ_resolutions(_x_Lo, _x_Hi, v_q2_thr, v_Nupxs, ):
 
     #  p_pxs[i], bins = _N.histogram(Nupx[i]+1)
     #  
-    global p_px_all;    global Nupxs;    global n_res
+    global p_hist_all;    global Nupxs;    global n_res
     global p_q2_thr;    global arr_0s;   global p_riemann_xs
     global p_ibinszs
-    global dSilenceXs
     global x_Lo, x_Hi
 
     cdef int i, j, tot = 0
@@ -709,9 +673,8 @@ def init_occ_resolutions(_x_Lo, _x_Hi, v_q2_thr, v_Nupxs, ):
     Nupxs        = <long*>malloc(n_res*sizeof(long))
     p_ibinszs    = <double*>malloc(n_res*sizeof(double))
     arr_0s       = <long*>malloc(n_res*sizeof(long))
-    dSilenceXs   = <double*>malloc(n_res*sizeof(double))
     p_q2_thr     = <double*>malloc(n_res*sizeof(double))
-    p_px_all     = <double*>malloc(_N.sum(v_Nupxs)*sizeof(double))
+    p_hist_all     = <double*>malloc(_N.sum(v_Nupxs)*sizeof(double))
     p_riemann_xs = <double*>malloc(_N.sum(v_Nupxs)*sizeof(double))
 
 
@@ -735,30 +698,28 @@ def init_occ_resolutions(_x_Lo, _x_Hi, v_q2_thr, v_Nupxs, ):
     #    print("%.4f\n" %  p_ibinszs[i])
 
 def clean_occ_resolutions():
-    global p_px_all;   global p_riemann_xs;   global p_q2_thr
+    global p_hist_all;   global p_riemann_xs;   global p_q2_thr
     global Nupxs;      global arr_0s
-    free(p_px_all);    free(p_riemann_xs);    free(p_q2_thr)
+    free(p_hist_all);    free(p_riemann_xs);    free(p_q2_thr)
     free(Nupxs);       free(arr_0s)
 
-def change_occ_px(pth, _x_Lo, _x_Hi):
-    global p_px_all;    global Nupxs;         global n_res
+def change_occ_hist(pth, _x_Lo, _x_Hi):
+    global p_hist_all;    global Nupxs;         global n_res
     global p_q2_thr;    global arr_0s;        global p_riemann_xs
     N_pth = len(pth)
-    global dSilenceXs
 
     cdef int i, j
     for 0 <= i < n_res:
-        dSilenceXs[i] = (N_pth / float(Nupxs[i]))*(_x_Hi - _x_Lo)
-        px, bns = _N.histogram(pth, _N.linspace(_x_Lo, _x_Hi, Nupxs[i]+1), normed=True)
+        hist, bns = _N.histogram(pth, _N.linspace(_x_Lo, _x_Hi, Nupxs[i]+1), normed=False)
 
         for 0 <= j < Nupxs[i]:
-            p_px_all[arr_0s[i] + j] = px[j]
+            p_hist_all[arr_0s[i] + j] = hist[j]
 
     #  for each
     
     
 # set BOTH the correct occupation density AND riemann_x
-cdef void getOccDens(double gau_q2, long *Nupx, long *iStart, double *dSilenceX, double *ibnsz):
+cdef void getOccHist(double gau_q2, long *Nupx, long *iStart, double *ibnsz):
     global Nupxs;      global arr_0s
     global n_res;      global p_q2_thr
     global p_ibinszs
@@ -768,6 +729,5 @@ cdef void getOccDens(double gau_q2, long *Nupx, long *iStart, double *dSilenceX,
         if gau_q2 < p_q2_thr[i]:
             Nupx[0]   = Nupxs[i]
             iStart[0] = arr_0s[i]
-            dSilenceX[0]= dSilenceXs[i]
             ibnsz[0]= p_ibinszs[i]
             return 
