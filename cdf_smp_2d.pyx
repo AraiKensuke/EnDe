@@ -26,11 +26,11 @@ cdef double[::1] v_fx2
 cdef double[::1] v_qx2
 
 #####  variables for changing resolution of occupation function
-cdef double *p_riemann_xs, 
-cdef double *p_hist_all
+cdef double *p_x_on_path, *p_y_on_path
+cdef double *p_occ_cnts_on_path  #  1D C array for occ_cnts[x, y]
 cdef double *p_ibinszs
 cdef double *p_q2_thr
-cdef int minSmps
+cdef int minSmps     #  how many points used to sample conditional PDF?
 
 cdef long *Nupxs
 cdef long *arr_0s
@@ -645,7 +645,7 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
 ###########################################################################
 ###########################################################################
 #####################  OCCUPATION FUNCTIONS
-def init_occ_resolutions(_x_Lo, _x_Hi, v_q2_thr, v_Nupxs, ):    
+def setup_occ_at_resolutions(_x_Lo, _x_Hi, v_q2_thr, v_Nupxs, ):    
     #  BIN a bit smaller than width
     # q2_thr, Nupxs
     # 0.02^2         0.05^2          0.1^2,          0.2^2,    
@@ -666,6 +666,16 @@ def init_occ_resolutions(_x_Lo, _x_Hi, v_q2_thr, v_Nupxs, ):
 
     cdef int i, j, tot = 0
     cdef double dx, x
+
+    xH, yH = _N.max(path_xy, axis=0)
+    xL, yL = _N.min(path_xy, axis=0)
+
+    AMP    = _N.array([xH - xL, yH - yL])*0.005
+    xL     = xL - AMP[0]
+    xH     = xH + AMP[0]
+    yL     = yL - AMP[1]
+    yH     = yH + AMP[1]
+
     x_Lo = _x_Lo
     x_Hi = _x_Hi
     n_res         = len(v_Nupxs)
@@ -676,6 +686,7 @@ def init_occ_resolutions(_x_Lo, _x_Hi, v_q2_thr, v_Nupxs, ):
     p_q2_thr     = <double*>malloc(n_res*sizeof(double))
     p_hist_all     = <double*>malloc(_N.sum(v_Nupxs)*sizeof(double))
     p_riemann_xs = <double*>malloc(_N.sum(v_Nupxs)*sizeof(double))
+
 
     for 0 <= i < n_res:
         p_q2_thr[i] = v_q2_thr[i]
@@ -692,9 +703,9 @@ def init_occ_resolutions(_x_Lo, _x_Hi, v_q2_thr, v_Nupxs, ):
 
         tot += Nupxs[i]
 
-    print "ibinszs"
-    for 0 <= i < n_res:
-       print("%.4f\n" %  p_ibinszs[i])
+    #print "ibinszs"
+    #for 0 <= i < n_res:
+    #    print("%.4f\n" %  p_ibinszs[i])
 
 def clean_occ_resolutions():
     global p_hist_all;   global p_riemann_xs;   global p_q2_thr
@@ -706,15 +717,32 @@ def change_occ_hist(pth, _x_Lo, _x_Hi):
     global p_hist_all;    global Nupxs;         global n_res
     global p_q2_thr;    global arr_0s;        global p_riemann_xs
     N_pth = len(pth)
+    #  Nupx has a different meaning here.
 
     cdef int i, j
+
     for 0 <= i < n_res:
-        hist, bns = _N.histogram(pth, _N.linspace(_x_Lo, _x_Hi, Nupxs[i]+1), normed=False)
+        BNS = Nupxs[i]
+        occ_cnts, bnsx, bnsy = _N.histogram2d(path_xy[:, 0], path_xy[:, 1], bins=(_N.linspace(xL, xH, BNS+1), _N.linspace(yL, yH, BNS+1)))
+        
+        occ_cnts, bnsx, bnsy = _N.histogram2d(pth, bins=(_N.linspace(_xy_Lo, _xy_Hi, Nupxs[i]+1), _N.linspace(_xy_Lo, _xy_Hi, Nupxs[i]+1)), normed=False)
 
-        for 0 <= j < Nupxs[i]:
-            p_hist_all[arr_0s[i] + j] = hist[j]
+        x, y = _N.where(occ_cnts > 0)
+        x_on_pth = _N.empty(x.shape[0])
+        y_on_pth = _N.empty(x.shape[0])
 
-    #  for each
+        #  or select only those near fx, fy  -  i can 
+
+        b_dx   = (xH-xL)/BNS
+        b_dy   = (yH-yL)/BNS
+
+        x_on_pth = bnsx[x] + 0.5*b_dx
+        y_on_pth = bnsy[y] + 0.5*b_dy
+
+        occ_cnts_on_path = occ_cnts[x, y]
+
+        ind1D = x*BNS+y
+
     
     
 # set BOTH the correct occupation density AND riemann_x
@@ -724,15 +752,9 @@ cdef void getOccHist(double gau_q2, long *Nupx, long *iStart, double *ibnsz):
     global p_ibinszs
     cdef int i
 
-    #  for higher q2 (wider), lower resolution OK
-    #  each Nupx[i] set so spatial resolution for sum is 1/3 (i-1)th level
-    for 0 <= i < n_res:  
+    for 0 <= i < n_res:
         if gau_q2 < p_q2_thr[i]:
             Nupx[0]   = Nupxs[i]
             iStart[0] = arr_0s[i]
             ibnsz[0]= p_ibinszs[i]
             return 
-    #  
-    Nupx[0]   = Nupxs[n_res-1]
-    iStart[0] = arr_0s[n_res-1]
-    ibnsz[0]= p_ibinszs[n_res-1]

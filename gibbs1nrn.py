@@ -17,7 +17,8 @@ import gibbsApprMxMutil as gAMxMu
 import stochasticAssignment as _sA
 #import cdf_smp_tbl as _cdfs
 import cdf_smp_sumx as _cdfs
-import ig_from_cdf_pkg as _ifcp
+import cdf_smp as _cdfs
+#import ig_from_cdf_pkg as _ifcp
 import fastnum as _fm
 import clrs 
 import compress_gz as c_gz
@@ -69,7 +70,7 @@ class MarkAndRF:
     Bx                  = 0    #  noise in xpos
 
     #  px and spatial integration limits.  Don't make larger accessible space
-    xLo      = -6;    xHi      = 6   
+    xLo      = None;    xHi      = None   
 
     #  limits of conditional probability sampling of f and q2
     f_L   = -12;     f_H = 12   
@@ -77,8 +78,8 @@ class MarkAndRF:
 
     oneCluster = False
 
-    q2_lvls    = _N.array([0.02**2, 0.05**2, 0.1**2, 0.2**2, 0.5**2, 1**2, 6**2, 100000**2])
-    Nupx_lvls  = _N.array([1000, 600, 200, 100, 60, 20, 12, 8])
+    q_lvls    = None
+    Nupx_lvls   = None
 
     priors     = None
     
@@ -101,6 +102,23 @@ class MarkAndRF:
         NT     = oo.dat.shape[0]
         oo.xLo = xLo
         oo.xHi = xHi
+
+    def setup_spatial_sum_params(self, q2x=None, f=None, n_q2_lvls=12, q_mlt_steps=2, q_min=0.01, bins_per_sd=5): 
+        """
+        *q_mlt_steps=2  means spatial bins [0.01, 0.02, 0.04, 0.08]...
+        *if my q2 is bigger than max level, i'll just end up using more bins than neccessary. no prob
+        *bins_per_sd=5   heuristically, this is a good setting.
+        """
+        oo = self
+        oo.q2_lvls = _N.empty(n_q2_lvls)
+        oo.Nupx_lvls = _N.empty(n_q2_lvls, dtype=_N.int)
+        oo.q2_lvls[0] = q_min**2
+        q2_mlt_steps = q_mlt_steps**2
+        oo.Nupx_lvls[0] = int(_N.ceil(((oo.xHi-oo.xLo)/_N.sqrt(oo.q2_lvls[0]))*bins_per_sd))
+
+        for i in xrange(1, n_q2_lvls):
+            oo.q2_lvls[i] = q2_mlt_steps*oo.q2_lvls[i-1]
+            oo.Nupx_lvls[i] = int(_N.ceil(((oo.xHi-oo.xLo)/_N.sqrt(oo.q2_lvls[i]))*bins_per_sd))
 
     def gibbs(self, ITERS, K, priors, ep1=0, ep2=None, saveSamps=True, saveOcc=True, doSepHash=True, nz_pth=0., smth_pth_ker=0, f_STEPS=13, q2_STEPS=13, f_SMALL=10, q2_SMALL=10, f_cldz=10, q2_cldz=10, minSmps=20, diag_cov=False, earliest=20000, cmprs=1):
         """
@@ -137,7 +155,7 @@ class MarkAndRF:
         
         ######################################  PRECOMPUTED
 
-        _ifcp.init()
+        #_ifcp.init()
         tau_l0 = oo.t_hlf_l0/_N.log(2)
         tau_q2 = oo.t_hlf_q2/_N.log(2)
 
@@ -155,13 +173,11 @@ class MarkAndRF:
                 #  0 10 30     20 - 5  = 15    0.5*((10+30) - (10+0)) = 15
                 DT = t0-tm1
 
-            posbins  = _N.linspace(oo.xLo, oo.xHi, oo.Nupx+1)
-            
             xt0t1 = x[t0:t1]#smthd_pos
             cmp_Nt0t1 = (t1-t0) / cmprs
             cmp_xt0t1 = _N.array(x[t0:t1:cmprs])
 
-            _cdfs.change_occ_px(xt0t1, oo.xLo, oo.xHi)
+            _cdfs.change_occ_hist(xt0t1, oo.xLo, oo.xHi)
 
             Asts    = _N.where(oo.dat[t0:t1, 1] == 1)[0]   #  based at 0
 
@@ -176,7 +192,7 @@ class MarkAndRF:
             q2       = _N.array([0.04])
             f        = _N.empty(M_use)
 
-            l0_exp_px = _N.empty(M_use)
+            l0_exp_hist = _N.empty(M_use)
             _l0_a    = _N.array([priors._l0_a[0]])
             _l0_B    = _N.array([priors._l0_B[0]])
             _f_u    = _N.array([priors._f_u[0]])
@@ -203,7 +219,7 @@ class MarkAndRF:
             v_sts = Asts
             clstsz[0] = nSpks
 
-            _cdfs.dSilenceX = (NSexp/float(oo.Nupx))*(oo.xHi-oo.xLo)
+            #_cdfs.dSilenceX = (NSexp/float(oo.Nupx))*(oo.xHi-oo.xLo)
 
             xAS  = x[Asts + t0]   #  position @ spikes.  creates new copy
             xASr = xAS.reshape((1, nSpks))
@@ -237,7 +253,8 @@ class MarkAndRF:
 
                     m_rnds = _N.random.rand(M_use)
 
-                    _cdfs.smp_f(M_use, clstsz, cls_str_ind, v_sts, xt0t1, cmp_xt0t1, cmprs, t0, f, q2, l0, _f_u, q2pr, m_rnds)
+                    #_cdfs.smp_f(M_use, clstsz, cls_str_ind, v_sts, xt0t1, cmp_xt0t1, cmprs, t0, f, q2, l0, _f_u, q2pr, m_rnds)
+                    _cdfs.smp_f(M_use, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _f_u, q2pr, m_rnds)
                     #f   = _N.array([6.33])
                     smp_sp_prms[oo.ky_p_f, itr] = f
 
@@ -256,7 +273,8 @@ class MarkAndRF:
                         _Dq2_a = _q2_a
                         _Dq2_B = _q2_B
 
-                    _cdfs.smp_q2(M_use, clstsz, cls_str_ind, v_sts, xt0t1, cmp_xt0t1, cmprs, t0, f, q2, l0, _Dq2_a, _Dq2_B, m_rnds)
+                    #_cdfs.smp_q2(M_use, clstsz, cls_str_ind, v_sts, xt0t1, cmp_xt0t1, cmprs, t0, f, q2, l0, _Dq2_a, _Dq2_B, m_rnds)
+                    _cdfs.smp_q2(M_use, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _Dq2_a, _Dq2_B, m_rnds)
 
                     smp_sp_prms[oo.ky_p_q2, itr]   = q2
 
@@ -264,9 +282,10 @@ class MarkAndRF:
                     ###############  CONDITIONAL l0
                     ###############
                     #  _ss.gamma.rvs.  uses k, theta  k is 1/B (B is our thing)
-                    _cdfs.l0_spatial(cmp_xt0t1, cmprs, M_use, oo.dt, f, q2, l0_exp_px)
+                    #_cdfs.l0_spatial(cmp_xt0t1, cmprs, M_use, oo.dt, f, q2, l0_exp_hist)
+                    _cdfs.l0_spatial(M_use, oo.dt, f, q2, l0_exp_hist)
 
-                    BL  = l0_exp_px    #  dim M
+                    BL  = l0_exp_hist    #  dim M
 
                     if (epc > 0) and oo.adapt:
                         _mn_nd= _l0_a / _l0_B
@@ -288,7 +307,7 @@ class MarkAndRF:
                         l0 = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_), size=M_use)  #  check
                     except ValueError:
                         print "problem with l0    %d" % itr
-                        print l0_exp_px
+                        print l0_exp_hist
                         print l0_a_
                         print l0_B_
                         raise

@@ -167,8 +167,8 @@ def adtv_smp_cdf_interp(double[::1] x, double[::1] log_p, int N, int m, double[:
 @cython.wraparound(False)
 def smp_f_2d(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts, 
 #          double[::1] fx, double[::1] pxO_full, 
-          double[::1] xt0t1, int t0, 
-          double[::1] f, double[::1] q2, double[::1] l0, double[::1] wgt, 
+          double[::1] xt0t1, double[::1] cmp_xt0t1, double cmprs, int t0, 
+          double[::1] f, double[::1] q2, double[::1] l0, double[::1] cmp_wgt, 
           double[::1] _f_u, double[::1] _f_q2, double[::1] m_rands):
     global f_STEPS, f_SMALL, f_cldz
     """
@@ -208,7 +208,7 @@ def smp_f_2d(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
         p_adtv_pdf_params[1] = FQ2
         p_adtv_pdf_params[2] = q2[m]
 
-        adtvInds, N = adtv_support_pdf_sum(fx2, cpf2, wgt, f_STEPS, f_cldz, f_SMALL, dt, l0[m], _NRM, adtv_pdf_params, xt0t1)
+        adtvInds, N = adtv_support_pdf_sum(fx2, cpf2, cmp_wgt, f_STEPS, f_cldz, f_SMALL, dt, l0[m], _NRM, adtv_pdf_params, cmp_xt0t1, cmprs)
 
         p_f[m] = adtv_smp_cdf_interp(fx2[adtvInds], cpf2[adtvInds], N, m, m_rands)
 
@@ -217,9 +217,9 @@ def smp_f_2d(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def smp_q2_2d(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts, 
-           double[::1] xt0t1, int t0, 
-           double[::1] f, double[::1] q2, double[::1] l0, double[::1] wgt, 
-           double[::1] _q2_a, double[::1] _q2_B, double[::1] m_rands, int ep):
+           double[::1] xt0t1, double[::1] cmp_xt0t1, double cmprs, int t0, 
+           double[::1] f, double[::1] q2, double[::1] l0, double[::1] cmp_wgt, 
+           double[::1] _q2_a, double[::1] _q2_B, double[::1] m_rands):
     cdef int m
     cdef double tmp, fm
     cdef double* _p_q2_a = &_q2_a[0]
@@ -259,7 +259,7 @@ def smp_q2_2d(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
         p_adtv_pdf_params[1] = SL_B
         p_adtv_pdf_params[2] = fm
 
-        adtvInds, N = adtv_support_pdf_sum(qx2, cpq22, wgt, q2_STEPS, f_cldz, f_SMALL, dt, l0[m], _IG, adtv_pdf_params, xt0t1)
+        adtvInds, N = adtv_support_pdf_sum(qx2, cpq22, cmp_wgt, q2_STEPS, f_cldz, f_SMALL, dt, l0[m], _IG, adtv_pdf_params, cmp_xt0t1, cmprs)
         p_q2[m] = adtv_smp_cdf_interp(qx2[adtvInds], cpq22[adtvInds], N, m, m_rands)
         dat = _N.empty((len(adtvInds), 2))
         dat[:, 0] = qx2[adtvInds]
@@ -270,7 +270,7 @@ def smp_q2_2d(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
 
 ########################################################################
 @cython.cdivision(True)
-cdef double pdfIGsum(double *p_xt0t1, double *p_wgt, long Nt0t1, double q2c, double fxd_f, double a, double B, double dt, double l0) nogil:
+cdef double pdfIGsum(double *p_cmp_xt0t1, int cmp_Nt0t1, double cmprs, double *p_cmp_wgt, double q2c, double fxd_f, double a, double B, double dt, double l0) nogil:
     #  
     cdef double hlfIIQ2 = -0.5/q2c
     cdef double sptlIntgrl = 0.0
@@ -279,16 +279,16 @@ cdef double pdfIGsum(double *p_xt0t1, double *p_wgt, long Nt0t1, double q2c, dou
     cdef double sd = sqrt(q2c)
 
     #for n in xrange(Nupx):   #  spatial integral
-    for 0 <= n < Nt0t1:    #  integrate
-        dd = fxd_f-p_xt0t1[n]
-        sptlIntgrl += exp(dd*dd*hlfIIQ2) * p_wgt[n]
+    for 0 <= n < cmp_Nt0t1:    #  integrate
+        dd = fxd_f-p_cmp_xt0t1[n]
+        sptlIntgrl += exp(dd*dd*hlfIIQ2) * p_cmp_wgt[n]
     sptlIntgrl *= ((dt*l0)/sqrt(twpi*q2c))
     
-    return -(a + 1)*log(q2c) - B/q2c-sptlIntgrl
+    return -(a + 1)*log(q2c) - B/q2c-sptlIntgrl*cmprs
 
 ########################################################################
 @cython.cdivision(True)
-cdef double pdfNRMsum(double *p_xt0t1, double* p_wgt, long Nt0t1, double fc, double fxd_q2, double fxd_IIQ2, double Mc, double Sigma2c, double dt, double l0) nogil:
+cdef double pdfNRMsum(double *p_cmp_xt0t1, int cmp_Nt0t1, double cmprs, double* p_cmp_wgt, double fc, double fxd_q2, double fxd_IIQ2, double Mc, double Sigma2c, double dt, double l0) nogil:
     #  Value of pdf @ fc.  
     #  fxd_IIQ2    1./q2_c
     #  Mc          - spiking + prior  mean
@@ -302,9 +302,9 @@ cdef double pdfNRMsum(double *p_xt0t1, double* p_wgt, long Nt0t1, double fc, dou
     
     ##  calculate 
     #for n in xrange(Nupx):    #  integrate
-    for 0 <= n < Nt0t1:    #  integrate
-        dd = fc - p_xt0t1[n]
-        sptlIntgrl += exp(dd*dd*hlfIIQ2) * p_wgt[n]
+    for 0 <= n < cmp_Nt0t1:    #  integrate
+        dd = fc - p_cmp_xt0t1[n]
+        sptlIntgrl += exp(dd*dd*hlfIIQ2) * p_cmp_wgt[n]
     sptlIntgrl *= ((dt*l0)/sqrt(twpi*fxd_q2))
 
     # if iDBG == 1:
@@ -314,12 +314,12 @@ cdef double pdfNRMsum(double *p_xt0t1, double* p_wgt, long Nt0t1, double fc, dou
     #     printf("sptlIntgrl----  %d  %d    %.4f   %d %d\n", iL, iR, sptlIntgrl, iL_, iR_)
     #     printf("fc %.4e   sd %.4e    Mc %.4e  Sigma2c %.4e\n", fc, sd, Mc, Sigma2c)
 
-    return -0.5*(fc-Mc)*(fc-Mc)/Sigma2c-sptlIntgrl
+    return -0.5*(fc-Mc)*(fc-Mc)/Sigma2c-sptlIntgrl*cmprs
 
 
 ########################################################################
 @cython.cdivision(True)
-def l0_spatial(double[::1] xt0t1, double[::1] yt0t1, long Nt0t1, long M, double dt, double[::1] v_fxd_fc_x, double[::1] v_fxd_q2_x, double[::1] v_fxd_fc_y, double[::1] v_fxd_q2_y, double[::1] v_l0_exp_px):
+def l0_spatial(double[::1] cmp_xt0t1, double[::1] cmp_yt0t1, double cmprs, long M, double dt, double[::1] v_fxd_fc_x, double[::1] v_fxd_q2_x, double[::1] v_fxd_fc_y, double[::1] v_fxd_q2_y, double[::1] v_l0_exp_px):
     #  Value of pdf @ fc.  
     #  fxd_IIQ2    1./q2_c
     #  Mc          - spiking + prior  mean
@@ -340,9 +340,10 @@ def l0_spatial(double[::1] xt0t1, double[::1] yt0t1, long Nt0t1, long M, double 
     cdef double *p_fxd_fc_y    = &v_fxd_fc_y[0]
     cdef double *p_fxd_q2_y    = &v_fxd_q2_y[0]
 
-    cdef double *p_xt0t1     = &xt0t1[0]
-    cdef double *p_yt0t1     = &yt0t1[0]
+    cdef double *p_cmp_xt0t1     = &cmp_xt0t1[0]
+    cdef double *p_cmp_yt0t1     = &cmp_yt0t1[0]
     cdef double fc_x, fc_y, q2c_x, q2c_y
+    cdef int cmp_Nt0t1       = cmp_xt0t1.shape[0]
 
     ##  calculate 
     for m in xrange(M):
@@ -356,18 +357,18 @@ def l0_spatial(double[::1] xt0t1, double[::1] yt0t1, long Nt0t1, long M, double 
         hlfIIQ2_y = -0.5/q2c_y
 
         #for n in xrange(Nupx):
-        for 0 <= n < Nt0t1:
-            sptlIntgrl += exp(((p_xt0t1[n]-fc_x)*(p_xt0t1[n]-fc_x))*hlfIIQ2_x + ((p_yt0t1[n]-fc_y)*(p_yt0t1[n]-fc_y))*hlfIIQ2_y) 
+        for 0 <= n < cmp_Nt0t1:
+            sptlIntgrl += exp(((p_cmp_xt0t1[n]-fc_x)*(p_cmp_xt0t1[n]-fc_x))*hlfIIQ2_x + ((p_cmp_yt0t1[n]-fc_y)*(p_cmp_yt0t1[n]-fc_y))*hlfIIQ2_y) 
         sptlIntgrl *= (dt/sqrt(twpi*q2c_x*q2c_y))
-        p_l0_exp_px[m] = sptlIntgrl
+        p_l0_exp_px[m] = sptlIntgrl*cmprs
 
 
 ########################################################################
 @cython.cdivision(True)
-def adtv_support_pdf_sum(double[::1] gx, double[::1] cond_pstr, double[::1] wgt,
+def adtv_support_pdf_sum(double[::1] gx, double[::1] cond_pstr, double[::1] cmp_wgt,
                          int STEPS, int cldz, int small,
                          double dt, double l0, 
-                         int dist, double[::1] params, double[::1] xt0t1):
+                         int dist, double[::1] params, double[::1] cmp_xt0t1, double cmprs):
     """
     This gets called M times per Gibbs sample
     gx      grid @ which to sample pdf.  
@@ -422,14 +423,14 @@ def adtv_support_pdf_sum(double[::1] gx, double[::1] cond_pstr, double[::1] wgt,
 
     cdef double *p_cond_pstr = &cond_pstr[0]
     cdef double *p_gx        = &gx[0]
-    cdef double *p_xt0t1        = &xt0t1[0]
-    cdef double *p_wgt          = &wgt[0]
+    cdef double *p_cmp_xt0t1        = &cmp_xt0t1[0]
+    cdef double *p_cmp_wgt          = &cmp_wgt[0]
 
     cdef double *p_params    = &params[0]
 
     cdef int imax   = -1
     cdef int gimax  = -1
-    cdef int Nt0t1 = xt0t1.shape[0]
+    cdef int cmp_Nt0t1 = cmp_xt0t1.shape[0]
 
     ####  
     ####  params conditioned on
@@ -460,9 +461,9 @@ def adtv_support_pdf_sum(double[::1] gx, double[::1] cond_pstr, double[::1] wgt,
 
     #initial point, set pmax, gmax
     if dist == __NRM:
-        p_cond_pstr[0] = pdfNRMsum(p_xt0t1, p_wgt, Nt0t1, p_gx[0], q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, dt, l0)
+        p_cond_pstr[0] = pdfNRMsum(p_cmp_xt0t1, cmp_Nt0t1, cmprs, p_cmp_wgt, p_gx[0], q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, dt, l0)
     elif dist == __IG:
-        p_cond_pstr[0] = pdfIGsum(p_xt0t1, p_wgt, Nt0t1, p_gx[0], f_cnd_on, a, B, dt, l0)
+        p_cond_pstr[0] = pdfIGsum(p_cmp_xt0t1, cmp_Nt0t1, cmprs, p_cmp_wgt, p_gx[0], f_cnd_on, a, B, dt, l0)
     pmax = p_cond_pstr[0]
     gmax = pmax
     imax = 0
@@ -497,7 +498,7 @@ def adtv_support_pdf_sum(double[::1] gx, double[::1] cond_pstr, double[::1] wgt,
             #   prior
 
             for strt <= ix < stop+1 by skp:
-                p_cond_pstr[ix] = pdfNRMsum(p_xt0t1, p_wgt, Nt0t1, p_gx[ix], q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, dt, l0)
+                p_cond_pstr[ix] = pdfNRMsum(p_cmp_xt0t1, cmp_Nt0t1, cmprs, p_cmp_wgt, p_gx[ix], q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, dt, l0)
 
                 if p_cond_pstr[ix] > pmax:
                     pmax = p_cond_pstr[ix]   # pmax updated each time grid made finer
@@ -508,7 +509,7 @@ def adtv_support_pdf_sum(double[::1] gx, double[::1] cond_pstr, double[::1] wgt,
             #   prior
             #   p_gx[ix]   values of q2
             for strt <= ix < stop+1 by skp:
-                p_cond_pstr[ix] = pdfIGsum(p_xt0t1, p_wgt, Nt0t1, p_gx[ix], f_cnd_on, a, B, dt, l0)
+                p_cond_pstr[ix] = pdfIGsum(p_cmp_xt0t1, cmp_Nt0t1, cmprs, p_cmp_wgt, p_gx[ix], f_cnd_on, a, B, dt, l0)
 
                 if p_cond_pstr[ix] > pmax:
                     pmax = p_cond_pstr[ix]   # pmax updated each time grid made finer

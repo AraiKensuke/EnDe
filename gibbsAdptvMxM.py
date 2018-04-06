@@ -83,10 +83,32 @@ class MarkAndRF:
 
     oneCluster = False
 
-    q2_lvls    = _N.array([0.02**2, 0.05**2, 0.1**2, 0.2**2, 0.5**2, 1**2, 6**2, 100000**2])
-    Nupx_lvls  = _N.array([1000, 600, 200, 100, 60, 20, 12, 8])
+    #q2_lvls    = _N.array([0.02**2, 0.05**2, 0.1**2, 0.2**2, 0.5**2, 1**2, 6**2, 100000**2])
+    #Nupx_lvls  = _N.array([1000, 600, 200, 100, 60, 20, 12, 8])
 
     priors     = None
+
+    def setup_spatial_sum_params(self, q2x=None, fx=None, n_q2_lvls=12, q_mlt_steps=2, q_min=0.01, bins_per_sd=5): 
+        """
+        *q_mlt_steps=2  means spatial bins [0.01, 0.02, 0.04, 0.08]...
+        *if my q2 is bigger than max level, i'll just end up using more bins than neccessary. no prob
+        *bins_per_sd=5   heuristically, this is a good setting.
+        *q2x, fx     grid 
+        """
+        oo = self
+        oo.q2_lvls = _N.empty(n_q2_lvls)
+        oo.Nupx_lvls = _N.empty(n_q2_lvls, dtype=_N.int)
+        oo.q2_lvls[0] = q_min**2
+        q2_mlt_steps = q_mlt_steps**2
+        oo.Nupx_lvls[0] = int(_N.ceil(((oo.xHi-oo.xLo)/_N.sqrt(oo.q2_lvls[0]))*bins_per_sd))
+
+        for i in xrange(1, n_q2_lvls):
+            oo.q2_lvls[i] = q2_mlt_steps*oo.q2_lvls[i-1]
+            oo.Nupx_lvls[i] = int(_N.ceil(((oo.xHi-oo.xLo)/_N.sqrt(oo.q2_lvls[i]))*bins_per_sd))
+
+        oo.binszs     = float(oo.xHi-oo.xLo)/oo.Nupx_lvls
+        oo.q2_L, oo.q2_H = q2x
+        oo.f_L,  oo.f_H  = fx
     
     def __init__(self, outdir, fn, intvfn, xLo=0, xHi=3, seed=1041, adapt=True, t_hlf_l0_mins=None, t_hlf_q2_mins=None, oneCluster=False, rotate=False):
         oo     = self
@@ -97,7 +119,6 @@ class MarkAndRF:
         ######################################  DATA input, define intervals
         # bFN = fn[0:-4]
         oo.outdir = outdir
-
 
 
         #  rotation about axis 1
@@ -235,37 +256,7 @@ class MarkAndRF:
             
             xt0t1 = x[t0:t1]#smthd_pos
 
-            if oo.use_conv_tabl:
-                Nf  = 1000
-                fs  = _N.linspace(oo.f_L, oo.f_H, Nf)                
-                Ngrd = 1000
-                dx  = 12./Ngrd
-                x_grid = _N.linspace(-6+dx/2, 6-dx/2, Ngrd)
-                i0  = 35
-                imi0=_N.arange(-i0, i0)
-                k=0.3
-                qs   = _N.exp(k*imi0*0.5)
-                iq2s= 1./(qs*qs)
-
-                cnts, xbns = _N.histogram(xt0t1, bins=_N.linspace(-6, 6, Ngrd+1), normed=False)
-                tbl = _gct.build_gau_pxdx_tbl(cnts, x_grid, xt0t1, fs, iq2s, i0, k, oo.f_L, oo.f_H)
-
-                print "tab:   min  %(min).3f    max  %(max).3f" % {"min" : _N.min(_gct._tab), "max" : _N.max(_gct._tab)}
-
-
-                #_plt.imshow(_N.exp(_gct._tab.T), aspect=10, cmap=_plt.get_cmap("Blues"), origin="lower", interpolation=None)
-
-
-
-
-
-            #else:
-                _cdfs.change_occ_px(xt0t1, oo.xLo, oo.xHi)
-            #px, xbns = _N.histogram(xt0t1, bins=posbins, normed=True)
-            
-            #pxr      = px.reshape((1, oo.Nupx))
-
-
+            _cdfs.change_occ_hist(xt0t1, oo.xLo, oo.xHi)
             Asts    = _N.where(oo.dat[t0:t1, 1] == 1)[0]   #  based at 0
 
             if epc == ep1:   ###  initialize
@@ -311,14 +302,14 @@ class MarkAndRF:
 
                 
                 l0_M, f_M, q2_M, u_M, Sg_M = gAMxMu.declare_params(M_max, K)   #  nzclstr not inited  # sized to include noise cluster if needed
-                l0_exp_px_M = _N.empty(M_max)
+                l0_exp_hist_M = _N.empty(M_max)
                 _l0_a_M, _l0_B_M, _f_u_M, _f_q2_M, _q2_a_M, _q2_B_M, _u_u_M, \
                     _u_Sg_M, _Sg_nu_M, _Sg_PSI_M = gAMxMu.declare_prior_hyp_params(M_max, nHSclusters, K, x, fit_mks, Asts, t0, priors, labS, labH)
 
                 l0, f, q2, u, Sg        = gAMxMu.copy_slice_params(M_use, l0_M, f_M, q2_M, u_M, Sg_M)
                 _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI        = gAMxMu.copy_slice_hyp_params(M_use, _l0_a_M, _l0_B_M, _f_u_M, _f_q2_M, _q2_a_M, _q2_B_M, _u_u_M, _u_Sg_M, _Sg_nu_M, _Sg_PSI_M)
 
-                l0_exp_px = _N.array(l0_exp_px_M[0:M_use], copy=True)
+                l0_exp_hist = _N.array(l0_exp_hist_M[0:M_use], copy=True)
 
                 fr = f.reshape((M_use, 1))
                 gAMxMu.init_params_hyps(oo, M_use, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, \
@@ -352,7 +343,7 @@ class MarkAndRF:
                 l0, f, q2, u, Sg        = gAMxMu.copy_slice_params(M_use, l0_M, f_M, q2_M, u_M, Sg_M)
                 _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI        = gAMxMu.copy_slice_hyp_params(M_use, _l0_a_M, _l0_B_M, _f_u_M, _f_q2_M, _q2_a_M, _q2_B_M, _u_u_M, _u_Sg_M, _Sg_nu_M, _Sg_PSI_M)
 
-                l0_exp_px = _N.array(l0_exp_px_M[0:M_use], copy=True)
+                l0_exp_hist = _N.array(l0_exp_hist_M[0:M_use], copy=True)
 
                 #  hyperparams of posterior. Not needed for all params
                 u_u_  = _N.empty((M_use, K))
@@ -396,8 +387,6 @@ class MarkAndRF:
                 v_sts = Asts
                 clstsz[0] = nSpks
             oo.gz=gz
-
-            _cdfs.dSilenceX = (NSexp/float(oo.Nupx))*(oo.xHi-oo.xLo)
 
             xAS  = x[Asts + t0]   #  position @ spikes.  creates new copy
             mAS  = fit_mks[Asts + t0]   #  position @ spikes
@@ -568,7 +557,7 @@ class MarkAndRF:
 
                     #ttsw9 = _tm.time()
 
-                    _cdfs.smp_q2(M_use, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _Dq2_a, _Dq2_B, m_rnds, epc)
+                    _cdfs.smp_q2(M_use, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _Dq2_a, _Dq2_B, m_rnds)
                     #q2 = _N.array([1.21])
 
                     smp_sp_prms[oo.ky_p_q2, itr]   = q2
@@ -579,12 +568,9 @@ class MarkAndRF:
                     ###############  CONDITIONAL l0
                     ###############
                     #  _ss.gamma.rvs.  uses k, theta  k is 1/B (B is our thing)
-                    if oo.use_conv_tabl:
-                        _cdfs.l0_spatial(M_use, oo.dt, f, q2, l0_exp_px)
-                    else:
-                        _cdfs.l0_spatial(M_use, oo.dt, f, q2, l0_exp_px)
+                    _cdfs.l0_spatial(M_use, oo.dt, f, q2, l0_exp_hist)
 
-                    BL  = l0_exp_px    #  dim M
+                    BL  = l0_exp_hist    #  dim M
 
                     if (epc > 0) and oo.adapt:
                         _mn_nd= _l0_a / _l0_B
@@ -607,7 +593,7 @@ class MarkAndRF:
                         #l0 = _N.array([900.])
                     except ValueError:
                         print "problem with l0    %d" % itr
-                        print l0_exp_px
+                        print l0_exp_hist
                         print l0_a_
                         print l0_B_
                         raise

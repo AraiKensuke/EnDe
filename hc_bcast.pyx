@@ -230,14 +230,17 @@ cdef void CIFatFxdMks_nogil(double *p_fxdMk, double* p_x, double* p_l0dt_i2pidco
     #   iSgs  :  M x mdim x mdim
     #   i2pidcovs  :  M x (mdim + 1) x (mdim + 1)
     #   zs:      Nx
+    #   qdrsp is M x Nxdim      m*Nx + ix
 
     #cdef double zs
     cdef long cmdim, cmdim2, i, j, k, ix, c, cNx
     cdef double tmp
     cdef double qdr_sp
+    cdef double arg
 
     cdef double fc, iq2c
-    for 0 <= c < M:
+
+    for 0 <= c < M:    #  calculate the mark-contribution first.
         iq2c = p_iq2[c]
         fc = p_f[c]
         tmp = 0
@@ -253,16 +256,26 @@ cdef void CIFatFxdMks_nogil(double *p_fxdMk, double* p_x, double* p_l0dt_i2pidco
 
         p_qdr_mk[c] = tmp
 
-        #for ix in xrange(Nx):
-        #    p_qdr_sp[cNx + ix] = (p_x[ix] - fc)*(p_x[ix] - fc)*iq2c
-
-    for 0 <= ix < Nx:
+    """
+    for 0 <= ix < Nx:  #  the mark contribution constant, modulating it by spatial contribution
         tmp = 0
-        for 0 <= c < M:
-            #p_qdr_sp[c*Nx + ix] = (p_x[ix] - p_f[c])*(p_x[ix] - p_f[c])*p_iq2[c]
+        for 0 <= c < M:    #  calculate the mark-contribution first.
             qdr_sp = (p_x[ix] - p_f[c])*(p_x[ix] - p_f[c])*p_iq2[c]
-            #if (p_qdr_sp[c*Nx+ix]+p_qdr_mk[c]) < 16:  #  if mk 
-            if (qdr_sp+p_qdr_mk[c]) < 16:  #  if mk 
-                #tmp += p_l0dt_i2pidcovs[c]*exp(-0.5*(p_qdr_sp[c*Nx+ix]+p_qdr_mk[c]))
-                tmp += p_l0dt_i2pidcovs[c]*exp(-0.5*(qdr_sp+p_qdr_mk[c]))
+
+            if (qdr_sp +p_qdr_mk[c]) < 16:  #  contribution large enough
+                tmp += p_l0dt_i2pidcovs[c]*exp(-0.5*(qdr_sp + p_qdr_mk[c]))
         p_zs[ix] = tmp
+    """
+
+    for 0 <= ix < Nx:  #  the mark contribution constant, modulating it by spatial contribution
+        tmp = 0
+        for 0 <= c < M:    #  calculate the mark-contribution first.
+            #qdr_sp = (p_x[ix] - p_f[c])*(p_x[ix] - p_f[c])*p_iq2[c]
+
+            arg = p_qdr_sp[c*Nx + ix] +p_qdr_mk[c]
+            if arg < 16:  #  contribution large enough
+                tmp += p_l0dt_i2pidcovs[c]*exp(-0.5*arg)
+        p_zs[ix] = tmp
+
+
+

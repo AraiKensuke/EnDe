@@ -278,7 +278,7 @@ def calc_fine_volrat2(double[:, ::1] O, int g_M, int g_Mf, int g_Tf, double fg_M
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def calc_volrat4(long g_T, long g_M, double[:, :, :, ::1] O, double[::1] trngs, double[:, :, :, :, ::1] volrat, long g_Tf, long g_Mf, double[:, :, :, ::1] O_zoom, double[:, :, :, :, ::1] volrat_zoom):
+def calc_volrat4(long g_T, long[::1] g_Ms, double[:, :, :, ::1] O, double[::1] trngs, double[:, :, :, :, ::1] volrat, long g_Tf, long g_Mf, double[:, :, :, ::1] O_zoom, double[:, :, :, :, ::1] volrat_zoom):
     #  changes in rescaled-time direction is abrupt, while over marks may not be so abrupt.  Cut box in mark direction in 4 
     cdef double tL, tH
     cdef double d1h, d2h, d3h, d4h, d1l, d2l, d3l, d4l
@@ -288,19 +288,21 @@ def calc_volrat4(long g_T, long g_M, double[:, :, :, ::1] O, double[::1] trngs, 
     cdef double fg_Mf = float(g_Mf)
     cdef double fg_Tf = float(g_Tf)
 
+    cdef long   *p_g_Ms  = &g_Ms[0]
     cdef double *p_O     = &O[0, 0, 0, 0]
     cdef double *p_trngs     = &trngs[0]
     cdef double *p_volrat = &volrat[0, 0, 0, 0, 0]
 
     cdef long it, inboundary, i_here, i_til_end
 
-    cdef long g_M3 = g_M*g_M*g_M
-    cdef long g_M2 = g_M*g_M
+    cdef long g_M3 = g_Ms[3]*g_Ms[2]*g_Ms[1]
+    cdef long g_M2 = g_Ms[2]*g_Ms[1]
+    cdef long g_M1 = g_Ms[1]
 
     cdef long    g_Tm1 = g_T-1
-    cdef long g_Mm1xTm1 = (g_M-1) * g_Tm1
-    cdef long g_Mm1_2xTm1 = (g_M-1) * g_Mm1xTm1
-    cdef long g_Mm1_3xTm1 = (g_M-1) * g_Mm1_2xTm1
+    cdef long g_Mm1xTm1 = (g_Ms[3]-1) * g_Tm1
+    cdef long g_Mm1_2xTm1 = (g_Ms[2]-1) * g_Mm1xTm1
+    cdef long g_Mm1_3xTm1 = (g_Ms[1]-1) * g_Mm1_2xTm1
 
     inside  = 0
     outside = 0
@@ -313,17 +315,17 @@ def calc_volrat4(long g_T, long g_M, double[:, :, :, ::1] O, double[::1] trngs, 
 
     cdef int i_start_search 
 
-    for m1 in xrange(g_M-1):
+    for m1 in xrange(p_g_Ms[0]-1):
         #print "m1  %d" % m1
-        _m1 = m1*g_M3
-        _m1p1 = (m1+1)*g_M3
-        for m2 in xrange(g_M-1):
+        _m1 = m1*g_M1
+        _m1p1 = (m1+1)*g_M1
+        for m2 in xrange(p_g_Ms[1]-1):
             _m2 = m2*g_M2
             _m2p1 = (m2+1)*g_M2
-            for m3 in xrange(g_M-1):
-                _m3 = m3*g_M
-                _m3p1 = (m3+1)*g_M
-                for m4 in xrange(g_M-1):
+            for m3 in xrange(p_g_Ms[2]-1):
+                _m3 = m3*g_M3
+                _m3p1 = (m3+1)*g_M3
+                for m4 in xrange(p_g_Ms[3]-1):
                     m4p1 = m4+1
                     inboundary = 1
 
@@ -421,7 +423,7 @@ def calc_volrat4(long g_T, long g_M, double[:, :, :, ::1] O, double[::1] trngs, 
                              (d21l > 0) or (d22l > 0) or (d23l > 0) or (d24l > 0) or (d25l > 0) or (d26l > 0) or \
                              (d31l > 0) or (d32l > 0) or (d33l > 0) or (d34l > 0) or \
                              (d41l > 0))):
-                            p_volrat[m1*g_Mm1_3xTm1+ m2*g_Mm1_2xTm1 + m3*g_Mm1xTm1 + m4*g_Tm1 + it] = calc_fine_volrat4(O, g_M, g_Mf, g_Tf, fg_Mf, fg_Tf, m1, m2, m3, m4, tL, dtf, O_zoom, volrat_zoom)
+                            p_volrat[m1*g_Mm1_3xTm1+ m2*g_Mm1_2xTm1 + m3*g_Mm1xTm1 + m4*g_Tm1 + it] = calc_fine_volrat4(O, g_Ms, g_Mf, g_Tf, fg_Mf, fg_Tf, m1, m2, m3, m4, tL, dtf, O_zoom, volrat_zoom)
                         else:  #  not a border
                             if (d01h < 0) and \
                                (d11h<0) and (d12h<0) and (d13h<0) and (d14h<0) and \
@@ -446,7 +448,7 @@ def calc_volrat4(long g_T, long g_M, double[:, :, :, ::1] O, double[::1] trngs, 
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def calc_fine_volrat4(double[:, :, :, ::1] O,  long g_M, long g_Mf, int g_Tf, double fg_Mf, double fg_Tf, long m1, long m2, long m3, long m4, double t, double dtf, double[:, :, :, ::1] O_z, double[:, :, :, :, ::1] vlr_z):
+def calc_fine_volrat4(double[:, :, :, ::1] O,  long[::1] g_Ms, long g_Mf, int g_Tf, double fg_Mf, double fg_Tf, long m1, long m2, long m3, long m4, double t, double dtf, double[:, :, :, ::1] O_z, double[:, :, :, :, ::1] vlr_z):
     #  changes in rescaled-time direction is abrupt, while over marks may not be so abrupt.  Cut box in mark direction in 4 
     cdef double sm = 0.01
 
@@ -465,7 +467,7 @@ def calc_fine_volrat4(double[:, :, :, ::1] O,  long g_M, long g_Mf, int g_Tf, do
 
     #  make a finer grid for O_z
 
-    cdef long m1m2m3m4 = g_M*g_M*g_M*m1 + g_M*g_M*m2 + g_M*m3 + m4
+    cdef long m1m2m3m4 = g_Ms[3]*g_Ms[2]*g_Ms[1]*m1 + g_Ms[3]*g_Ms[2]*m2 + g_Ms[3]*m3 + m4
     cdef double tL, tH
     cdef double d1h, d2h, d3h, d4h, d1l, d2l, d3l, d4l
 
@@ -706,7 +708,7 @@ def find_O2(int g_M, int NT, double[::1] attimes, double[::1] occ, double[:, ::1
                     inboundary = 0
                     
 
-def find_O4(int g_M, int NT, double[::1] attimes, double[::1] occ, double[:, :, :, ::1] O):
+def find_O4(long[::1] g_Ms, int NT, double[::1] attimes, double[::1] occ, double[:, :, :, ::1] O):
     #  for each mark on the grid, loop until O(mk)
     cdef double maxt, att
     cdef int inboundary, i, j, k, l, it
@@ -715,24 +717,25 @@ def find_O4(int g_M, int NT, double[::1] attimes, double[::1] occ, double[:, :, 
     cdef double *p_O      = &O[0, 0, 0, 0]
 
     cdef int ig_M3, jg_M2, kg_M, g_M4, g_M3, g_M2
-    g_M4 = g_M * g_M * g_M * g_M
-    g_M3 = g_M * g_M * g_M 
-    g_M2 = g_M * g_M
-    
-    for i in xrange(g_M):
-        ig_M3 = i*g_M3
-        for j in xrange(g_M):
+
+    g_M1 = g_Ms[1]*g_Ms[2]*g_Ms[3]
+    g_M2 = g_Ms[2]*g_Ms[3]
+    g_M3 = g_Ms[3]
+
+    for i in xrange(g_Ms[0]):
+        ig_M1 = i*g_M1
+        for j in xrange(g_Ms[1]):
             jg_M2 = j*g_M2
-            for k in xrange(g_M):
-                kg_M = k*g_M
-                for l in xrange(g_M):
+            for k in xrange(g_Ms[2]):
+                kg_M3 = k*g_M3
+                for l in xrange(g_Ms[3]):
                     inboundary = 1
                     it = -1
                     while inboundary and (it < NT-1):
                         it += 1
                         att = p_attimes[it]
 
-                        if p_O[ig_M3 + jg_M2 + kg_M + l] >= att:
+                        if p_O[ig_M1 + jg_M2 + kg_M3 + l] >= att:
                             p_occ[it] += 1.
                         else:
                             inboundary = 0

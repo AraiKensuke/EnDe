@@ -363,7 +363,7 @@ def l0_spatial(double[::1] cmp_xt0t1, double cmprs, long M, double dt, double[::
 def adtv_support_pdf_sum(double[::1] gx, double[::1] cond_pstr,
                          int STEPS, int cldz, int small,
                          double dt, double l0, 
-                         int dist, double[::1] params, double[::1] xt0t1, double cmprs):
+                         int dist, double[::1] params, double[::1] cmp_xt0t1, double cmprs):
     """
     This gets called M times per Gibbs sample
     gx      grid @ which to sample pdf.  
@@ -418,8 +418,8 @@ def adtv_support_pdf_sum(double[::1] gx, double[::1] cond_pstr,
 
     cdef double *p_cond_pstr = &cond_pstr[0]
     cdef double *p_gx        = &gx[0]
-    cdef double *p_xt0t1        = &xt0t1[0]
-    cdef int Nt0t1           = xt0t1.shape[0]
+    cdef double *p_cmp_xt0t1        = &cmp_xt0t1[0]
+    cdef int cmp_Nt0t1           = cmp_xt0t1.shape[0]
 
     cdef double *p_params    = &params[0]
 
@@ -455,9 +455,9 @@ def adtv_support_pdf_sum(double[::1] gx, double[::1] cond_pstr,
 
     #initial point, set pmax, gmax
     if dist == __NRM:
-        p_cond_pstr[0] = pdfNRMsum(p_xt0t1, Nt0t1, cmprs, p_gx[0], q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, dt, l0)
+        p_cond_pstr[0] = pdfNRMsum(p_cmp_xt0t1, cmp_Nt0t1, cmprs, p_gx[0], q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, dt, l0)
     elif dist == __IG:
-        p_cond_pstr[0] = pdfIGsum(p_xt0t1, Nt0t1, cmprs, p_gx[0], f_cnd_on, a, B, dt, l0)
+        p_cond_pstr[0] = pdfIGsum(p_cmp_xt0t1, cmp_Nt0t1, cmprs, p_gx[0], f_cnd_on, a, B, dt, l0)
     pmax = p_cond_pstr[0]
     gmax = pmax
     imax = 0
@@ -492,7 +492,7 @@ def adtv_support_pdf_sum(double[::1] gx, double[::1] cond_pstr,
             #   prior
 
             for strt <= ix < stop+1 by skp:
-                p_cond_pstr[ix] = pdfNRMsum(p_xt0t1, Nt0t1, cmprs, p_gx[ix], q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, dt, l0)
+                p_cond_pstr[ix] = pdfNRMsum(p_cmp_xt0t1, cmp_Nt0t1, cmprs, p_gx[ix], q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, dt, l0)
 
                 if p_cond_pstr[ix] > pmax:
                     pmax = p_cond_pstr[ix]   # pmax updated each time grid made finer
@@ -503,7 +503,7 @@ def adtv_support_pdf_sum(double[::1] gx, double[::1] cond_pstr,
             #   prior
             #   p_gx[ix]   values of q2
             for strt <= ix < stop+1 by skp:
-                p_cond_pstr[ix] = pdfIGsum(p_xt0t1, Nt0t1, cmprs, p_gx[ix], f_cnd_on, a, B, dt, l0)
+                p_cond_pstr[ix] = pdfIGsum(p_cmp_xt0t1, cmp_Nt0t1, cmprs, p_gx[ix], f_cnd_on, a, B, dt, l0)
 
                 if p_cond_pstr[ix] > pmax:
                     pmax = p_cond_pstr[ix]   # pmax updated each time grid made finer
