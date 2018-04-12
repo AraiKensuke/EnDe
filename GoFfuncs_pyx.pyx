@@ -187,6 +187,7 @@ class GoFfuncs:
 
         cdef int nt = 0
         l0   = _N.array(prms[uFE][0])
+        print l0
         nonzero = _N.where(l0 > 0.001)[0]
         Mnz    = len(nonzero)
 
@@ -201,6 +202,8 @@ class GoFfuncs:
             mnz    = nonzero[m]
             his[m]    = us[mnz] + 5*_N.sqrt(_N.diagonal(covs[mnz]))  #  unit
             los[m]    = us[mnz] - 5*_N.sqrt(_N.diagonal(covs[mnz]))  #  unit
+
+            print _N.sqrt(_N.diagonal(covs[mnz]))
             cand_grd_szs[m] = _N.sqrt(_N.diagonal(covs[mnz]))/smpsPerSD
 
         all_his = _N.max(his, axis=0)

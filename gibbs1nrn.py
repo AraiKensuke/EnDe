@@ -103,7 +103,7 @@ class MarkAndRF:
         oo.xLo = xLo
         oo.xHi = xHi
 
-    def setup_spatial_sum_params(self, q2x=None, f=None, n_q2_lvls=12, q_mlt_steps=2, q_min=0.01, bins_per_sd=5): 
+    def setup_spatial_sum_params(self, q2x=None, fx=None, n_q2_lvls=12, q_mlt_steps=2, q_min=0.01, bins_per_sd=5):
         """
         *q_mlt_steps=2  means spatial bins [0.01, 0.02, 0.04, 0.08]...
         *if my q2 is bigger than max level, i'll just end up using more bins than neccessary. no prob
@@ -119,6 +119,8 @@ class MarkAndRF:
         for i in xrange(1, n_q2_lvls):
             oo.q2_lvls[i] = q2_mlt_steps*oo.q2_lvls[i-1]
             oo.Nupx_lvls[i] = int(_N.ceil(((oo.xHi-oo.xLo)/_N.sqrt(oo.q2_lvls[i]))*bins_per_sd))
+            #  Nupx_lvls should not be too small.  how finely 
+            oo.Nupx_lvls[i] = 40 if oo.Nupx_lvls[i] < 40 else oo.Nupx_lvls[i]
 
     def gibbs(self, ITERS, K, priors, ep1=0, ep2=None, saveSamps=True, saveOcc=True, doSepHash=True, nz_pth=0., smth_pth_ker=0, f_STEPS=13, q2_STEPS=13, f_SMALL=10, q2_SMALL=10, f_cldz=10, q2_cldz=10, minSmps=20, diag_cov=False, earliest=20000, cmprs=1):
         """
@@ -313,3 +315,32 @@ class MarkAndRF:
                         raise
 
                     smp_sp_prms[oo.ky_p_l0, itr] = l0
+        oo.finish()
+
+    def finish(self):
+        oo = self
+        ITERS = oo.smp_sp_prms.shape[1]
+        frms = _pU.find_good_clstrs_and_stationary_from(1, oo.smp_sp_prms[:, 0:ITERS])
+
+        l_trlsNearMAP = []
+
+        skp = 2
+        print "-------------"
+        #  marginal posteriors of the spatial and cluster params
+        frm       = frms[0]
+        f_smps    = oo.smp_sp_prms[1, frm:ITERS:skp]
+        _f_u      = _N.mean(f_smps)
+        _f_q2     = _N.std(f_smps)**2
+            #  hyper params to be copied to _f_u, _f_s
+
+        ##########################
+        _l0_a, _l0_B = _pU.gam_inv_gam_dist_ML(oo.smp_sp_prms[0, frm:ITERS:skp], dist=_pU._GAMMA, clstr=0)
+        ##########################
+        _q2_a, _q2_B = _pU.gam_inv_gam_dist_ML(oo.smp_sp_prms[2, frm:ITERS:skp], dist=_pU._INV_GAMMA, clstr=0)
+
+        #  modes
+        oo.sp_prmPstMd[oo.ky_p_f] = _f_u
+        oo.sp_prmPstMd[oo.ky_p_l0] = (_l0_a - 1) / _l0_B
+        oo.sp_prmPstMd[oo.ky_p_q2] = _q2_B / (_q2_a + 1) 
+
+        

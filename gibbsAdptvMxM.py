@@ -105,6 +105,8 @@ class MarkAndRF:
         for i in xrange(1, n_q2_lvls):
             oo.q2_lvls[i] = q2_mlt_steps*oo.q2_lvls[i-1]
             oo.Nupx_lvls[i] = int(_N.ceil(((oo.xHi-oo.xLo)/_N.sqrt(oo.q2_lvls[i]))*bins_per_sd))
+            #  Nupx_lvls should not be too small.  how finely 
+            oo.Nupx_lvls[i] = 40 if oo.Nupx_lvls[i] < 40 else oo.Nupx_lvls[i]
 
         oo.binszs     = float(oo.xHi-oo.xLo)/oo.Nupx_lvls
         oo.q2_L, oo.q2_H = q2x

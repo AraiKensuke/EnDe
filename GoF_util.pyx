@@ -295,9 +295,10 @@ def calc_volrat4(long g_T, long[::1] g_Ms, double[:, :, :, ::1] O, double[::1] t
 
     cdef long it, inboundary, i_here, i_til_end
 
-    cdef long g_M3 = g_Ms[3]*g_Ms[2]*g_Ms[1]
-    cdef long g_M2 = g_Ms[2]*g_Ms[1]
-    cdef long g_M1 = g_Ms[1]
+    cdef long g_M3 = g_Ms[3]
+    cdef long g_M2 = g_Ms[3]*g_Ms[2]
+    cdef long g_M1 = g_Ms[3]*g_Ms[2]*g_Ms[1]
+
 
     cdef long    g_Tm1 = g_T-1
     cdef long g_Mm1xTm1 = (g_Ms[3]-1) * g_Tm1
@@ -661,7 +662,7 @@ def calc_fine_volrat4(double[:, :, :, ::1] O,  long[::1] g_Ms, long g_Mf, int g_
 
     return _N.mean(vlr_z)
 
-def find_O(int g_M, int NT, double[::1] attimes, double[::1] occ, double[::1] O):
+def find_Occ(int g_M, int NT, double[::1] attimes, double[::1] occ, double[::1] O):
     #  for each mark on the grid, loop until O(mk)
     cdef double maxt, att
     cdef int inboundary, i, j, it
@@ -683,7 +684,7 @@ def find_O(int g_M, int NT, double[::1] attimes, double[::1] occ, double[::1] O)
             else:
                 inboundary = 0
 
-def find_O2(int g_M, int NT, double[::1] attimes, double[::1] occ, double[:, ::1] O):
+def find_Occ2(int g_M, int NT, double[::1] attimes, double[::1] occ, double[:, ::1] O):
     #  for each mark on the grid, loop until O(mk)
     cdef double maxt, att
     cdef int inboundary, i, j, it
@@ -708,8 +709,8 @@ def find_O2(int g_M, int NT, double[::1] attimes, double[::1] occ, double[:, ::1
                     inboundary = 0
                     
 
-def find_O4(long[::1] g_Ms, int NT, double[::1] attimes, double[::1] occ, double[:, :, :, ::1] O):
-    #  for each mark on the grid, loop until O(mk)
+def find_Occ4(long[::1] g_Ms, int NT, double[::1] attimes, double[::1] occ, double[:, :, :, ::1] O):
+    #  at given rescaled time, number of mark voxels < boundary (rescaled time)
     cdef double maxt, att
     cdef int inboundary, i, j, k, l, it
     cdef double *p_attimes = &attimes[0]
