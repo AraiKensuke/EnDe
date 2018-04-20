@@ -254,11 +254,13 @@ def smp_q2(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
         p_adtv_pdf_params[1] = SL_B
         p_adtv_pdf_params[2] = fm
 
+
         adtvInds, N = adtv_support_pdf(qx2, cpq22, q2_STEPS, f_cldz, f_SMALL, dt, l0[m], _IG, adtv_pdf_params, )
+        #  look at qx2[adtvInds], cpq22[adtvInds]
         p_q2[m] = adtv_smp_cdf_interp(qx2[adtvInds], cpq22[adtvInds], N, m, m_rands)
-        dat = _N.empty((len(adtvInds), 2))
-        dat[:, 0] = qx2[adtvInds]
-        dat[:, 1] = cpq22[adtvInds]
+        # dat = _N.empty((len(adtvInds), 2))
+        # dat[:, 0] = qx2[adtvInds]
+        # dat[:, 1] = cpq22[adtvInds]
         # fn = _U.uniqFN("adtv%d" % m, serial=True, iStart=0)
         # _N.savetxt(fn, dat, fmt="%.4e %.4e")
 
