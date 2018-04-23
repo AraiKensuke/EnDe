@@ -221,7 +221,55 @@ def evalAtFxdMks_new(double[:, ::1] fxdMks, double[::1] l0, double[:, ::1] us, d
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef void CIFatFxdMks_nogil(double *p_fxdMk, double* p_x, double* p_l0dt_i2pidcovs, double* p_us, double* p_iSgs, double* p_f, double *p_iq2, double* p_zs, double* p_qdr_mk, double* p_qdr_sp, long M, long Nx, long mdim, double dt) nogil:
+def CIFatFxdMks_mv(double[::1] mv_fxdMk, double[::1] mv_x, double[::1] mv_l0dt_i2pidcovs, double[:, ::1] mv_us, double[:, :, ::1] mv_iSgs, double[::1] mv_f, double[::1] mv_iq2, double[::1] mv_zs, double[::1] mv_qdr_mk, double[:, ::1] mv_qdr_sp, long M, long Nx, long mdim, double dt):
+    #   x:       Nx
+    #   fxdMks:  mdim
+    #   l0s   :  M
+    #   us    :  M x mdim
+    #   fs    :  M
+    #   iSgs  :  M x mdim x mdim
+    #   i2pidcovs  :  M x (mdim + 1) x (mdim + 1)
+    #   zs:      Nx
+    #   qdrsp is M x Nxdim      m*Nx + ix
+
+    #cdef double zs
+    cdef long cmdim, cmdim2, i, j, k, ix, c, cNx
+    cdef double tmp
+    cdef double qdr_sp
+    cdef double arg
+
+    cdef double fc, iq2c
+
+    for 0 <= c < M:    #  calculate the mark-contribution first.
+        iq2c = mv_iq2[c]
+        fc = mv_f[c]
+        tmp = 0
+        cNx    = c*Nx
+
+        for 0 <= j < mdim:
+            k = j
+            tmp += (mv_fxdMk[j]-mv_us[c,j]) * mv_iSgs[c, j, k] * (mv_fxdMk[k]-mv_us[c, k])
+            for j+1 <= k < mdim:
+                tmp += 2* (mv_fxdMk[j]-mv_us[c, j]) * mv_iSgs[c, j, k] * (mv_fxdMk[k]-mv_us[c, k])
+
+        mv_qdr_mk[c] = tmp
+
+    for 0 <= ix < Nx:  #  the mark contribution constant, modulating it by spatial contribution
+        tmp = 0
+        for 0 <= c < M:    #  calculate the mark-contribution first.
+            #qdr_sp = (p_x[ix] - p_f[c])*(p_x[ix] - p_f[c])*p_iq2[c]
+
+            arg = mv_qdr_sp[c, ix] +mv_qdr_mk[c]
+            if arg < 16:  #  contribution large enough
+                tmp += mv_l0dt_i2pidcovs[c]*exp(-0.5*arg)
+        mv_zs[ix] = tmp
+
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+#cdef void CIFatFxdMks_nogil(double *p_fxdMk, double* p_x, double* p_l0dt_i2pidcovs, double* p_us, double* p_iSgs, double* p_f, double *p_iq2, double* p_zs, double* p_qdr_mk, double* p_qdr_sp, long M, long Nx, long mdim, double dt) nogil:
+cdef void CIFatFxdMks_nogil(double *p_fxdMk, double* p_l0dt_i2pidcovs, double* p_us, double* p_iSgs, double* p_f, double *p_iq2, double* p_zs, double* p_qdr_mk, double* p_qdr_sp, long M, long Nx, long mdim, double dt) nogil:
     #   x:       Nx
     #   fxdMks:  mdim
     #   l0s   :  M
@@ -256,17 +304,6 @@ cdef void CIFatFxdMks_nogil(double *p_fxdMk, double* p_x, double* p_l0dt_i2pidco
 
         p_qdr_mk[c] = tmp
 
-    """
-    for 0 <= ix < Nx:  #  the mark contribution constant, modulating it by spatial contribution
-        tmp = 0
-        for 0 <= c < M:    #  calculate the mark-contribution first.
-            qdr_sp = (p_x[ix] - p_f[c])*(p_x[ix] - p_f[c])*p_iq2[c]
-
-            if (qdr_sp +p_qdr_mk[c]) < 16:  #  contribution large enough
-                tmp += p_l0dt_i2pidcovs[c]*exp(-0.5*(qdr_sp + p_qdr_mk[c]))
-        p_zs[ix] = tmp
-    """
-
     for 0 <= ix < Nx:  #  the mark contribution constant, modulating it by spatial contribution
         tmp = 0
         for 0 <= c < M:    #  calculate the mark-contribution first.
@@ -279,3 +316,49 @@ cdef void CIFatFxdMks_nogil(double *p_fxdMk, double* p_x, double* p_l0dt_i2pidco
 
 
 
+"""
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef void CIFatFxdMks_kde_nogil(double *p_fxdMk, double* p_x, double* p_l0dt_i2pidcovs, double* p_us, double* p_iSgs, double* p_f, double *p_iq2, double* p_zs, double* p_qdr_mk, double* p_qdr_sp, long M, long Nx, long mdim, double dt) nogil:
+    #   x:       Nx
+    #   fxdMks:  mdim
+    #   l0s   :  M
+    #   us    :  M x mdim
+    #   fs    :  M
+    #   iSgs  :  M x mdim x mdim
+    #   i2pidcovs  :  M x (mdim + 1) x (mdim + 1)
+    #   zs:      Nx
+    #   qdrsp is M x Nxdim      m*Nx + ix
+
+    #cdef double zs
+    cdef long cmdim, cmdim2, i, j, k, ix, c, cNx
+    cdef double tmp
+    cdef double qdr_sp
+    cdef double arg
+
+    cdef double fc, iq2c
+
+    for 0 <= c < M:    #  calculate the mark-contribution first.
+        iq2c = p_iq2[c]
+        fc = p_f[c]
+        tmp = 0
+        cmdim  = c*mdim
+        cmdim2 = cmdim*mdim
+        cNx    = c*Nx
+
+        for 0 <= j < mdim:
+            tmp += (p_fxdMk[j]-p_us[cmdim+j]) * p_iSgs[cmdim2 + j*mdim + j] * (p_fxdMk[k]-p_us[cmdim+k])
+
+        p_qdr_mk[c] = tmp
+
+    for 0 <= ix < Nx:  #  the mark contribution constant, modulating it by spatial contribution
+        tmp = 0
+        for 0 <= c < M:    #  calculate the mark-contribution first.
+            arg = p_qdr_sp[c*Nx + ix] +p_qdr_mk[c]
+            if arg < 16:  #  contribution large enough
+                tmp += p_l0dt_i2pidcovs[c]*exp(-0.5*arg)
+        #  xt is xix 
+        #  bx2 = bx*bx
+        #  occ[ix] = _N.sum(_N.exp(-0.5*(xix-f[c])**2/bx2)
+        p_zs[ix] = tmp
+"""

@@ -55,28 +55,21 @@ class GoFfuncs:
     xHi      = 3
     mLo      = -2
     mHi      = 8
-    chmins   = None
 
     sts_per_tet = None
     _sts_per_tet = None
     svMkIntnsty = None   #  save just the mark intensities
 
     ##  X_   and _X
-    def __init__(self, Nx=61, kde=False, bx=None, Bx=None, Bm=None, mkfn=None, encfns=None, K=None, xLo=0, xHi=3, maze=mz_CRCL, spdMult=0.1, ignorespks=False, chmins=None, rotate=False):
+    def __init__(self, Nx=61, kde=False, mkfn=None, encfns=None, K=None, xLo=0, xHi=3, maze=mz_CRCL, spdMult=0.1, rotate=False):
         """
         """
         oo = self
         oo.Nx = Nx
         oo.maze = maze
         oo.kde = kde
-        if chmins is not None:
-            oo.chmins = chmins
-        else:
-            oo.chmins = _N.ones(K)*-10000
 
         oo.spdMult = spdMult
-        oo.ignorespks = ignorespks
-        oo.bx = bx;   oo.Bx = Bx;   oo.Bm = Bm
         #  read mkfns
         _sts   = []#  a mark on one of the several tetrodes
         oo._sts_per_tet = []
@@ -183,7 +176,7 @@ class GoFfuncs:
 
 
     #####################   GoF tools
-    def getGridDims(self, g_M, prms, smpsPerSD, obsvd_mks):
+    def getGridDims(self, method, prms, smpsPerSD, obsvd_mks):
         #  the max-min range needed for each dimension calculated 
         #  by taking the extreme values of u +/- 5*sd for each cluster
         #  g_M then dividing that by smpsPerSD*sd of each cluster, and finding
@@ -264,25 +257,7 @@ class GoFfuncs:
 
         
 
-
-    #####################   GoF tools
-    def mark_ranges(self, g_M):
-        oo = self
-        mk_ranges = _N.empty((oo.mdim, g_M))
-
-        #mgrid     = _N.empty([oo.nTets] + [g_M]*oo.mdim)
-
-        for im in xrange(oo.mdim):
-            sts = _N.where(oo.mkpos[:, 1] == 1)[0]
-
-            mL  = _N.min(oo.mkpos[sts, 2+im])
-            mH  = _N.max(oo.mkpos[sts, 2+im])
-            A   = mH - mL
-            mk_ranges[im] = _N.linspace(mL - 0.03*A, mH + 0.03*A, g_M, endpoint=True)
-
-        return mk_ranges
-
-    def rescale_spikes(self, prms, t0, t1, kde=False):
+    def rescale_spikes(self, prms, t0, t1, spc_occ, kde=False):
         """
         uFE    which epoch fit to use for encoding model
         prms posterior params
@@ -296,20 +271,15 @@ class GoFfuncs:
         i2pidcovs  = []
         i2pidcovsr = []
 
-        if not kde:
-            l0s = _N.array(prms[0])
-            us  = _N.array(prms[5])
-            covs= _N.array(prms[6])
+        l0s = _N.array(prms[0])
+        us  = _N.array(prms[5])
+        covs= _N.array(prms[6])
 
-            M   = covs.shape[0]
+        M   = covs.shape[0]
 
-            iSgs= _N.linalg.inv(covs)
-            i2pidcovs = (1/_N.sqrt(2*_N.pi))**(oo.mdim+1)*(1./_N.sqrt(_N.linalg.det(covs)))
-            l0sr = _N.array(l0s)
-        else:
-            ibx2   = 1. / (oo.bx * oo.bx)
-            sptl   = -0.5*ibx2*(oo.xpr - oo.tr_pos)**2  #  this piece doesn't need to be evalu
-
+        iSgs= _N.linalg.inv(covs)
+        i2pidcovs = (1/_N.sqrt(2*_N.pi))**(oo.mdim+1)*(1./_N.sqrt(_N.linalg.det(covs)))
+        l0sr = _N.array(l0s)
 
         fxdMks = _N.empty((oo.Nx, oo.mdim+1))  #  for each pos, a fixed mark
         fxdMks[:, 0] = oo.xp
@@ -319,17 +289,23 @@ class GoFfuncs:
         for t in xrange(t0+1, t1): # start at 1 because initial condition
             if (oo.mkpos[t, 1] == 1):
                 fxdMks[:, 1:] = oo.mkpos[t, 2:]
-                if kde:   #  kerFr returns lambda(m, x) for all x
-                    mkint = _ku.kerFr(fxdMks[0, 1:], sptl, oo.tr_marks, oo.mdim, oo.Bx, oo.Bm, oo.bx, oo.dxp, oo.occ)
-                else:     #  evalAtFxdMks returns lambda(m, x) for all x
-                    mkint = _hb.evalAtFxdMks_new(fxdMks, l0s, us, iSgs, i2pidcovs, M, oo.Nx, oo.mdim + 1)*oo.dt
+
+                mkint = _hb.evalAtFxdMks_new(fxdMks, l0s, us, iSgs, i2pidcovs, M, oo.Nx, oo.mdim + 1)*oo.dt
+
+                # if not kde:
+                #     _hb.CIFatFxdMks_nogil(p_mk, p_xp, p_l0dt_i2pidcovs, p_us, p_iCovs, p_fs, p_iq2s, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, M, ooNx, mdim, ddt)
+                # else:
+                #     _hb.CIFatFxdMks_nogil(p_mk, p_xp, p_l0dt_i2pidcovs, p_us, p_iCovs, p_fs, p_iq2s, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, M, ooNx, mdim, ddt)
 
                 lst = [_N.sum(mkint[disc_pos[t0+1:t1]]), _N.sum(mkint[disc_pos[t0+1:t]])]
+
+                #lst = [_N.sum(p_CIF_at_grid_mks[disc_pos[t0+1:t1]]), _N.sum(p_CIF_at_grid_mks[disc_pos[t0+1:t]])]  #  actual rescaled time is 2nd element.  1st element used to draw boundary for 1D mark
                 lst.extend(oo.mkpos[t, 2:].tolist())
 
                 rscld.append(lst)
 
         return rscld
+
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -344,14 +320,11 @@ class GoFfuncs:
         oo = self
         ##  each 
 
-        #disc_pos = _N.array((oo.pos - oo.xLo) * (oo.Nx/(oo.xHi-oo.xLo)), dtype=_N.int)
         pos_hstgrm_t0t1, bns = _N.histogram(oo.pos[t0:t1], _N.linspace(oo.xLo, oo.xHi, oo.Nx+1, endpoint=True))
 
         cdef long[::1] mv_pos_hstgrm_t0t1 = pos_hstgrm_t0t1
         cdef long* p_pos_hstgrm_t0t1    = &mv_pos_hstgrm_t0t1[0]
 
-        #cdef long[::1] mv_disc_pos = disc_pos
-        #cdef long* p_disc_pos    = &mv_disc_pos[0]
         cdef double[:, ::1] mv_mrngs = mrngs
         cdef double* p_mrngs     = &mv_mrngs[0, 0]
 
@@ -446,8 +419,6 @@ class GoFfuncs:
         cdef double[::1] mv_iq2s = iq2s
         cdef double* p_iq2s   = &mv_iq2s[0]
 
-        cdef double[:, :, ::1] mv_iSgs = iSgs
-        cdef double* p_iSgs   = &mv_iSgs[0, 0, 0]
         cdef double[::1] mv_l0dt_i2pidcovs = l0dt_i2pidcovs
         cdef double* p_l0dt_i2pidcovs   = &mv_l0dt_i2pidcovs[0]
         cdef double[:, :, ::1] mv_iCovs = iCovs
@@ -542,7 +513,7 @@ class GoFfuncs:
                                     p_mk[1] = p_mrngs[g_M + i1]   #  mrngs is 4 vecs of dim g_M
                                     p_mk[2] = p_mrngs[2*g_M + i2]
                                     p_mk[3] = p_mrngs[3*g_M + i3]
-                                    _hb.CIFatFxdMks_nogil(p_mk, p_xp, p_l0dt_i2pidcovs, p_us, p_iCovs, p_fs, p_iq2s, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, M, ooNx, mdim, ddt)
+                                    _hb.CIFatFxdMks_nogil(p_mk, p_l0dt_i2pidcovs, p_us, p_iCovs, p_fs, p_iq2s, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, M, ooNx, mdim, ddt)
                                     p_O[ii] = 0
 
                                     for nn in xrange(ooNx):
@@ -600,64 +571,62 @@ class GoFfuncs:
 
 
 
-    # def max_rescaled_T_at_mark_KDE(self, mrngs, long g_M, prms, uFE, long t0, long t1, long rad, char iskde, smpld_marks=None):
+    # @cython.boundscheck(False)
+    # @cython.wraparound(False)
+    # def max_rescaled_T_at_mark_KDE(self, mrngs, long[::1] g_Ms, prms, long t0, long t1, char iskde, double smpsPerSD):
     #     """
-    #     uFE    which epoch fit to use for encoding model
+    #     method to calculate boundary depends on the model
     #     prms posterior params
     #     use params to decode marks from t0 to t1
 
     #     mrngs     # nTets x mdim x M
     #     """
-    #     print "epoch used for encoding: %d" % uFE
     #     oo = self
     #     ##  each 
 
-    #     disc_pos = _N.array((oo.pos - oo.xLo) * (oo.Nx/(oo.xHi-oo.xLo)), dtype=_N.int)
-    #     cdef long[::1] mv_disc_pos = disc_pos
-    #     cdef long* p_disc_pos    = &mv_disc_pos[0]
-    #     cdef double[:, :, ::1] mv_mrngs = mrngs
-    #     cdef double* p_mrngs     = &mv_mrngs[0, 0, 0]
+    #     #disc_pos = _N.array((oo.pos - oo.xLo) * (oo.Nx/(oo.xHi-oo.xLo)), dtype=_N.int)
+    #     pos_hstgrm_t0t1, bns = _N.histogram(oo.pos[t0:t1], _N.linspace(oo.xLo, oo.xHi, oo.Nx+1, endpoint=True))
 
-    #     oo.svMkIntnsty = []
-    #     l0dt_i2pidcovs = []
-    #     us  = []
-    #     covs= []
-    #     fs  = []
-    #     q2s = []
-    #     M   = []
-    #     iSgs= []
-    #     #i2pidcovs = []
-    #     #i2pidcovsr = []
+    #     cdef long[::1] mv_pos_hstgrm_t0t1 = pos_hstgrm_t0t1
+    #     cdef long* p_pos_hstgrm_t0t1    = &mv_pos_hstgrm_t0t1[0]
+
+    #     #cdef long[::1] mv_disc_pos = disc_pos
+    #     #cdef long* p_disc_pos    = &mv_disc_pos[0]
+    #     cdef double[:, ::1] mv_mrngs = mrngs
+    #     cdef double* p_mrngs     = &mv_mrngs[0, 0]
+
     #     sptl= []
-    #     cdef long g_M2 = g_M*g_M
-    #     cdef long g_M3 = g_M*g_M2
-    #     cdef long g_M4 = g_M*g_M3
 
-    #     if iskde == 0:
-    #         for nt in xrange(oo.nTets):
-    #             #l0s.append(prms[nt][uFE][0])
-    #             us.append(prms[nt][uFE][1])
-    #             covs.append(prms[nt][uFE][2])
-    #             fs.append(prms[nt][uFE][3])
-    #             q2s.append(prms[nt][uFE][4])
-    #             #fs_us.append(prms[nt][uFE][5])
-    #             #q2s_covs.append()
+    #     #  4dim
+    #     #ii = ii0*g_Ms[1]*g_Ms[2]*g_Ms[3]+ ii1*g_Ms[2]*g_Ms[3]+ ii2*g_Ms[3]+ ii3
+    #     #ii = ii0*g_M1 + ii1*g_M2 + ii2*g_M3 + ii3
+    #     #  2dim
+    #     #ii = ii0*g_Ms[1]+ ii1
+    #     #ii = ii0*g_M1
+    #     cdef long g_M1, g_M2, g_M3
+    #     cdef long g_M = _N.max(g_Ms)
+    #     if oo.mdim  == 2:
+    #         g_M1 = g_Ms[1]
+    #     elif oo.mdim  == 4:
+    #         g_M1 = g_Ms[1]*g_Ms[2]*g_Ms[3]
+    #         g_M2 = g_Ms[2]*g_Ms[3]
+    #         g_M3 = g_Ms[3]
 
-    #             M.append(covs[nt].shape[0])
+    #     l0   = _N.array(prms[0])
+        
+    #     us   = _N.array(prms[1])
+    #     fs   = _N.array(prms[2])
 
-    #             iSgs.append(_N.linalg.inv(prms[nt][uFE][6]))
-    #             l0dt = (prms[nt][uFE][0]*oo.dt)
-    #             i2pidcovs = (_N.sqrt(2*_N.pi)**(oo.mdim+1))*_N.sqrt(_N.linalg.det(prms[nt][uFE][6]))
+    #     cdef long N  = covs.shape[0]
 
-    #             l0dt_i2pidcovs.append(l0dt/i2pidcovs)
-    #             #i2pidcovsr.append(i2pidcovs.reshape((M, 1)))
-    #             #l0dt = _N.array(l0s[0][:, 0]*oo.dt)  # for nt==0
-    #     else:
-    #         ibx2   = 1. / (oo.bx * oo.bx)
-    #         for nt in xrange(oo.nTets):
-    #             sptl.append(-0.5*ibx2*(oo.xpr - oo.tr_pos[nt])**2)  #  this piece doesn't need to be evalu
+    #     l0dt = _N.array(prms[0]*oo.dt)
 
-    #     nt    = 0
+    #     i2pidcovs = _N.array((_N.sqrt(2*_N.pi)**(oo.mdim+1))*_N.sqrt(_N.linalg.det(prms[6])))
+
+    #     l0dt_i2pidcovs = l0dt/i2pidcovs
+
+    #     iCovs        = _N.linalg.inv(covs)
+    #     iq2s          = _N.array(1./q2s)
 
     #     cdef char* p_O01
     #     cdef char[::1] mv_O011
@@ -668,236 +637,203 @@ class GoFfuncs:
     #     cdef double[:, ::1] mv_O2
     #     cdef double[:, :, :, ::1] mv_O4
 
-    #     cdef long i0, i1, i2, i3
     #     if oo.mdim == 1:
-    #         O = _N.zeros(g_M)   #  where lambda is near 0, so is O
-    #         O01 = _N.zeros(g_M, dtype=_N.uint8)   #  where lambda is near 0, so is O
-    #         mv_O011 = O01
-    #         p_O01 = &mv_O011[0]
+    #         O = _N.zeros(g_Ms[0])   #  where lambda is near 0, so is O
     #         mv_O1   = O
     #         p_O    = &mv_O1[0]
     #     elif oo.mdim == 2:
-    #         O = _N.zeros([g_M, g_M])
-    #         O01 = _N.zeros([g_M, g_M], dtype=_N.uint8)   #  where lambda is near 0, so is O
-    #         mv_O012 = O01
-    #         p_O01 = &mv_O012[0, 0]
+    #         O = _N.zeros([g_Ms[0], g_Ms[1]])
     #         mv_O2   = O
     #         p_O    = &mv_O2[0, 0]
     #     elif oo.mdim == 4:
-    #         O = _N.zeros([g_M, g_M, g_M, g_M])
-    #         O01 = _N.zeros([g_M, g_M, g_M, g_M], dtype=_N.uint8)   #  where lambda is near 0, so is O
-    #         mv_O014 = O01
-    #         p_O01 = &mv_O014[0, 0, 0, 0]
+    #         O = _N.zeros([g_Ms[0], g_Ms[1], g_Ms[2], g_Ms[3]])
     #         mv_O4   = O
     #         p_O    = &mv_O4[0, 0, 0, 0]
+    #         O01 = _N.zeros([g_Ms[0], g_Ms[1], g_Ms[2], g_Ms[3]], dtype=_N.uint8)   #  where lambda is near 0, so is O
+    #         mv_O014 = O01
+    #         p_O01 = &mv_O014[0, 0, 0, 0]
 
-    #     #mk = _N.empty((oo.Nx, oo.mdim+1))
+
     #     mk = _N.empty(oo.mdim)
-    #     #mk[:, 0] = oo.xp
     #     cdef double[::1] mv_mk = mk
     #     cdef double* p_mk         = &mv_mk[0]
     #     cdef double[::1] mv_xp    = oo.xp
     #     cdef double* p_xp         = &mv_xp[0]
 
-    #     #  temp
-    #     mxval = _N.zeros((g_M, oo.Nx))
-    #     cdef double[:, ::1] mxval_mv = mxval   #  memory view
-    #     cdef double *p_mxval         = &mxval_mv[0, 0]
-
-    #     disc_pos_t0t1 = _N.array(disc_pos[t0+1:t1])
-    #     cdef long[::1] mv_disc_pos_t0t1 = disc_pos_t0t1
-    #     cdef long* p_disc_pos_t0t1      = &mv_disc_pos_t0t1[0]
-
+    #     #disc_pos_t0t1 = _N.array(disc_pos[t0+1:t1])
+    #     #cdef long[::1] mv_disc_pos_t0t1 = disc_pos_t0t1
+    #     #cdef long* p_disc_pos_t0t1      = &mv_disc_pos_t0t1[0]
 
     #     cdef long ooNx = oo.Nx
-    #     cdef long Mnt
     #     cdef long pmdim = oo.mdim + 1
     #     cdef long mdim = oo.mdim
     #     cdef double ddt = oo.dt
-    #     if iskde == 0:
-    #         usnt          = _N.array(us[nt])
-    #         iSgsnt        = _N.array(iSgs[nt])
-    #         iCovsnt        = _N.linalg.inv(covs[nt])
-    #         l0dt_i2pidcovsnt   = _N.array(l0dt_i2pidcovs[nt])
 
-    #         fsnt          = _N.array(fs[nt])
-    #         iq2snt          = _N.array(1./q2s[nt])
-    #         Mnt             = M[nt]
-
-    #     qdr_mk    = _N.empty(Mnt)
+    #     qdr_mk    = _N.empty(M)
     #     cdef double[::1] mv_qdr_mk = qdr_mk
     #     cdef double* p_qdr_mk      = &mv_qdr_mk[0]
-    #     qdr_sp    = _N.empty((Mnt, oo.Nx))
+    #     qdr_sp    = _N.empty((M, oo.Nx))
     #     cdef double[:, ::1] mv_qdr_sp = qdr_sp
     #     cdef double* p_qdr_sp      = &mv_qdr_sp[0, 0]
 
-    #     cdef double[:, ::1] mv_usnt = usnt
-    #     cdef double* p_usnt   = &mv_usnt[0, 0]
-    #     cdef double[::1] mv_fsnt = fsnt
-    #     cdef double* p_fsnt   = &mv_fsnt[0]
-    #     cdef double[::1] mv_iq2snt = iq2snt
-    #     cdef double* p_iq2snt   = &mv_iq2snt[0]
+    #     cdef double[:, ::1] mv_us = us
+    #     cdef double* p_us   = &mv_us[0, 0]
+    #     cdef double[::1] mv_fs = fs
+    #     cdef double* p_fs   = &mv_fs[0]
+    #     cdef double[::1] mv_iq2s = iq2s
+    #     cdef double* p_iq2s   = &mv_iq2s[0]
 
-    #     cdef double[:, :, ::1] mv_iSgsnt = iSgsnt
-    #     cdef double* p_iSgsnt   = &mv_iSgsnt[0, 0, 0]
-    #     cdef double[::1] mv_l0dt_i2pidcovsnt = l0dt_i2pidcovsnt
-    #     cdef double* p_l0dt_i2pidcovsnt   = &mv_l0dt_i2pidcovsnt[0]
-    #     cdef double[:, :, ::1] mv_iCovsnt = iCovsnt
-    #     cdef double* p_iCovsnt   = &mv_iCovsnt[0, 0, 0]
+    #     cdef double[::1] mv_l0dt_i2pidcovs = l0dt_i2pidcovs
+    #     cdef double* p_l0dt_i2pidcovs   = &mv_l0dt_i2pidcovs[0]
+    #     cdef double[:, :, ::1] mv_iCovs = iCovs
+    #     cdef double* p_iCovs   = &mv_iCovs[0, 0, 0]
 
-    #     #cdef double[::1] mv_l0dt_i2pidcovsnt = l0dt
-    #     #cdef double* p_l0dt      = &mv_l0dt[0]
+    #     LLcrnr = mrngs[:, 0]   # lower left hand corner
+    #     cdef double LLcrnr0=mrngs[0, 0]
+    #     cdef double LLcrnr1=mrngs[1, 0]
+    #     cdef double LLcrnr2=mrngs[2, 0]
+    #     cdef double LLcrnr3=mrngs[3, 0]
 
-    #     LLcrnr = mrngs[nt, :, 0]   # lower left hand corner
-
-    #     dm = _N.array(_N.diff(mrngs[0])[:, 0])
+    #     #  mrngs is mdim x g_Ms
+    #     dm = _N.array(_N.diff(mrngs)[:, 0])   #  dm dimension is mdim
     #     cdef double[::1] mv_dm = dm   #  memory view
     #     cdef double *p_dm         = &mv_dm[0]
 
-    #     cdef double[:, ::1] mv_smpld_marks
-    #     cdef double* p_smpld_marks
-
-    #     cdef long s, i0_l, i0_h, i1_l, i1_h, i2_l, i2_h, i3_l, i3_h
-    #     CIF_at_grid_mks = _N.empty(oo.Nx)
+    #     CIF_at_grid_mks = _N.zeros(oo.Nx)
     #     cdef double[::1] mv_CIF_at_grid_mks = CIF_at_grid_mks
     #     cdef double*     p_CIF_at_grid_mks  = &mv_CIF_at_grid_mks[0]
 
-    #     cdef long tt, ii, ii0, ii1, ii2, ii3
-    #     cdef long nx
+    #     cdef int tt, ii, iii, i0, i1, i2, i3, ii0, ii1, ii2, ii3, u0, u1, u2, u3, w0, w1, w2, w3
+    #     cdef long nx, m
     #     cdef double mrngs0, mrngs1, mrngs2, mrngs3
-    #     cdef long icnt, cum_icnt 
+    #     cdef int icnt = 0, cum_icnt 
+    #     cdef int skip0, skip1, skip2, skip3
+    #     cdef double d_skip0, d_skip1, d_skip2, d_skip3
 
-    #     if (smpld_marks is not None) and (oo.mdim > 1):
-    #         tt0 = _tm.time()
-    #         sN = smpld_marks.shape[0]   #  smpld_mks   Nx x mdim
-    #         mv_smpld_marks  = smpld_marks
-    #         p_smpld_marks   = &mv_smpld_marks[0, 0]
-    #         for s in xrange(sN):
-    #             icnt = 0
-    #             ttt0 = _tm.time()
-    #             #inds = _N.array((smpld_marks[s] - LLcrnr) / dm, dtype=_N.int)
+    #     cdef double tt1, tt2
 
-    #             i0 = <long>((p_smpld_marks[s*mdim] - LLcrnr[0]) / p_dm[0])
-    #             i1 = <long>((p_smpld_marks[s*mdim+1] - LLcrnr[1]) / p_dm[1])
-    #             i2 = <long>((p_smpld_marks[s*mdim+2] - LLcrnr[2]) / p_dm[2])
-    #             i3 = <long>((p_smpld_marks[s*mdim+3] - LLcrnr[3]) / p_dm[3])
+    #     #_hb.CIFspatial_nogil(p_xp, p_l0dt_i2pidcovs, p_fs, p_iq2s, p_qdr_sp, M, ooNx, ddt)
+        
+    #     #  Bx, Bm  - variance in space, mark of kernel
+    #     #  bx      - variance in
+        
+    #     cdef double iBx2 = 1./(Bx*Bx)
+    #     cdef double iBm2 = 1./(Bm*Bm)
+    #     cdef double ibx2 = 1./(bx*bx)
+    #     cdef int smp_per_grid=4
+    #     cdef sds_to_use = 4
+    #     cdef int skp_0_0, skp_0_1, skp_0_2, skp_0_3
+    #     skp_0_0 = <int>(g_Ms[0]/10)
+    #     skp_0_1 = <int>(g_Ms[1]/10)
+    #     skp_0_2 = <int>(g_Ms[2]/10)
+    #     skp_0_3 = <int>(g_Ms[3]/10)
 
-    #             if p_O01[i0*g_M3+ i1*g_M2+ i2*g_M+ i3] == 0:
-    #                 #p_O01[i0*g_M3+ i1*g_M2+ i2*g_M+ i3] = 1   #  we'll do this one later
-    #                 i0_l = i0 - rad if i0 >= rad else 0
-    #                 i0_h = i0 + rad+1 if i0 + rad < g_M else g_M
-    #                 i1_l = i1 - rad if i1 >= rad else 0
-    #                 i1_h = i1 + rad+1 if i1 + rad < g_M else g_M
-    #                 i2_l = i2 - rad if i2 >= rad else 0
-    #                 i2_h = i2 + rad+1 if i2 + rad < g_M else g_M
-    #                 i3_l = i3 - rad if i3  >= rad else 0
-    #                 i3_h = i3 + rad+1 if i3 + rad < g_M else g_M
+    #     for n in xrange(N):   # pre-compute this
+    #         #qdr_sp    N x oo.Nx
+    #         qdr_sp[n] = (oo.xp - fs[n])*(oo.xp - fs[n])*iBx2
+    #     for inn in xrange(N):
+    #         tt1 = _tm.time()
+    #         nK = inn*oo.mdim
+            
+    #         #  us are observed marks of spikes used for training
+    #         u0 = <int>((p_us[nK]   - LLcrnr0) / p_dm[0])
+    #         u1 = <int>((p_us[nK+1] - LLcrnr1) / p_dm[1])
+    #         u2 = <int>((p_us[nK+2] - LLcrnr2) / p_dm[2])
+    #         u3 = <int>((p_us[nK+3] - LLcrnr3) / p_dm[3])
 
-    #                 if iskde == 0:
-    #                     with nogil:
-    #                         for ii0 in xrange(i0_l, i0_h):
-    #                             for ii1 in xrange(i1_l, i1_h):
-    #                                 for ii2 in xrange(i2_l, i2_h):
-    #                                     for ii3 in xrange(i3_l, i3_h):
-    #                                         ii = ii0*g_M3+ ii1*g_M2+ ii2*g_M+ ii3
-    #                                         if p_O01[ii] == 0:
-    #                                             p_O01[ii] = 1
-    #                                             icnt += 1
-    #                                             #  mrngs   # nTets x mdim x g_M
-    #                                             p_mk[0] = p_mrngs[ii0]
-    #                                             p_mk[1] = p_mrngs[g_M + ii1]
-    #                                             p_mk[2] = p_mrngs[2*g_M + ii2]
-    #                                             p_mk[3] = p_mrngs[3*g_M + ii3]
-    #                                             _hb.CIFatFxdMks_nogil(p_mk, p_xp, p_l0dt_i2pidcovsnt, p_usnt, p_iCovsnt, p_fsnt, p_iq2snt, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, Mnt, ooNx, mdim, ddt)
-    #                                             p_O[ii] = 0
-    #                                             for tt in xrange(0, t1-t0-1):
-    #                                                 p_O[ii] += p_CIF_at_grid_mks[p_disc_pos_t0t1[tt]]
-    #             cum_icnt += icnt
-    #             if icnt > 0:  #  in "for s in xrange(sN):"
-    #                 print "spk %(s)d out of %(t)d,   cum mk spc smps %(c)d" % {"s" : s, "t" : sN, "c" : cum_icnt}
+    #         d_skip0 = (sqrt(covs[c, 0, 0]) / smpsPerSD)/p_dm[0]
+    #         skip0   = <int>_N.ceil(d_skip0 - 0.05)  #  allow for 1.01 to be 1
+    #         d_skip1 = (sqrt(covs[c, 1, 1]) / smpsPerSD)/p_dm[1]
+    #         skip1   = <int>_N.ceil(d_skip1 - 0.05)
+    #         d_skip2 = (sqrt(covs[c, 2, 2]) / smpsPerSD)/p_dm[2]
+    #         skip2   = <int>_N.ceil(d_skip2 - 0.05)
+    #         d_skip3 = (sqrt(covs[c, 3, 3]) / smpsPerSD)/p_dm[3]
+    #         skip3   = <int>_N.ceil(d_skip3 - 0.05)
 
-    #     tt1 = _tm.time()
-    #     print "done   %.4f" % (tt1-tt0)
+    #         idl_grd_sz0 = p_dm[0]*skip0
+    #         idl_grd_sz1 = p_dm[1]*skip1
+    #         idl_grd_sz2 = p_dm[2]*skip2
+    #         idl_grd_sz3 = p_dm[3]*skip3
+
+    #         w0 = <int>((sqrt(covs[c, 0, 0]) / idl_grd_sz0)*sds_to_use)
+    #         w1 = <int>((sqrt(covs[c, 1, 1]) / idl_grd_sz1)*sds_to_use)
+    #         w2 = <int>((sqrt(covs[c, 2, 2]) / idl_grd_sz2)*sds_to_use)
+    #         w3 = <int>((sqrt(covs[c, 3, 3]) / idl_grd_sz3)*sds_to_use)
+
+    #         printf("us %d %d %d %d   ws %d %d %d %d\n", u0, u1, u2, u3, w0, w1, w2, w3)
+    #         printf("us %d %d %d %d\n", skip0, skip1, skip2, skip3)
+
+    #         #  so i look from 
+    #         with nogil:
+    #             for i0 from u0 - w0 <= i0 < u0 + w0 + 1 by skip0:
+    #                 for i1 from u1 - w1 <= i1 < u1 + w1 + 1 by skip1:
+    #                     for i2 from u2 - w2 <= i2 < u1 + w1 + 1 by skip2:
+    #                         for i3 from u3 - w3 <= i3 < u3 + w3 + 1 by skip3:
+    #                             ii = i0*g_M1+ i1*g_M2+ i2*g_M3+ i3
+    #                             if p_O01[ii] == 0:
+    #                                 p_O01[ii] = 1
+
+    #                                 icnt += 1
+    #                                 #  mrngs   # mdim x g_M
+    #                                 p_mk[0] = p_mrngs[i0]
+    #                                 p_mk[1] = p_mrngs[g_M + i1]   #  mrngs is 4 vecs of dim g_M
+    #                                 p_mk[2] = p_mrngs[2*g_M + i2]
+    #                                 p_mk[3] = p_mrngs[3*g_M + i3]
+    #                                 _hb.CIFatFxdMks_nogil(p_mk, p_xp, p_l0dt_i2pidcovs, p_us, p_iCovs, p_fs, p_iq2s, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, M, ooNx, mdim, ddt)
+    #                                 p_O[ii] = 0
+
+    #                                 for nn in xrange(ooNx):
+    #                                     p_O[ii] += p_pos_hstgrm_t0t1[nn]*p_CIF_at_grid_mks[nn]
+    #                                 ##  summing over entire path is VERY slow.  we get roughly 100x speed up when using histogram
+    #                                 #for tt in xrange(0, t1-t0-1):
+    #                                 #    p_O[ii] += p_CIF_at_grid_mks[p_disc_pos_t0t1[tt]]
+    #                             #  do intrapolation
+    #                             for ii0 in xrange(i0, i0+skip0):
+    #                                 for ii1 in xrange(i1, i1+skip1):
+    #                                     for ii2 in xrange(i2, i2+skip2):
+    #                                         for ii3 in xrange(i3, i3+skip3):
+    #                                             iii = ii0*g_M1+ ii1*g_M2+ ii2*g_M3+ ii3
+    #                                             if p_O01[iii] == 0:
+    #                                                 p_O[iii] = p_O[ii]
+    #                                                 p_O01[iii] = 1
+
+    #         tt2 = _tm.time()
+    #         printf("**done   %.4f, icnt  %d\n", (tt2-tt1), icnt)
+    #     # #  outside of cluster loop.
+    #     # #for i0 in xrange(0, g_Ms[0], skip):
+    #     # for i0 from 0 <= i0 < g_Ms[0]-1 by skp_0_0:
+    #     #     for i1 from 0 <= i1 < g_Ms[1]-1 by skp_0_1:
+    #     #         for i2 from 0 <= i2 < g_Ms[2]-1 by skp_0_2:
+    #     #             for i3 from 0 <= i3 < g_Ms[3]-1 by skp_0_3:
+    #     #                 ii = i0*g_M1+ i1*g_M2+ i2*g_M3+ i3
+    #     #                 if p_O01[ii] == 0:
+    #     #                     p_O01[ii] = 1
+
+    #     #                     icnt += 1
+    #     #                     #  mrngs   # mdim x g_M
+    #     #                     p_mk[0] = p_mrngs[i0]
+    #     #                     p_mk[1] = p_mrngs[g_M + i1]   #  mrngs is 4 vecs of dim g_M
+    #     #                     p_mk[2] = p_mrngs[2*g_M + i2]
+    #     #                     p_mk[3] = p_mrngs[3*g_M + i3]
+    #     #                     _hb.CIFatFxdMks_nogil(p_mk, p_xp, p_l0dt_i2pidcovs, p_us, p_iCovs, p_fs, p_iq2s, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, M, ooNx, mdim, ddt)
+    #     #                     p_O[ii] = 0
+
+    #                         # for nn in xrange(ooNx):
+    #                         #     p_O[ii] += p_pos_hstgrm_t0t1[nn]*p_CIF_at_grid_mks[nn]
+
+    #                     # #  do intrapolation
+    #                     # for ii0 in xrange(i0, i0+skp_0_0):
+    #                     #     for ii1 in xrange(i1, i1+skp_0_1):
+    #                     #         for ii2 in xrange(i2, i2+skp_0_2):
+    #                     #             for ii3 in xrange(i3, i3+skp_0_3):
+    #                     #                 iii = ii0*g_M1+ ii1*g_M2+ ii2*g_M3+ ii3
+    #                     #                 if p_O01[iii] == 0:
+    #                     #                     p_O[iii] = p_O[ii]
+    #                     #                     p_O01[iii] = 1
+
 
     #     return O
 
 
-    # def calc_volrat(self, O, g_Mf, g_Tf, fg_Mf, fg_Tf, m1, m2, t, dtf, O_z, vlr_z):
-    #     #  changes in rescaled-time direction is abrupt, while over marks may not be so abrupt.  Cut box in mark direction in 4 
-
-    #     #  assumption O[m1+1, m2+1] = O[m1, m2] + dO_m1
-    #     dO_m1 = O[m1+1, m2] - O[m1, m2]
-    #     dO_m2 = O[m1, m2+1] - O[m1, m2]
-
-    #     #  make a finer grid for O_z
-    #     for im1f in xrange(g_Mf):
-    #         for im2f in xrange(g_Mf):
-    #             O_z[im1f, im2f] = O[m1, m2] + (im1f/(fg_Mf-1))*dO_m1 + (im2f/(fg_Mf-1))*dO_m2
-    #     #O_z[g_Mf-1, g_Mf-1] = O[m1+1, m2+1]
-
-    #     for im1f in xrange(g_Mf-1):
-    #         for im2f in xrange(g_Mf-1):
-    #             for itf in xrange(g_Tf-1):
-    #                 tL = t + itf * dtf
-    #                 tH = t + (itf+1) * dtf 
-
-    #                 d1h = tH - O_z[im1f, im2f] 
-    #                 d2h = tH - O_z[im1f+1, im2f] 
-    #                 d3h = tH - O_z[im1f, im2f+1] 
-    #                 d4h = tH - O_z[im1f+1, im2f+1]
-    #                 d1l = O_z[im1f, im2f] - tL
-    #                 d2l = O_z[im1f+1, im2f] - tL
-    #                 d3l = O_z[im1f, im2f+1] - tL
-    #                 d4l = O_z[im1f+1, im2f+1] - tL
-
-    #                 if (((d1h > 0) or (d2h > 0) or \
-    #                      (d3h > 0) or (d4h > 0)) and \
-    #                     ((d1l > 0) or (d2l > 0) or \
-    #                      (d3l > 0) or (d4l > 0))):
-    #                     #  a border
-    #                     if d1h > 0:
-    #                         r1h = 1 if (d1h > dtf) else d1h / dtf
-    #                     else:
-    #                         r1h = 0.01  #  don't set to 0
-    #                     if d2h > 0:
-    #                         r2h = 1 if (d2h > dtf) else d2h / dtf
-    #                     else:
-    #                         r2h = 0.01 #  don't set to 0
-    #                     if d3h > 0:
-    #                         r3h = 1 if (d3h > dtf) else d3h / dtf
-    #                     else:
-    #                         r3h = 0.01  #  don't set to 0
-    #                     if d4h > 0:
-    #                         r4h = 1 if (d4h > dtf) else d4h / dtf
-    #                     else:
-    #                         r4h = 0.01  #  don't set to 0
 
 
-    #                     vlr_z[im1f, im2f, itf] = r1h*r2h*r3h*r4h
-    #                 else:  #  not a border
-    #                     if ((d1h < 0) and (d2h < 0) and \
-    #                         (d3h < 0) and (d4h < 0)):
-    #                         vlr_z[im1f, im2f, itf] = 1
-    #                     else:
-    #                         vlr_z[im1f, im2f, itf] = 0
-
-    #                 # if (((O_z[im1f, im2f] < tH) or (O_z[im1f+1, im2f] < tH) or \
-    #                 #     (O_z[im1f, im2f+1] < tH) or (O_z[im1f+1, im2f+1] < tH)) and \
-    #                 #     ((O_z[im1f, im2f] > tL) or (O_z[im1f+1, im2f] > tL) or \
-    #                 #      (O_z[im1f, im2f+1] > tL) or (O_z[im1f+1, im2f+1] > tL))):
-    #                 #     #  a border
-    #                 #     vlr_z[im1f, im2f, itf] = 
-    #                 # else:  #  not a border
-    #                 #     if ((O_z[im1f, im2f] > tH) and (O_z[im1f+1, im2f] > tH) and \
-    #                 #         (O_z[im1f, im2f+1] > tH) and (O_z[im1f+1, im2f+1] > tH)):
-    #                 #         vlr_z[im1f, im2f, itf] = 1
-    #                 #     else:
-    #                 #         vlr_z[im1f, im2f, itf] = 0
-
-    #     return _N.mean(vlr_z)
-
-                        
-                    
-        
-        
-        
