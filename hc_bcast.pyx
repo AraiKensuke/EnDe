@@ -221,7 +221,7 @@ def evalAtFxdMks_new(double[:, ::1] fxdMks, double[::1] l0, double[:, ::1] us, d
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def CIFatFxdMks_mv(double[::1] mv_fxdMk, double[::1] mv_x, double[::1] mv_l0dt_i2pidcovs, double[:, ::1] mv_us, double[:, :, ::1] mv_iSgs, double[::1] mv_f, double[::1] mv_iq2, double[::1] mv_zs, double[::1] mv_qdr_mk, double[:, ::1] mv_qdr_sp, long M, long Nx, long mdim, double dt):
+def CIFatFxdMks_mv(double[::1] mv_fxdMk, double[::1] mv_l0dt_i2pidcovs, double[:, ::1] mv_us, double[:, :, ::1] mv_iSgs, double[::1] mv_f, double[::1] mv_iq2, double[::1] mv_zs, double[::1] mv_qdr_mk, double[:, ::1] mv_qdr_sp, long M, long Nx, long mdim, double dt):
     #   x:       Nx
     #   fxdMks:  mdim
     #   l0s   :  M

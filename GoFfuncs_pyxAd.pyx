@@ -272,34 +272,53 @@ class GoFfuncs:
         i2pidcovsr = []
 
         l0s = _N.array(prms[0])
-        us  = _N.array(prms[5])
-        covs= _N.array(prms[6])
+        mksp_us  = _N.array(prms[5])
+        mksp_covs= _N.array(prms[6])
+
+        us   = _N.array(prms[1])
+        covs = _N.array(prms[2])
+        fs   = _N.array(prms[3])
+        q2s  = _N.array(prms[4])
+        iCovs        = _N.linalg.inv(covs)
+        iq2s          = _N.array(1./q2s)
 
         M   = covs.shape[0]
 
-        iSgs= _N.linalg.inv(covs)
-        i2pidcovs = (1/_N.sqrt(2*_N.pi))**(oo.mdim+1)*(1./_N.sqrt(_N.linalg.det(covs)))
+        i_mksp_Sgs= _N.linalg.inv(mksp_covs)
+        #i2pid_mksp_covs = (1/_N.sqrt(2*_N.pi))**(oo.mdim+1)*(1./_N.sqrt(_N.linalg.det(mksp_covs)))
+        twopidcovs = _N.array((_N.sqrt(2*_N.pi)**(oo.mdim+1))*_N.sqrt(_N.linalg.det(mksp_covs)))
+
+        l0dt_i2pidcovs = (l0s*oo.dt)/twopidcovs
+
         l0sr = _N.array(l0s)
 
+        CIF_at_grid_mks = _N.zeros(oo.Nx)
         fxdMks = _N.empty((oo.Nx, oo.mdim+1))  #  for each pos, a fixed mark
         fxdMks[:, 0] = oo.xp
+        fxdMk = _N.empty(oo.mdim)  #  for each pos, a fixed mark
+
+        qdr_mk    = _N.empty(M)
+        qdr_sp    = _N.empty((M, oo.Nx))
+        for c in xrange(M):   # pre-compute this
+            qdr_sp[c] = (oo.xp - fs[c])*(oo.xp - fs[c])*iq2s[c]
 
         rscld = []
 
         for t in xrange(t0+1, t1): # start at 1 because initial condition
             if (oo.mkpos[t, 1] == 1):
                 fxdMks[:, 1:] = oo.mkpos[t, 2:]
+                fxdMk[:] = oo.mkpos[t, 2:]
+                
+                #mkint = _hb.evalAtFxdMks_new(fxdMks, l0s, mksp_us, i_mksp_Sgs, i2pid_mksp_covs, M, oo.Nx, oo.mdim + 1)*oo.dt
 
-                mkint = _hb.evalAtFxdMks_new(fxdMks, l0s, us, iSgs, i2pidcovs, M, oo.Nx, oo.mdim + 1)*oo.dt
-
-                # if not kde:
-                #     _hb.CIFatFxdMks_nogil(p_mk, p_xp, p_l0dt_i2pidcovs, p_us, p_iCovs, p_fs, p_iq2s, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, M, ooNx, mdim, ddt)
+                if not kde:
+                     _hb.CIFatFxdMks_mv(fxdMk, l0dt_i2pidcovs, us, iCovs, fs, iq2s, CIF_at_grid_mks, qdr_mk, qdr_sp, M, oo.Nx, oo.mdim, oo.dt)
                 # else:
                 #     _hb.CIFatFxdMks_nogil(p_mk, p_xp, p_l0dt_i2pidcovs, p_us, p_iCovs, p_fs, p_iq2s, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, M, ooNx, mdim, ddt)
 
-                lst = [_N.sum(mkint[disc_pos[t0+1:t1]]), _N.sum(mkint[disc_pos[t0+1:t]])]
+                #lst = [_N.sum(mkint[disc_pos[t0+1:t1]]), _N.sum(mkint[disc_pos[t0+1:t]])]
 
-                #lst = [_N.sum(p_CIF_at_grid_mks[disc_pos[t0+1:t1]]), _N.sum(p_CIF_at_grid_mks[disc_pos[t0+1:t]])]  #  actual rescaled time is 2nd element.  1st element used to draw boundary for 1D mark
+                lst = [_N.sum(CIF_at_grid_mks[disc_pos[t0+1:t1]]), _N.sum(CIF_at_grid_mks[disc_pos[t0+1:t]])]  #  actual rescaled time is 2nd element.  1st element used to draw boundary for 1D mark
                 lst.extend(oo.mkpos[t, 2:].tolist())
 
                 rscld.append(lst)
