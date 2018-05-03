@@ -458,6 +458,7 @@ class mkdecoder:
                         #(atMark, fld_x, tr_pos, tr_mks, all_pos, mdim, Bx, cBm, bx)
                     #tt1 = _tm.time()
                     mkint = _ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx, oo.dxp, oo.occ)
+                    print mkint
                     #tt2 = _tm.time()
                     #tspk += tt2-tt1
 
