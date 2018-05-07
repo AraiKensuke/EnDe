@@ -330,19 +330,20 @@ cdef void CIFatFxdMks_kde_nogil(double *p_fxdMk, double* p_l0dt_i2pidcovs, doubl
         tmp = 0
         cmdim  = c*mdim
 
-        for 0 <= j < mdim:
-            tmp += (p_fxdMk[j]-p_us[cmdim+j]) * (p_fxdMk[j]-p_us[cmdim+j])
+        j = 0
+        while (j < mdim) and (tmp < 16):  #  if too far away, give up ASAP
+            tmp += (p_fxdMk[j]-p_us[cmdim+j]) * (p_fxdMk[j]-p_us[cmdim+j])*iBm2
+            j   += 1
 
-        p_qdr_mk[c] = tmp*iBm2
+        p_qdr_mk[c] = tmp
 
     for 0 <= ix < Nx:  #  the mark contribution constant, modulating it by spatial contribution
         tmp = 0
         for 0 <= c < M:    #  calculate the mark-contribution first.
-            #qdr_sp = (p_x[ix] - p_f[c])*(p_x[ix] - p_f[c])*p_iq2[c]
-
-            arg = p_qdr_sp[c*Nx + ix] +p_qdr_mk[c]
-            #if arg < 16:  #  contribution large enough
-            tmp += p_l0dt_i2pidcovs[c]*exp(-0.5*arg)
+            if p_qdr_mk[c] < 16:   #  don't include spks w/ mark too fa away
+                arg = p_qdr_sp[c*Nx + ix] +p_qdr_mk[c]
+                #if arg < 16:  #  contribution large enough
+                tmp += p_l0dt_i2pidcovs[c]*exp(-0.5*arg)
         p_CIF[ix] = tmp * p_i_spc_occ_dt[ix]
 
 
