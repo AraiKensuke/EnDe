@@ -7,15 +7,12 @@ from libc.math cimport sqrt
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def calc_volrat4(long g_T, long[::1] g_Ms, double[:, :, :, ::1] O, double[::1] trngs, double[:, :, :, ::1] volrat_mk, long g_Tf, long g_Mf):
+def calc_volrat4(long g_T, long[::1] g_Ms, double[:, :, :, ::1] O, double[::1] trngs, double[:, :, :, ::1] volrat_mk):
     #  changes in rescaled-time direction is abrupt, while over marks may not be so abrupt.  Cut box in mark direction in 4 
     cdef double tL, tH
     cdef double d1h, d2h, d3h, d4h, d1l, d2l, d3l, d4l
     cdef long ti, inside, outside, border
     cdef long m1, m2, m3, m4
-    cdef double dtf          = (trngs[1] - trngs[0]) / g_Tf
-    cdef double fg_Mf = float(g_Mf)
-    cdef double fg_Tf = float(g_Tf)
 
     cdef long   *p_g_Ms  = &g_Ms[0]
     cdef double *p_O     = &O[0, 0, 0, 0]

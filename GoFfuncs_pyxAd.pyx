@@ -657,7 +657,8 @@ class GoFfuncs:
                     skip2   = <int>_N.ceil(d_skip2 - 0.05)
                     d_skip3 = (sqrt(covs[c, 3, 3]) / smpsPerSD)/p_dm[3]
                     skip3   = <int>_N.ceil(d_skip3 - 0.05)
-                    
+
+                    print "%(0)d %(1)d %(2)d %(3)d" % {"0" : skip0, "1" : skip1, "2" : skip2, "3" : skip3}
                     skip0   = 1
                     skip1   = 1
                     skip2   = 1

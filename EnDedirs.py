@@ -13,6 +13,14 @@ def resFN(fn, dir=None, create=False):
     return "%(rd)s/%(fn)s" % {"rd" : rD, "fn" : fn}
 """
 
+def recurseMkdir(dirstr):
+    lvls = dirstr.split("/")
+    rD   = ""
+    for lvl in lvls:
+        rD += "%s/" % lvl
+        if not os.access("%s" % rD, os.F_OK):
+            os.mkdir(rD)
+
 def resFN(fn, dir=None, create=False):
     #  ${EnDedir}/Results/
     __EnDeResultDir__ = os.environ["__EnDeResultDir__"]
