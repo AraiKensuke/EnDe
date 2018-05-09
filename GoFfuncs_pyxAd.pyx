@@ -433,6 +433,10 @@ class GoFfuncs:
             O = _N.zeros([g_Ms[0], g_Ms[1]])
             mv_O2   = O
             p_O    = &mv_O2[0, 0]
+            O01 = _N.zeros([g_Ms[0], g_Ms[1]], dtype=_N.uint8)   #  where lambda is near 0, so is O
+            mv_O012 = O01
+            p_O01 = &mv_O012[0, 0]
+
         elif oo.mdim == 4:
             O = _N.zeros([g_Ms[0], g_Ms[1], g_Ms[2], g_Ms[3]])
             mv_O4   = O
@@ -550,6 +554,7 @@ class GoFfuncs:
                 if use_kde == 0:  #  all clusters have same width (KDE)
                     d_skip0 = (sqrt(covs[c, 0, 0]) / smpsPerSD)/p_dm[0]
                     skip0   = <int>_N.ceil(d_skip0 - 0.05)  #  allow for 1.01 to be 1
+                    skip0   = 1
                 idl_grd_sz0 = p_dm[0]*skip0
 
                 w0 = <int>((sqrt(covs[c, 0, 0]) / idl_grd_sz0)*sds_to_use)
@@ -557,11 +562,6 @@ class GoFfuncs:
                 printf("skip0   %d\n" % skip0)
                 with nogil:
                     for i0 from u0 - w0 <= i0 < u0 + w0 + 1 by skip0:
-                        # if i0 > g_Ms[0]:
-                        #     printf( "! 0\n")
-                        # if i0 < 0:
-                        #     printf("!! 0\n")
-
                         p_mk[0] = p_mrngs[i0]  #  mrngs[0, i0]  mrngs[0, 0:g_Ms[0]]
                         ii = i0
                         if (not ((i0 > g_Ms[0]) or (i0 < 0)) and \
@@ -572,7 +572,6 @@ class GoFfuncs:
                             icnt += 1
                             #  mrngs   # mdim x g_M
                             if use_kde:
-
                                 _hb.CIFatFxdMks_kde_nogil(p_mk, p_l0dt_i2pidcovs, p_us, iBm2, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, p_i_spc_occ_dt, M, ooNx, mdim, ddt)
                             else:
                                 _hb.CIFatFxdMks_nogil(p_mk, p_l0dt_i2pidcovs, p_us, p_iCovs, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, M, ooNx, mdim, ddt)
@@ -593,6 +592,56 @@ class GoFfuncs:
                                  if p_O01[iii] == 0:
                                      p_O[iii] = p_O[ii]
                                      p_O01[iii] = 1
+            elif mdim == 2:
+                u0 = <int>((p_us[cK]   - LLcrnr0) / p_dm[0])
+                u1 = <int>((p_us[cK+1] - LLcrnr1) / p_dm[1])
+
+                if use_kde == 0:  #  all clusters have same width (KDE)
+                    d_skip0 = (sqrt(covs[c, 0, 0]) / smpsPerSD)/p_dm[0]
+                    skip0   = <int>_N.ceil(d_skip0 - 0.05)  #  allow for 1.01 to be 1
+                    d_skip1 = (sqrt(covs[c, 1, 1]) / smpsPerSD)/p_dm[1]
+                    skip1   = <int>_N.ceil(d_skip1 - 0.05)
+                    
+                    skip0   = 1
+                    skip1   = 1
+                    iskip0   = 1./skip0                    
+                    iskip1   = 1./skip1
+
+                idl_grd_sz0 = p_dm[0]*skip0
+                idl_grd_sz1 = p_dm[1]*skip1
+
+                w0 = <int>((sqrt(covs[c, 0, 0]) / idl_grd_sz0)*sds_to_use)
+                w1 = <int>((sqrt(covs[c, 1, 1]) / idl_grd_sz1)*sds_to_use)
+
+                with nogil:
+                    for i0 from u0 - w0 <= i0 < u0 + w0 + 1 by skip0:
+                        for i1 from u1 - w1 <= i1 < u1 + w1 + 1 by skip1:
+                            ii = i0*g_M1+ i1
+                            if (not ((i0 > g_Ms[0]) or (i0 < 0) or \
+                                     (i1 > g_Ms[1]) or (i1 < 0))) and \
+                                (p_O01[ii] == 0):
+                                p_O01[ii] = 1
+
+                                icnt += 1
+                                #  mrngs   # mdim x g_M
+                                p_mk[0] = p_mrngs[i0]  #  mrngs[0, i0]  mrngs[0, 0:g_Ms[0]]
+                                p_mk[1] = p_mrngs[g_M + i1]   #  mrngs is 4 vecs of dim g_M
+                                if use_kde:
+
+                                    _hb.CIFatFxdMks_kde_nogil(p_mk, p_l0dt_i2pidcovs, p_us, iBm2, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, p_i_spc_occ_dt, M, ooNx, mdim, ddt)
+                                else:
+                                    _hb.CIFatFxdMks_nogil(p_mk, p_l0dt_i2pidcovs, p_us, p_iCovs, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, M, ooNx, mdim, ddt)
+                                p_O[ii] = 0
+
+                                for nn in xrange(ooNx):
+                                    p_O[ii] += p_pos_hstgrm_t0t1[nn]*p_CIF_at_grid_mks[nn]
+                                    #p_O[ii] += p_CIF_at_grid_mks[nn]
+                                p_O[ii] *= ddt
+
+                                ##  summing over entire path is VERY slow.  we get roughly 100x speed up when using histogram
+                                #for tt in xrange(0, t1-t0-1):
+                                #    p_O[ii] += p_CIF_at_grid_mks[p_disc_pos_t0t1[tt]]
+
             elif mdim == 4:
                 u0 = <int>((p_us[cK]   - LLcrnr0) / p_dm[0])
                 u1 = <int>((p_us[cK+1] - LLcrnr1) / p_dm[1])
