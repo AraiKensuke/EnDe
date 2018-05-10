@@ -121,3 +121,31 @@ def find_Occ2(long[::1] g_Ms, int NT, double[::1] attimes, double[::1] occ, doub
                 else:
                     inboundary = 0
                     
+def get_obs_exp_v(long[::1] mv_g_Ms, double[:, ::1] mv_expctd, short[:, ::1] mv_chi2_boxes_mk, double low):
+    cdef double c_e = 0
+    cdef short c_o = 0
+    cdef double c_v = 0
+    cdef int i0, i1, ii0, ii1
+    cdef long* p_g_Ms = &mv_g_Ms[0]
+
+    run_o = []
+    run_e = []
+    run_v = []
+
+    for i0 in xrange(0, p_g_Ms[0]-2, 2):
+        for i1 in xrange(0, p_g_Ms[1]-2, 2):
+            for ii0 in xrange(i0, i0+2):
+                for ii1 in xrange(i1, i1+2):
+                    c_e += mv_expctd[ii0, ii1]
+                    c_o += mv_chi2_boxes_mk[ii0, ii1]
+            c_v += 4
+
+            if (c_o > low) and (c_e > low):
+                run_o.append(c_o)
+                run_e.append(c_e)
+                run_v.append(c_v)
+                c_o = 0
+                c_e = 0
+                c_v = 0
+
+    return run_o, run_e, run_v

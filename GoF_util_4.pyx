@@ -152,13 +152,14 @@ def calc_volrat4(long g_T, long[::1] g_Ms, double[:, :, :, ::1] O, double[::1] t
                             tmp = 1 if (tmp > 1) else tmp
 
                             p_volrat_mk[m1*g_Mm1_3+ m2*g_Mm1_2 + m3*g_Mm1 + m4] += tmp
-                        else:  #  not a border
-                            if (d01h < 0) and \
+                        elif (d01h < 0) and \
                                (d11h<0) and (d12h<0) and (d13h<0) and (d14h<0) and \
                                (d21h<0) and (d22h<0) and (d23h<0) and (d24h<0) and (d25h<0) and (d26h<0) and \
                                  (d31h<0) and (d32h<0) and (d33h<0) and (d34h<0) and \
                                  (d41h < 0):
                                 p_volrat_mk[m1*g_Mm1_3+ m2*g_Mm1_2 + m3*g_Mm1 + m4] += 1
+                        else:
+                            inboundary = 0
 
     return inside, outside, border
                     
@@ -195,3 +196,39 @@ def find_Occ4(long[::1] g_Ms, int NT, double[::1] attimes, double[::1] occ, doub
                         else:
                             inboundary = 0
                     
+
+
+def get_obs_exp_v(long[::1] mv_g_Ms, double[:, :, :, ::1] mv_expctd, short[:, :, :, ::1] mv_chi2_boxes_mk, double low):
+    cdef double c_e = 0
+    cdef short c_o = 0
+    cdef double c_v = 0
+    cdef int i0, i1, i2, i3, ii0, ii1, ii2, ii3
+    cdef long* p_g_Ms = &mv_g_Ms[0]
+    #cdef double* p_expctd = &mv_expctd[0, 0, 0, 0]
+    #cdef int* p_chi2_boxes_mk = &mv_chi2_boxes_mk[0, 0, 0, 0]
+
+    run_o = []
+    run_e = []
+    run_v = []
+
+    for i0 in xrange(0, p_g_Ms[0]-2, 2):
+        for i1 in xrange(0, p_g_Ms[1]-2, 2):
+            for i2 in xrange(0, p_g_Ms[2]-2, 2):
+                for i3 in xrange(0, p_g_Ms[3]-2, 2):
+                    for ii0 in xrange(i0, i0+2):
+                        for ii1 in xrange(i1, i1+2):
+                            for ii2 in xrange(i2, i2+2):
+                                for ii3 in xrange(i3, i3+2):
+                                    c_e += mv_expctd[ii0, ii1, ii2, ii3]
+                                    c_o += mv_chi2_boxes_mk[ii0, ii1, ii2, ii3]
+                    c_v += 16
+
+                    if (c_o > low) and (c_e > low):
+                        run_o.append(c_o)
+                        run_e.append(c_e)
+                        run_v.append(c_v)
+                        c_o = 0
+                        c_e = 0
+                        c_v = 0
+
+    return run_o, run_e, run_v
