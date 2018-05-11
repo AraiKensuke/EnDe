@@ -504,7 +504,7 @@ class GoFfuncs:
         cdef double[::1] mv_CIF_at_grid_mks = CIF_at_grid_mks
         cdef double*     p_CIF_at_grid_mks  = &mv_CIF_at_grid_mks[0]
 
-        cdef int tt, ii, iii, i0, i1, i2, i3, ii0, ii1, ii2, ii3, u0, u1, u2, u3, w0, w1, w2, w3
+        cdef int tt, ii, iii, i0, i1, i2, i3, ii0, ii1, ii2, ii3, u0, u1, u2, u3, w0, w1, w2, w3, pk_w0, pk_w1, pk_w2, pk_w3
         cdef long nx, m
         cdef double mrngs0, mrngs1, mrngs2, mrngs3
         cdef int icnt = 0, cum_icnt 
@@ -512,8 +512,10 @@ class GoFfuncs:
         cdef double d_skip0, d_skip1, d_skip2, d_skip3
 
         cdef double tt1, tt2
-        cdef double m0, m1, m2, m3, iskip0, iskip1, iskip2, iskip3
-        cdef int I, I_0, I_1, I_2, I_3, id0, id1, id2, id3
+        cdef double m0, m1, m2, m3, iskip0, iskip1, iskip2, iskip3, iv
+        cdef int I_0, I_1, I_2, I_3, I_4, I_5, I_6, I_7, I_8, I_9, I_10, I_11, I_12, I_13, I_14, I_15, id0, id1, id2, id3
+        cdef double za, zb, zc, zd, ze, zf, zg, zh, zi, zk, zl, zm, zn, zo, zp
+        cdef int im10, im11, im12, im20, im21, im22, im30, im31, im32, im40, im41, im42
 
         #_hb.CIFspatial_nogil(p_xp, p_l0dt_i2pidcovs, p_fs, p_iq2s, p_qdr_sp, M, ooNx, ddt)
 
@@ -541,7 +543,58 @@ class GoFfuncs:
 
         for c in xrange(M):   # pre-compute this
             qdr_sp[c] = (oo.xp - fs[c])*(oo.xp - fs[c])*iq2s[c]
-        for ic in xrange(M):
+        if (mdim == 4) and (use_kde == 0):
+            for ic in xrange(M):  
+                #  First, compute near peak of all clusters - no approximation
+                #  since near peak is very nonlinear so poor interpolation 
+                c   = sA[M-ic-1]  #  from narrowest to widest cluster
+                tt1 = _tm.time()
+                icnt = 0
+                cK = c*oo.mdim
+                printf("doing cluster peaks %d\n" % c)
+
+                u0 = <int>((p_us[cK]   - LLcrnr0) / p_dm[0])
+                u1 = <int>((p_us[cK+1] - LLcrnr1) / p_dm[1])
+                u2 = <int>((p_us[cK+2] - LLcrnr2) / p_dm[2])
+                u3 = <int>((p_us[cK+3] - LLcrnr3) / p_dm[3])
+
+                idl_grd_sz0 = p_dm[0]
+                idl_grd_sz1 = p_dm[1]
+                idl_grd_sz2 = p_dm[2]
+                idl_grd_sz3 = p_dm[3]
+
+                pk_w0 = <int>((sqrt(covs[c, 0, 0]) / idl_grd_sz0))
+                pk_w1 = <int>((sqrt(covs[c, 1, 1]) / idl_grd_sz1))
+                pk_w2 = <int>((sqrt(covs[c, 2, 2]) / idl_grd_sz2))
+                pk_w3 = <int>((sqrt(covs[c, 3, 3]) / idl_grd_sz3))
+
+                with nogil:   #  sample near peak densely, no approx
+                    for i0 from u0 - pk_w0 <= i0 < u0 + pk_w0 + 1:
+                        for i1 from u1 - pk_w1 <= i1 < u1 + pk_w1 + 1:
+                            for i2 from u2 - pk_w2 <= i2 < u2 + pk_w2 + 1:
+                                for i3 from u3 - pk_w3 <= i3 < u3 + pk_w3 + 1:
+                                    ii = i0*g_M1+ i1*g_M2+ i2*g_M3+ i3
+                                    if (not ((i0 > g_Ms[0]) or (i0 < 0) or \
+                                             (i1 > g_Ms[1]) or (i1 < 0) or \
+                                             (i2 > g_Ms[2]) or (i2 < 0) or \
+                                             (i3 > g_Ms[3]) or (i3 < 0))) and \
+                                        (p_O01[ii] == 0):
+                                        p_O01[ii] = 1
+
+                                        icnt += 1
+                                        #  mrngs   # mdim x g_M
+                                        p_mk[0] = p_mrngs[i0]  #  mrngs[0, i0]  mrngs[0, 0:g_Ms[0]]
+                                        p_mk[1] = p_mrngs[g_M + i1]   #  mrngs is 4 vecs of dim g_M
+                                        p_mk[2] = p_mrngs[2*g_M + i2]
+                                        p_mk[3] = p_mrngs[3*g_M + i3]
+                                        _hb.CIFatFxdMks_nogil(p_mk, p_l0dt_i2pidcovs, p_us, p_iCovs, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, M, ooNx, mdim, ddt)
+                                        p_O[ii] = 0
+
+                                        for nn in xrange(ooNx):
+                                            p_O[ii] += p_pos_hstgrm_t0t1[nn]*p_CIF_at_grid_mks[nn]
+                                        p_O[ii] *= ddt
+
+        for ic in xrange(M):  #  now the rest of the mark space
             c   = sA[M-ic-1]  #  from narrowest to widest cluster
             tt1 = _tm.time()
             icnt = 0
@@ -658,15 +711,25 @@ class GoFfuncs:
                     d_skip3 = (sqrt(covs[c, 3, 3]) / smpsPerSD)/p_dm[3]
                     skip3   = <int>_N.ceil(d_skip3 - 0.05)
 
-                    print "%(0)d %(1)d %(2)d %(3)d" % {"0" : skip0, "1" : skip1, "2" : skip2, "3" : skip3}
-                    skip0   = 1
-                    skip1   = 1
-                    skip2   = 1
-                    skip3   = 1
+                    # print "%(0)d %(1)d %(2)d %(3)d" % {"0" : skip0, "1" : skip1, "2" : skip2, "3" : skip3}
+                    printf("us %d %d %d %d\n", skip0, skip1, skip2, skip3)
+
+                    printf("us %d %d %d %d\n", skip0, skip1, skip2, skip3)
+                    #  skips   3~5 -> 2     6~8 -> 3    9~11 -> 4
+                    # skip0    = (skip0/2) + 1 if (skip0 > 2) else skip0
+                    # skip1    = (skip1/2) + 1 if (skip1 > 2) else skip1
+                    # skip2    = (skip2/2) + 1 if (skip2 > 2) else skip2
+                    # skip3    = (skip3/2) + 1 if (skip3 > 2) else skip3
+
+                    skip0    = 2 if skip0 > 2 else skip0
+                    skip1    = 2 if skip1 > 2 else skip1
+                    skip2    = 2 if skip2 > 2 else skip2
+                    skip3    = 2 if skip3 > 2 else skip3
                     iskip0   = 1./skip0                    
                     iskip1   = 1./skip1
                     iskip2   = 1./skip2
                     iskip3   = 1./skip3
+                    iv       = iskip0 * iskip1 * iskip2 * iskip3
 
                 idl_grd_sz0 = p_dm[0]*skip0
                 idl_grd_sz1 = p_dm[1]*skip1
@@ -678,42 +741,12 @@ class GoFfuncs:
                 w2 = <int>((sqrt(covs[c, 2, 2]) / idl_grd_sz2)*sds_to_use)
                 w3 = <int>((sqrt(covs[c, 3, 3]) / idl_grd_sz3)*sds_to_use)
 
-                #printf("us %d %d %d %d   ws %d %d %d %d\n", u0, u1, u2, u3, w0, w1, w2, w3)
-                #printf("us %d %d %d %d\n", skip0, skip1, skip2, skip3)
-
-                #  so i look from 
-
-                with nogil:
+                with nogil:   #  sample near peak densely, no approx
+                    #  away from peak, sample more sparsely
                     for i0 from u0 - w0 <= i0 < u0 + w0 + 1 by skip0:
-                        # if i0 > g_Ms[0]:
-                        #     printf( "! 0\n")
-                        # if i0 < 0:
-                        #     printf("!! 0\n")
-
-
                         for i1 from u1 - w1 <= i1 < u1 + w1 + 1 by skip1:
-                            # if i1 > g_Ms[1]:
-                            #     printf( "! 1\n")
-                            # if i1 < 0:
-                            #     printf("!! 1\n")
-
-
-                            #  mrngs[1, i1]  mrngs[1, 0:g_Ms[1]]
-
                             for i2 from u2 - w2 <= i2 < u2 + w2 + 1 by skip2:
-                                # if i2 > g_Ms[2]:
-                                #     printf( "! 2\n")
-                                # if i2 < 0:
-                                #     printf("!! 2\n")
-
-
                                 for i3 from u3 - w3 <= i3 < u3 + w3 + 1 by skip3:
-                                    # if i3 > g_Ms[3]:
-                                    #     printf( "! 3\n")
-                                    # if i3 < 0:
-                                    #     printf("!! 3\n")
-
-
                                     ii = i0*g_M1+ i1*g_M2+ i2*g_M3+ i3
                                     if (not ((i0 > g_Ms[0]) or (i0 < 0) or \
                                              (i1 > g_Ms[1]) or (i1 < 0) or \
@@ -738,39 +771,101 @@ class GoFfuncs:
 
                                         for nn in xrange(ooNx):
                                             p_O[ii] += p_pos_hstgrm_t0t1[nn]*p_CIF_at_grid_mks[nn]
-                                            #p_O[ii] += p_CIF_at_grid_mks[nn]
                                         p_O[ii] *= ddt
 
-                                        ##  summing over entire path is VERY slow.  we get roughly 100x speed up when using histogram
-                                        #for tt in xrange(0, t1-t0-1):
-                                        #    p_O[ii] += p_CIF_at_grid_mks[p_disc_pos_t0t1[tt]]
-
-
-                    """
                     if use_kde == 0:
                         #  do intrapolation
                         for i0 from u0 - w0 <= i0 < u0 + w0 + 1 by skip0:
+                            im10 = i0
+                            im11 = i0 + skip0
                             for i1 from u1 - w1 <= i1 < u1 + w1 + 1 by skip1:
+                                im20 = i1
+                                im21 = i1 + skip1
                                 for i2 from u2 - w2 <= i2 < u2 + w2 + 1 by skip2:
+                                    im30 = i2
+                                    im31 = i2 + skip2
+
                                     for i3 from u3 - w3 <= i3 < u3 + w3 + 1 by skip3:
-                                        I = i0*g_M1+ i1*g_M2+ i2*g_M3+ i3
-                                        I_0 = (i0+skip0)*g_M1+ i1*g_M2+ i2*g_M3+ i3
-                                        I_1 = i0*g_M1+ (i1+skip1)*g_M2+ i2*g_M3+ i3
-                                        I_2 = i0*g_M1+ i1*g_M2+ (i2+skip2)*g_M3+ i3
-                                        I_3 = i0*g_M1+ i1*g_M2+ i2*g_M3+ i3+skip3
-                                        m0    = (p_O[I_0] - p_O[I])*iskip0
-                                        m1    = (p_O[I_1] - p_O[I])*iskip1
-                                        m2    = (p_O[I_2] - p_O[I])*iskip2
-                                        m3    = (p_O[I_3] - p_O[I])*iskip3
-                                        for id0 in xrange(1, skip0):
-                                            for id1 in xrange(1, skip1):
-                                                for id2 in xrange(1, skip2):
-                                                    for id3 in xrange(1, skip3):
-                                                        iii = (i0+id0)*g_M1+ (i1+id1)*g_M2+ (i2+id2)*g_M3+ i3+id3
+                                        im40 = i3
+                                        im41 = i3 + skip3
+
+                                        I_0 = im10*g_M1 + im20*g_M2 + im30*g_M3 + im40
+
+                                        I_1 = im11*g_M1 + im20*g_M2 + im30*g_M3 + im40
+                                        I_2 = im10*g_M1 + im21*g_M2 + im30*g_M3 + im40
+                                        I_3 = im10*g_M1 + im20*g_M2 + im31*g_M3 + im40
+                                        I_4 = im10*g_M1 + im20*g_M2 + im30*g_M3 + im41
+
+                                        I_5 = im11*g_M1 + im21*g_M2 + im30*g_M3 + im40
+                                        I_6 = im11*g_M1 + im20*g_M2 + im31*g_M3 + im40
+                                        I_7 = im11*g_M1 + im20*g_M2 + im30*g_M3 + im41
+                                        I_8 = im10*g_M1 + im21*g_M2 + im31*g_M3 + im40
+                                        I_9 = im10*g_M1 + im21*g_M2 + im30*g_M3 + im41
+                                        I_10= im10*g_M1 + im20*g_M2 + im31*g_M3 + im41
+
+                                        I_11= im11*g_M1 + im21*g_M2 + im31*g_M3 + im40
+                                        I_12= im11*g_M1 + im21*g_M2 + im30*g_M3 + im41
+                                        I_13= im11*g_M1 + im20*g_M2 + im31*g_M3 + im41
+                                        I_14= im10*g_M1 + im21*g_M2 + im31*g_M3 + im41
+
+                                        I_15= im11*g_M1 + im21*g_M2 + im31*g_M3 + im41
+
+
+                                        za  = p_O[I_0]
+                                        zb  = p_O[I_1]
+                                        zc  = p_O[I_2]
+                                        zd  = p_O[I_3]
+                                        ze  = p_O[I_4]
+                                        zf  = p_O[I_5]
+                                        zg  = p_O[I_6]
+                                        zh  = p_O[I_7]
+                                        zi  = p_O[I_8]
+                                        zj  = p_O[I_9]
+                                        zk  = p_O[I_10]
+                                        zl  = p_O[I_11]
+                                        zm  = p_O[I_12]
+                                        zn  = p_O[I_13]
+                                        zo  = p_O[I_14]
+                                        zp  = p_O[I_15]
+
+
+
+                                        for id0 in xrange(skip0):
+                                            im12 = id0 + i0
+                                            for id1 in xrange(skip1):
+                                                im22 = id1 + i1
+                                                for id2 in xrange(skip2):
+                                                    im32 = id2 + i2
+                                                    for id3 in xrange(skip3):
+                                                        im42 = id3 + i3
+                                                        iii = im12*g_M1+ im22*g_M2+ im32*g_M3+ im42
                                                         if p_O01[iii] == 0:
-                                                            p_O[iii] = p_O[I]#+(id0*m0 + id1*m1 + id2*m2 + id3*m3)*0.25
+
+                                                            zint  = iv*(za * (im11-im12)*(im21-im22)*(im31-im32)*(im41-im42) + \
+                                                                        ##########################################
+                                                                        zb * (im12-im10)*(im21-im22)*(im31-im32)*(im41-im42) + \
+                                                                        zc * (im11-im12)*(im22-im20)*(im31-im32)*(im41-im42) + \
+                                                                        zd * (im11-im12)*(im21-im22)*(im32-im30)*(im41-im42) + \
+                                                                        ze * (im11-im12)*(im21-im22)*(im31-im32)*(im42-im40) + \
+                                                                        ##########################################
+                                                                        zf * (im12-im10)*(im22-im20)*(im31-im32)*(im41-im42) + \
+                                                                        zg * (im12-im10)*(im21-im22)*(im32-im30)*(im41-im42) + \
+                                                                        zh * (im12-im10)*(im21-im22)*(im31-im32)*(im42-im40) + \
+                                                                        zi * (im11-im12)*(im22-im20)*(im32-im30)*(im41-im42) + \
+                                                                        zj * (im11-im12)*(im22-im20)*(im31-im32)*(im42-im40) + \
+                                                                        zk * (im11-im12)*(im21-im22)*(im32-im30)*(im42-im40) + \
+                                                                        ##########################################
+                                                                        zl * (im12-im10)*(im22-im20)*(im32-im30)*(im41-im42) + \
+                                                                        zm * (im12-im10)*(im22-im20)*(im31-im32)*(im42-im40) + \
+                                                                        zn * (im12-im10)*(im21-im22)*(im32-im30)*(im42-im40) + \
+                                                                        zo * (im11-im12)*(im22-im20)*(im32-im30)*(im42-im40) + \
+                                                    ##########################################
+                                                                        zp * (im12-im10)*(im22-im20)*(im32-im30)*(im42-im40))
+
+                                                            #p_O[iii] = (p_O[I_0] + p_O[I_1] + p_O[I_2] + p_O[I_3] + p_O[I_4] + p_O[I_5] + p_O[I_6] + p_O[I_7] + p_O[I_8] + p_O[I_9] + p_O[I_10] + p_O[I_11] + p_O[I_12] + p_O[I_13] + p_O[I_14] + p_O[I_15])*0.0625
+                                                            p_O[iii] = zint
                                                             p_O01[iii] = 1
-                    """
+
 
             tt2 = _tm.time()
             printf("**done   %.4f, icnt  %d\n", (tt2-tt1), icnt)

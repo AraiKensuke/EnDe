@@ -211,6 +211,7 @@ def get_obs_exp_v(long[::1] mv_g_Ms, double[:, :, :, ::1] mv_expctd, short[:, :,
     run_e = []
     run_v = []
 
+    """
     for i0 in xrange(0, p_g_Ms[0]-2, 2):
         for i1 in xrange(0, p_g_Ms[1]-2, 2):
             for i2 in xrange(0, p_g_Ms[2]-2, 2):
@@ -221,8 +222,29 @@ def get_obs_exp_v(long[::1] mv_g_Ms, double[:, :, :, ::1] mv_expctd, short[:, :,
                                 for ii3 in xrange(i3, i3+2):
                                     c_e += mv_expctd[ii0, ii1, ii2, ii3]
                                     c_o += mv_chi2_boxes_mk[ii0, ii1, ii2, ii3]
-                    c_v += 16
 
+                                    c_v += 1
+                                    if (c_o > low) and (c_e > low):
+                                        run_o.append(c_o)
+                                        run_e.append(c_e)
+                                        run_v.append(c_v)
+                                        c_o = 0
+                                        c_e = 0
+                                        c_v = 0
+    """
+
+    for i0 in xrange(0, p_g_Ms[0]-2, 2):
+        for i1 in xrange(0, p_g_Ms[1]-2, 2):
+            for i2 in xrange(0, p_g_Ms[2]-2, 2):
+                for i3 in xrange(0, p_g_Ms[3]-2, 2):
+                    for ii0 in xrange(i0, i0+2):
+                        for ii1 in xrange(i1, i1+2):
+                            for ii2 in xrange(i2, i2+2):
+                                for ii3 in xrange(i3, i3+2):
+                                    c_e += mv_expctd[ii0, ii1, ii2, ii3]
+                                    c_o += mv_chi2_boxes_mk[ii0, ii1, ii2, ii3]
+
+                    c_v += 16
                     if (c_o > low) and (c_e > low):
                         run_o.append(c_o)
                         run_e.append(c_e)
@@ -230,5 +252,7 @@ def get_obs_exp_v(long[::1] mv_g_Ms, double[:, :, :, ::1] mv_expctd, short[:, :,
                         c_o = 0
                         c_e = 0
                         c_v = 0
+
+
 
     return run_o, run_e, run_v
