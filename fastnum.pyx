@@ -497,6 +497,7 @@ def full_qdrtcs_K4_diag(double[:, ::1] pkFRr, double [:, ::1] mkNrms, double[:, 
     cdef double u_m_1
     cdef double u_m_2
     cdef double u_m_3
+    cdef double x_0, x_1, x_2, x_3
 
     with nogil:#, parallel(num_threads=2):
         for 0 <= m < M:
@@ -527,18 +528,95 @@ def full_qdrtcs_K4_diag(double[:, ::1] pkFRr, double [:, ::1] mkNrms, double[:, 
                 #mNk_nk = mNk + n*k
                 mNn    = mN+n
                 nK     = n*k
-                # p_qdrMKS[mNn] = p_v[mNk_nk+3]*iS33*p_v[mNk_nk+3] + \
-                #                 p_v[mNk_nk]*iS00*p_v[mNk_nk] + \
-                #                 p_v[mNk_nk+1]*iS11*p_v[mNk_nk+1] + \
-                #                 p_v[mNk_nk+2]*iS22*p_v[mNk_nk+2]
+
+                x_0 = p_mAS[nK]-p_u[mK]
+                x_1 = p_mAS[nK+1]-p_u[mK+1]
+                x_2 = p_mAS[nK+2]-p_u[mK+2]
+                x_3 = p_mAS[nK+3]-p_u[mK+3]
+
+                p_qdrMKS[mNn] = (p_mAS[nK+3]-u_m_3)*iS33*(p_mAS[nK+3]-u_m_3) +\
+                                (p_mAS[nK]-u_m_0)*iS00*(p_mAS[nK]-u_m_0) + \
+                                (p_mAS[nK+1]-u_m_1)*iS11*(p_mAS[nK+1]-u_m_1) + \
+                               (p_mAS[nK+2]-u_m_2)*iS22*(p_mAS[nK+2]-u_m_2)
+
+                p_qdrSPC[mNn] = (pfrm - p_xASr[n])*(pfrm - p_xASr[n])*piq2rm
+
+                p_exp_arg[mNn] = pkFRr_m + mkNrms_m - 0.5*(p_qdrSPC[mNn] + p_qdrMKS[mNn])
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def full_qdrtcs_K4_diag_lkat_spc_frst(double[:, ::1] pkFRr, double [:, ::1] mkNrms, double[:, ::1] exp_arg, double[:, ::1] fr, double [:, ::1] xASr, double[:, ::1] iq2r, double [:, ::1] qdrSPC, double[:, ::1] mAS, double [:, ::1] u, double[:, :, ::1] iSg, double[:, ::1] qdrMKS, int M, int N, int k):
+    #  fxs       M x fss   
+    #  fxrux     Nupx    
+    #  f_intgrd  Nupx
+    cdef int n, m, mNk, mkk, nk, ik, mNk_nk, mN, mNn, mK, nK
+
+    cdef double *p_mAS   = &mAS[0, 0]
+    cdef double *p_u     = &u[0, 0]
+    #cdef double *p_v   = &v[0, 0, 0]
+    cdef double *p_iSg = &iSg[0, 0, 0]
+    cdef double *p_qdrMKS = &qdrMKS[0, 0]
+
+    cdef double pfrm
+    cdef double piq2rm
+    cdef double *p_qdrSPC   = &qdrSPC[0, 0]
+    cdef double *p_fr       = &fr[0, 0]
+    cdef double *p_xASr     = &xASr[0, 0]
+    cdef double *p_iq2r     = &iq2r[0, 0]
+
+    cdef double *p_pkFRr       = &pkFRr[0, 0]
+    cdef double *p_mkNrms     = &mkNrms[0, 0]
+    cdef double *p_exp_arg       = &exp_arg[0, 0]
+    cdef double pkFRr_m, mkNrms_m
+
+    cdef double iS00
+    cdef double iS11
+    cdef double iS22
+    cdef double iS33
+    cdef double u_m_0
+    cdef double u_m_1
+    cdef double u_m_2
+    cdef double u_m_3
+
+    with nogil:#, parallel(num_threads=2):
+        for 0 <= m < M:
+        #for m in prange(M):
+            mkk  = m*k*k
+            mN   = m*N
+            #mNk   = m*N*k
+            mK =   m*k
+            #  write output to p_qdr[m, n].  (xn - um)iSg_m (xn - um)
+
+            iS00 = p_iSg[mkk]
+            iS11 = p_iSg[mkk+k+1]
+            iS22 = p_iSg[mkk+2*k+2]
+            iS33 = p_iSg[mkk+3*k+3]
+
+            u_m_0 = p_u[mK]
+            u_m_1 = p_u[mK + 1]
+            u_m_2 = p_u[mK + 2]
+            u_m_3 = p_u[mK + 3]
+
+            pfrm = p_fr[m]
+            piq2rm= p_iq2r[m]
+
+            pkFRr_m = p_pkFRr[m]
+            mkNrms_m = p_mkNrms[m]
+
+            for n in range(N):  # only 
+                mNn    = mN+n
+                nK     = n*k
+
+                p_qdrSPC[mNn] = (pfrm - p_xASr[n])*(pfrm - p_xASr[n])*piq2rm
+
+            for n in range(N):  # only calculate this for spks that are spatially near
                 p_qdrMKS[mNn] = (p_mAS[nK+3]-u_m_3)*iS33*(p_mAS[nK+3]-u_m_3) +\
                                 (p_mAS[nK]-u_m_0)*iS00*(p_mAS[nK]-u_m_0) + \
                                 (p_mAS[nK+1]-u_m_1)*iS11*(p_mAS[nK+1]-u_m_1) + \
                                 (p_mAS[nK+2]-u_m_2)*iS22*(p_mAS[nK+2]-u_m_2)
 
-                p_qdrSPC[mNn] = (pfrm - p_xASr[n])*(pfrm - p_xASr[n])*piq2rm
-
                 p_exp_arg[mNn] = pkFRr_m + mkNrms_m - 0.5*(p_qdrSPC[mNn] + p_qdrMKS[mNn])
+
 
 
 @cython.boundscheck(False)
@@ -759,3 +837,32 @@ def cluster_bounds2(long[::1] clstsz, long[::1] Asts, long[::1] cls_str_ind, lon
                         p_v_sts[i0+ns] = p_Asts[n] + t0
                         ns += 1
             i0 += p_clstsz[m]
+
+def sum_random_inds(double[::1] mv_arr, long[::1] mv_these_inds, long t0, long t1):
+    # _N.sum(arr[t0:t1])   vs summing this in C
+
+    cdef double* p_arr = &mv_arr[0]
+    cdef long*   p_these_inds = &mv_these_inds[0]
+
+    cdef double tot = 0
+
+    with nogil:
+        for i in xrange(t0, t1):
+            tot += p_arr[p_these_inds[i]]
+
+    return tot
+
+    
+
+cdef double sum_random_inds_nogil(double* p_arr, long* p_these_inds, long t0, long t1) nogil:
+    # _N.sum(arr[t0:t1])   vs summing this in C
+
+    cdef double tot = 0
+    cdef long i
+
+    for i in xrange(t0, t1):
+        tot += p_arr[p_these_inds[i]]
+
+    return tot
+
+    

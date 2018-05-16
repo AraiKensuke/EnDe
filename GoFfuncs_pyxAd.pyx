@@ -9,6 +9,8 @@ from libc.stdio cimport printf
 from libc.math cimport sqrt, exp
 import cython
 cimport cython
+import fastnum as _fn
+cimport fastnum as _fn
 
 mz_CRCL = 0
 mz_W    = 1
@@ -214,12 +216,10 @@ class GoFfuncs:
 
         return g_Ms, mk_ranges
             
-
-
-
         
-
-    def rescale_spikes(self, prms, t0, t1, i_spc_occ_dt, kde=False):
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def rescale_spikes(self, prms, long t0, long t1, i_spc_occ_dt, kde=False):
         """
         uFE    which epoch fit to use for encoding model
         prms posterior params
@@ -229,7 +229,8 @@ class GoFfuncs:
         ##  each 
 
         disc_pos = _N.array((oo.pos - oo.xLo) * (oo.Nx/(oo.xHi-oo.xLo)), dtype=_N.int)
-                                
+        cdef long[::1] mv_disc_pos = disc_pos
+        cdef long*  p_disc_pos     = &mv_disc_pos[0]
         i2pidcovs  = []
         i2pidcovsr = []
 
@@ -245,6 +246,7 @@ class GoFfuncs:
         iq2s          = _N.array(1./q2s)
 
         cdef long M  = covs.shape[0]
+        cdef long t, inn
 
         iSgs = _N.linalg.inv(prms[6])
         l0dt = _N.array(prms[0])#*oo.dt)
@@ -296,6 +298,7 @@ class GoFfuncs:
             print "%.5f" % iBm2
 
         M   = covs.shape[0]
+        print "M  is %d" % M
 
         i_mksp_Sgs= _N.linalg.inv(mksp_covs)
         i2pid_mksp_covs = (1/_N.sqrt(2*_N.pi))**(oo.mdim+1)*(1./_N.sqrt(_N.linalg.det(mksp_covs)))
@@ -305,59 +308,68 @@ class GoFfuncs:
 
         l0sr = _N.array(l0s)
 
-        fxdMks = _N.empty((oo.Nx, oo.mdim+1))  #  for each pos, a fixed mark
-        fxdMks[:, 0] = oo.xp
-        fxdMk = _N.empty(oo.mdim)  #  for each pos, a fixed mark
+        #fxdMks = _N.empty((oo.Nx, oo.mdim+1))  #  for each pos, a fixed mark
+        #fxdMks[:, 0] = oo.xp
+        #fxdMk = _N.empty(oo.mdim)  #  for each pos, a fixed mark
 
         qdr_mk    = _N.empty(M)
 
         for c in xrange(M):   # pre-compute this
             qdr_sp[c] = (oo.xp - fs[c])*(oo.xp - fs[c])*iq2s[c]
 
-        rscld = []
+        rscldA = _N.empty((M, mdim+1))
+        cdef double[:, ::1] mv_rscldA = rscldA
+        cdef double* p_rscldA = &mv_rscldA[0, 0]
 
         sts = _N.where(oo.mkpos[t0+1:t1, 1] == 1)[0]
-        Nspks = len(sts)
+        cdef double[:, ::1] mv_mkpos = oo.mkpos
+        cdef long Nspks = len(sts)
         cifs = _N.empty((Nspks, oo.Nx))
-        itt = -1
+        cdef double[:, ::1] mv_cifs = cifs
+        cdef double* p_cifs = &mv_cifs[0, 0]
+        cdef long itt = -1
+        ttt0 = _tm.time()
         if kde:
             iBm2 = iCovs[0, 0, 0]
             print "-----  %.4f" % iBm2
-        for t in xrange(t0+1, t1): # start at 1 because initial condition
-            if (oo.mkpos[t, 1] == 1):
-                itt += 1
-                if itt % 200 == 0:
-                    print itt
-                fxdMks[:, 1:] = oo.mkpos[t, 2:]
-                fxdMk[:] = oo.mkpos[t, 2:]
+        with nogil:
+            for t in xrange(t0+1, t1): # start at 1 because initial condition
+                #if (oo.mkpos[t, 1] == 1):
+                if (mv_mkpos[t, 1] == 1):
+                    itt += 1
+                    if itt % 200 == 0:
+                        #ttt1 = _tm.time()
+                        #print "%(itt)d    %(t).3f" % {"itt" : itt, "t" : (ttt1-ttt0)}
+                        #print "%(itt)d" % {"itt" : itt}
+                        #ttt0 = ttt1
+                        printf("%ld\n", itt)
 
-                for im in xrange(mdim):
-                    p_mk[im] = oo.mkpos[t, 2+im]
+                    for im in xrange(mdim):
+                        p_mk[im] = mv_mkpos[t, 2+im]#oo.mkpos[t, 2+im]
+                        p_rscldA[pmdim*itt + im+1] = p_mk[im]
 
-                #mkint = _hb.evalAtFxdMks_new(fxdMks, l0s, mksp_us, i_mksp_Sgs, i2pid_mksp_covs, M, oo.Nx, oo.mdim + 1)*oo.dt
 
-                if use_kde:
-                    _hb.CIFatFxdMks_kde_nogil(p_mk, p_l0dt_i2pidcovs, p_us, iBm2, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, p_i_spc_occ_dt, M, ooNx, mdim, ddt)
-                else:
-                    _hb.CIFatFxdMks_nogil(p_mk, p_l0dt_i2pidcovs, p_us, p_iCovs, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, M, ooNx, mdim, ddt)
+                    if use_kde:
+                        _hb.CIFatFxdMks_kde_nogil(p_mk, p_l0dt_i2pidcovs, p_us, iBm2, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, p_i_spc_occ_dt, M, ooNx, mdim, ddt)
+                    else:
+                        _hb.CIFatFxdMks_nogil(p_mk, p_l0dt_i2pidcovs, p_us, p_iCovs, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, M, ooNx, mdim, ddt)
 
-                cifs[itt] = CIF_at_grid_mks
-                #  the rescaling of spike at time t depends on mark of that spk
-                lst = [_N.sum(CIF_at_grid_mks[disc_pos[t0+1:t1]])*ddt, _N.sum(CIF_at_grid_mks[disc_pos[t0+1:t]])*ddt]  #  actual rescaled time is 2nd element.  1st element used to draw boundary for 1D mark
-                lst.extend(oo.mkpos[t, 2:].tolist())
+                    for inn in xrange(ooNx):
+                        p_cifs[itt*ooNx + inn] = p_CIF_at_grid_mks[inn]
+                    #  the rescaling of spike at time t depends on mark of that spk
 
-                rscld.append(lst)
+                    p_rscldA[pmdim*itt] = _fn.sum_random_inds_nogil(p_CIF_at_grid_mks, p_disc_pos, t0, t)*ddt  #  actual rescaled time is 2nd element.  1st element used to draw boundary for 1D mark
 
-        if use_kde:
-            _N.savetxt("cifs_kde.dat", cifs, fmt="%.5e")
-        else:
-            _N.savetxt("cifs_gt.dat", cifs, fmt="%.5e")
-        return rscld
+        # if use_kde:
+        #     _N.savetxt("cifs_kde.dat", cifs, fmt="%.5e")
+        # else:
+        #     _N.savetxt("cifs_gt.dat", cifs, fmt="%.5e")
+        return rscldA
 
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def max_rescaled_T_at_mark_MoG(self, char use_kde, mrngs, long[::1] g_Ms, prms, long t0, long t1, double smpsPerSD, int sds_to_use, double[::1] mv_i_spc_occ_dt):
+    def max_rescaled_T_at_mark_MoG(self, char use_kde, mrngs, long[::1] g_Ms, prms, long t0, long t1, double smpsPerSD, double sds_to_use, double[::1] mv_i_spc_occ_dt):
         """
         method to calculate boundary depends on the model
         prms posterior params
@@ -504,7 +516,8 @@ class GoFfuncs:
         cdef double[::1] mv_CIF_at_grid_mks = CIF_at_grid_mks
         cdef double*     p_CIF_at_grid_mks  = &mv_CIF_at_grid_mks[0]
 
-        cdef int tt, ii, iii, i0, i1, i2, i3, ii0, ii1, ii2, ii3, u0, u1, u2, u3, w0, w1, w2, w3, pk_w0, pk_w1, pk_w2, pk_w3
+        cdef int tt, i0, i1, i2, i3, ii0, ii1, ii2, ii3, u0, u1, u2, u3, w0, w1, w2, w3, pk_w0, pk_w1, pk_w2, pk_w3
+        cdef long ii, iii    #  needs long because 128**4 is max addressable
         cdef long nx, m
         cdef double mrngs0, mrngs1, mrngs2, mrngs3
         cdef int icnt = 0, cum_icnt 
@@ -513,7 +526,7 @@ class GoFfuncs:
 
         cdef double tt1, tt2
         cdef double m0, m1, m2, m3, iskip0, iskip1, iskip2, iskip3, iv
-        cdef int I_0, I_1, I_2, I_3, I_4, I_5, I_6, I_7, I_8, I_9, I_10, I_11, I_12, I_13, I_14, I_15, id0, id1, id2, id3
+        cdef long I_0, I_1, I_2, I_3, I_4, I_5, I_6, I_7, I_8, I_9, I_10, I_11, I_12, I_13, I_14, I_15, id0, id1, id2, id3
         cdef double za, zb, zc, zd, ze, zf, zg, zh, zi, zk, zl, zm, zn, zo, zp
         cdef int im10, im11, im12, im20, im21, im22, im30, im31, im32, im40, im41, im42
 
@@ -540,6 +553,8 @@ class GoFfuncs:
             skip1 = 1
             skip2 = 1
             skip3 = 1
+
+        print "M  is %d" % M
 
         for c in xrange(M):   # pre-compute this
             qdr_sp[c] = (oo.xp - fs[c])*(oo.xp - fs[c])*iq2s[c]
@@ -614,7 +629,7 @@ class GoFfuncs:
 
                 printf("skip0   %d\n" % skip0)
                 with nogil:
-                    for i0 from u0 - w0 <= i0 < u0 + w0 + 1 by skip0:
+                    for i0 from 0 <= i0 < g_Ms[0]:
                         p_mk[0] = p_mrngs[i0]  #  mrngs[0, i0]  mrngs[0, 0:g_Ms[0]]
                         ii = i0
                         if (not ((i0 > g_Ms[0]) or (i0 < 0)) and \
@@ -638,13 +653,6 @@ class GoFfuncs:
                             ##  summing over entire path is VERY slow.  we get roughly 100x speed up when using histogram
                             #for tt in xrange(0, t1-t0-1):
                             #    p_O[ii] += p_CIF_at_grid_mks[p_disc_pos_t0t1[tt]]
-                        #  do intrapolation
-                        if use_kde == 0:
-                            for ii0 in xrange(i0, i0+skip0):
-                                 iii = ii0
-                                 if p_O01[iii] == 0:
-                                     p_O[iii] = p_O[ii]
-                                     p_O01[iii] = 1
             elif mdim == 2:
                 u0 = <int>((p_us[cK]   - LLcrnr0) / p_dm[0])
                 u1 = <int>((p_us[cK+1] - LLcrnr1) / p_dm[1])

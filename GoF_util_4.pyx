@@ -7,17 +7,21 @@ from libc.math cimport sqrt
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def calc_volrat4(long g_T, long[::1] g_Ms, double[:, :, :, ::1] O, double[::1] trngs, double[:, :, :, ::1] volrat_mk):
+def calc_volrat4(long g_T, long[::1] g_Ms, double[:, :, :, ::1] O, double[::1] trngs, float[:, :, :, ::1] volrat_mk):
+#def calc_volrat4(long g_T, long[::1] g_Ms, double[:, :, :, ::1] O, double[::1] trngs, double[:, :, :, ::1] volrat_mk):
     #  changes in rescaled-time direction is abrupt, while over marks may not be so abrupt.  Cut box in mark direction in 4 
     cdef double tL, tH
     cdef double d1h, d2h, d3h, d4h, d1l, d2l, d3l, d4l
     cdef long ti, inside, outside, border
     cdef long m1, m2, m3, m4
+    #cdef double tmp
+    cdef float tmp
 
     cdef long   *p_g_Ms  = &g_Ms[0]
     cdef double *p_O     = &O[0, 0, 0, 0]
     cdef double *p_trngs     = &trngs[0]
-    cdef double *p_volrat_mk = &volrat_mk[0, 0, 0, 0]
+    cdef float *p_volrat_mk = &volrat_mk[0, 0, 0, 0]
+    #cdef double *p_volrat_mk = &volrat_mk[0, 0, 0, 0]
 
     cdef long it, inboundary, i_here, i_til_end
 
@@ -163,46 +167,50 @@ def calc_volrat4(long g_T, long[::1] g_Ms, double[:, :, :, ::1] O, double[::1] t
 
     return inside, outside, border
                     
-
+@cython.boundscheck(False)
+@cython.wraparound(False)
 def find_Occ4(long[::1] g_Ms, int NT, double[::1] attimes, double[::1] occ, double[:, :, :, ::1] O):
     #  at given rescaled time, number of mark voxels < boundary (rescaled time)
     cdef double maxt, att
-    cdef int inboundary, i, j, k, l, it
+    cdef long inboundary, i, j, k, l, it
     cdef double *p_attimes = &attimes[0]
     cdef double *p_occ    = &occ[0]
     cdef double *p_O      = &O[0, 0, 0, 0]
 
-    cdef int ig_M3, jg_M2, kg_M, g_M4, g_M1, g_M3, g_M2
+    cdef long ig_M1, jg_M2, kg_M3, g_M4, g_M1, g_M3, g_M2
 
     g_M1 = g_Ms[1]*g_Ms[2]*g_Ms[3]
     g_M2 = g_Ms[2]*g_Ms[3]
     g_M3 = g_Ms[3]
 
-    for i in xrange(g_Ms[0]):
-        ig_M1 = i*g_M1
-        for j in xrange(g_Ms[1]):
-            jg_M2 = j*g_M2
-            for k in xrange(g_Ms[2]):
-                kg_M3 = k*g_M3
-                for l in xrange(g_Ms[3]):
-                    inboundary = 1
-                    it = -1
-                    while inboundary and (it < NT-1):
-                        it += 1
-                        att = p_attimes[it]
+    with nogil:
+        for i in xrange(g_Ms[0]):
+            ig_M1 = i*g_M1
+            for j in xrange(g_Ms[1]):
+                jg_M2 = j*g_M2
+                for k in xrange(g_Ms[2]):
+                    kg_M3 = k*g_M3
+                    for l in xrange(g_Ms[3]):
+                        inboundary = 1
+                        it = -1
+                        while inboundary and (it < NT-1):
+                            it += 1
+                            att = p_attimes[it]
 
-                        if p_O[ig_M1 + jg_M2 + kg_M3 + l] >= att:
-                            p_occ[it] += 1.
-                        else:
-                            inboundary = 0
+                            if p_O[ig_M1 + jg_M2 + kg_M3 + l] >= att:
+                                p_occ[it] += 1.
+                            else:
+                                inboundary = 0
                     
 
-
-def get_obs_exp_v(long[::1] mv_g_Ms, double[:, :, :, ::1] mv_expctd, short[:, :, :, ::1] mv_chi2_boxes_mk, double low):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def get_obs_exp_v(long[::1] mv_g_Ms, float[:, :, :, ::1] mv_expctd, short[:, :, :, ::1] mv_chi2_boxes_mk, double low):
+#def get_obs_exp_v(long[::1] mv_g_Ms, double[:, :, :, ::1] mv_expctd, short[:, :, :, ::1] mv_chi2_boxes_mk, double low):
     cdef double c_e = 0
     cdef short c_o = 0
     cdef double c_v = 0
-    cdef int i0, i1, i2, i3, ii0, ii1, ii2, ii3
+    cdef long i0, i1, i2, i3, ii0, ii1, ii2, ii3
     cdef long* p_g_Ms = &mv_g_Ms[0]
     #cdef double* p_expctd = &mv_expctd[0, 0, 0, 0]
     #cdef int* p_chi2_boxes_mk = &mv_chi2_boxes_mk[0, 0, 0, 0]
@@ -232,6 +240,7 @@ def get_obs_exp_v(long[::1] mv_g_Ms, double[:, :, :, ::1] mv_expctd, short[:, :,
                                         c_e = 0
                                         c_v = 0
     """
+
 
     for i0 in xrange(0, p_g_Ms[0]-2, 2):
         for i1 in xrange(0, p_g_Ms[1]-2, 2):

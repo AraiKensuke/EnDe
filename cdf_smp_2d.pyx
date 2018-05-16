@@ -684,7 +684,7 @@ def setup_occ_at_resolutions(_x_Lo, _x_Hi, v_q2_thr, v_Nupxs, ):
     p_ibinszs    = <double*>malloc(n_res*sizeof(double))
     arr_0s       = <long*>malloc(n_res*sizeof(long))
     p_q2_thr     = <double*>malloc(n_res*sizeof(double))
-    p_hist_all     = <double*>malloc(_N.sum(v_Nupxs)*sizeof(double))
+    p_hist_all     = <double*>malloc(_N.sum(v_Nupxs)*sizeof(double))  # histogram stored 
     p_riemann_xs = <double*>malloc(_N.sum(v_Nupxs)*sizeof(double))
 
 

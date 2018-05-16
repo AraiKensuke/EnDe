@@ -156,7 +156,7 @@ class MarkAndRF:
         tau_l0 = oo.t_hlf_l0/_N.log(2)
         tau_q2 = oo.t_hlf_q2/_N.log(2)
 
-        _cdfs.init(oo.dt, oo.f_L, oo.f_H, oo.q2_L, oo.q2_H, f_STEPS, q2_STEPS, f_SMALL, q2_SMALL, f_cldz, q2_cldz, minSmps)
+        _cdfs2d.init(oo.dt, oo.f_L, oo.f_H, oo.q2_L, oo.q2_H, f_STEPS, q2_STEPS, f_SMALL, q2_SMALL, f_cldz, q2_cldz, minSmps)
 
         M_max    = 1
         M_use    = 1
@@ -175,7 +175,7 @@ class MarkAndRF:
 
             _cdfs2d.setup_occ(oo.xLo, oo.xHi, oo.q2_lvls, oo.Nupx_lvls)
 
-"""
+
             _cdfs2d.change_occ_hist(xt0t1, oo.xLo, oo.xHi)
 
             Asts    = _N.where(oo.dat[t0:t1, s01col] == 1)[0]   #  based at 0
@@ -297,4 +297,4 @@ class MarkAndRF:
 
                     #l0  = _N.array([800.])
                     smp_sp_prms[oo.ky_p_l0, itr] = l0
-"""
+
