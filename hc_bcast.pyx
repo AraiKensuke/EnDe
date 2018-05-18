@@ -321,7 +321,7 @@ cdef void CIFatFxdMks_kde_nogil(double *p_fxdMk, double* p_l0dt_i2pidcovs, doubl
     #   qdrsp is M x Nxdim      m*Nx + ix
 
     #cdef double zs
-    cdef long cmdim, cmdim2, i, j, k, ix, c, cNx
+    cdef long cmdim, cmdim2, i, j, k, ix, c, ic, cNx
     cdef double tmp
     cdef double qdr_sp
     cdef double arg
@@ -346,6 +346,43 @@ cdef void CIFatFxdMks_kde_nogil(double *p_fxdMk, double* p_l0dt_i2pidcovs, doubl
                 tmp += p_l0dt_i2pidcovs[c]*exp(-0.5*arg)
         p_CIF[ix] = tmp * p_i_spc_occ_dt[ix]
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef void CIFatFxdMks_kde_nogil_closeonly(double *p_fxdMk, double* p_l0dt_i2pidcovs, double* p_us, double iBm2, double* p_CIF, double* p_qdr_mk, double* p_qdr_sp, double* p_i_spc_occ_dt, long M, long Nx, long mdim, long* p_theseClose, long Nclose, double dt) nogil:
+    #   x:       Nx
+    #   fxdMks:  mdim
+    #   l0s   :  M
+    #   us    :  M x mdim
+    #   fs    :  M
+    #   iSgs  :  M x mdim x mdim
+    #   i2pidcovs  :  M x (mdim + 1) x (mdim + 1)
+    #   zs:      Nx
+    #   qdrsp is M x Nxdim      m*Nx + ix
+
+    #cdef double zs
+    cdef long cmdim, cmdim2, i, j, k, ix, c, ic, cNx
+    cdef double tmp
+    cdef double qdr_sp
+    cdef double arg
+
+    for 0 <= ic < Nclose:
+        c = p_theseClose[ic]
+        tmp = 0
+        cmdim  = c*mdim
+
+        j = 0
+        for j in xrange(mdim):
+            tmp += (p_fxdMk[j]-p_us[cmdim+j]) * (p_fxdMk[j]-p_us[cmdim+j])*iBm2
+
+        p_qdr_mk[c] = tmp
+
+    for 0 <= ix < Nx:  #  the mark contribution constant, modulating it by spatial contribution
+        tmp = 0
+        for 0 <= ic < Nclose:
+            c = p_theseClose[ic]
+            arg = p_qdr_sp[c*Nx + ix] +p_qdr_mk[c]
+            tmp += p_l0dt_i2pidcovs[c]*exp(-0.5*arg)
+        p_CIF[ix] = tmp * p_i_spc_occ_dt[ix]
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
