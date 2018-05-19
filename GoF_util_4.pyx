@@ -7,7 +7,7 @@ from libc.math cimport sqrt
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def calc_volrat4(long g_T, long[::1] g_Ms, double[:, :, :, ::1] O, double[::1] trngs, float[:, :, :, ::1] volrat_mk):
+def calc_volrat4(long g_T, long[::1] g_Ms, float[:, :, :, ::1] O, double[::1] trngs, float[:, :, :, ::1] volrat_mk):
 #def calc_volrat4(long g_T, long[::1] g_Ms, double[:, :, :, ::1] O, double[::1] trngs, double[:, :, :, ::1] volrat_mk):
     #  changes in rescaled-time direction is abrupt, while over marks may not be so abrupt.  Cut box in mark direction in 4 
     cdef double tL, tH
@@ -18,7 +18,7 @@ def calc_volrat4(long g_T, long[::1] g_Ms, double[:, :, :, ::1] O, double[::1] t
     cdef float tmp
 
     cdef long   *p_g_Ms  = &g_Ms[0]
-    cdef double *p_O     = &O[0, 0, 0, 0]
+    cdef float *p_O     = &O[0, 0, 0, 0]
     cdef double *p_trngs     = &trngs[0]
     cdef float *p_volrat_mk = &volrat_mk[0, 0, 0, 0]
     #cdef double *p_volrat_mk = &volrat_mk[0, 0, 0, 0]
@@ -169,13 +169,13 @@ def calc_volrat4(long g_T, long[::1] g_Ms, double[:, :, :, ::1] O, double[::1] t
                     
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def find_Occ4(long[::1] g_Ms, int NT, double[::1] attimes, double[::1] occ, double[:, :, :, ::1] O):
+def find_Occ4(long[::1] g_Ms, int NT, double[::1] attimes, double[::1] occ, float[:, :, :, ::1] O):
     #  at given rescaled time, number of mark voxels < boundary (rescaled time)
     cdef double maxt, att
     cdef long inboundary, i, j, k, l, it
     cdef double *p_attimes = &attimes[0]
     cdef double *p_occ    = &occ[0]
-    cdef double *p_O      = &O[0, 0, 0, 0]
+    cdef float *p_O      = &O[0, 0, 0, 0]
 
     cdef long ig_M1, jg_M2, kg_M3, g_M4, g_M1, g_M3, g_M2
 
@@ -203,14 +203,16 @@ def find_Occ4(long[::1] g_Ms, int NT, double[::1] attimes, double[::1] occ, doub
                                 inboundary = 0
                     
 
+#  quads=[[30, 67], [35, 73]]  # intermediate
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def get_obs_exp_v(long[::1] mv_g_Ms, float[:, :, :, ::1] mv_expctd, short[:, :, :, ::1] mv_chi2_boxes_mk, double low):
+def get_obs_exp_v(g_Ms, float[:, :, :, ::1] mv_expctd, short[:, :, :, ::1] mv_chi2_boxes_mk, double low, quadrnts=None):
 #def get_obs_exp_v(long[::1] mv_g_Ms, double[:, :, :, ::1] mv_expctd, short[:, :, :, ::1] mv_chi2_boxes_mk, double low):
     cdef double c_e = 0
     cdef short c_o = 0
     cdef double c_v = 0
     cdef long i0, i1, i2, i3, ii0, ii1, ii2, ii3
+    cdef long[::1] mv_g_Ms = g_Ms
     cdef long* p_g_Ms = &mv_g_Ms[0]
     #cdef double* p_expctd = &mv_expctd[0, 0, 0, 0]
     #cdef int* p_chi2_boxes_mk = &mv_chi2_boxes_mk[0, 0, 0, 0]
@@ -219,19 +221,62 @@ def get_obs_exp_v(long[::1] mv_g_Ms, float[:, :, :, ::1] mv_expctd, short[:, :, 
     run_e = []
     run_v = []
 
-    """
-    for i0 in xrange(0, p_g_Ms[0]-2, 2):
-        for i1 in xrange(0, p_g_Ms[1]-2, 2):
-            for i2 in xrange(0, p_g_Ms[2]-2, 2):
-                for i3 in xrange(0, p_g_Ms[3]-2, 2):
-                    for ii0 in xrange(i0, i0+2):
-                        for ii1 in xrange(i1, i1+2):
-                            for ii2 in xrange(i2, i2+2):
-                                for ii3 in xrange(i3, i3+2):
-                                    c_e += mv_expctd[ii0, ii1, ii2, ii3]
-                                    c_o += mv_chi2_boxes_mk[ii0, ii1, ii2, ii3]
 
+    if quadrnts is None:
+        quads0 = _N.arange(0, 1);  quads1 = _N.arange(0, 1)
+        quads2 = _N.arange(0, 1);  quads3 = _N.arange(0, 1)
+        lims0  = _N.array([0, g_Ms[0]-1]);   lims1  = _N.array([0, g_Ms[1]-1])
+        lims2  = _N.array([0, g_Ms[2]-1]);   lims3  = _N.array([0, g_Ms[3]-1])
+    else:
+        quads0 = _N.arange(0, len(quadrnts[0])+1)
+        quads1 = _N.arange(0, len(quadrnts[1])+1)
+        quads2 = _N.arange(0, len(quadrnts[2])+1)
+        quads3 = _N.arange(0, len(quadrnts[3])+1)
+        lims0  = _N.zeros(len(quadrnts[0])+2, dtype=_N.int)
+        lims1  = _N.zeros(len(quadrnts[1])+2, dtype=_N.int)
+        lims2  = _N.zeros(len(quadrnts[2])+2, dtype=_N.int)
+        lims3  = _N.zeros(len(quadrnts[3])+2, dtype=_N.int)
+
+        
+        lims0[len(quadrnts[0])+1]  = g_Ms[0]-1;        
+        lims1[len(quadrnts[1])+1]  = g_Ms[1]-1
+        lims2[len(quadrnts[2])+1]  = g_Ms[2]-1;        
+        lims3[len(quadrnts[3])+1]  = g_Ms[3]-1
+        for i in xrange(len(quadrnts[0])):  lims0[i+1] = quadrnts[0][i]
+        for i in xrange(len(quadrnts[1])):  lims1[i+1] = quadrnts[1][i]
+        for i in xrange(len(quadrnts[2])):  lims2[i+1] = quadrnts[2][i]
+        for i in xrange(len(quadrnts[3])):  lims3[i+1] = quadrnts[3][i]
+
+    """
+    for q0 in quads0:
+        for q1 in quads1:
+            print "new quad  %(1)d %(2)d" % {"1" : q0, "2" : q1}
+            for i0 in xrange(lims0[q0], lims0[q0+1]):
+                for i1 in xrange(lims1[q1], lims1[q1+1]):
+                    print "---  %(1)d %(2)d" % {"1" : i0, "2" : i1}
+    """
+
+    run_os = []
+    run_es = []
+    run_vs = []
+
+    lftovr_os = []   #  left overs
+    lftovr_es = []   #  left overs
+    for q0 in quads0:
+        for q1 in quads1:
+            for q2 in quads2:
+                for q3 in quads3:
+                    run_o = []
+                    run_e = []
+                    run_v = []
+                    for i0 in xrange(lims0[q0], lims0[q0+1]):
+                        for i1 in xrange(lims1[q1], lims1[q1+1]):
+                            for i2 in xrange(lims2[q2], lims2[q2+1]):
+                                for i3 in xrange(lims3[q3], lims3[q3+1]):
+                                    c_e += mv_expctd[i0, i1, i2, i3]
+                                    c_o += mv_chi2_boxes_mk[i0, i1, i2, i3]
                                     c_v += 1
+
                                     if (c_o > low) and (c_e > low):
                                         run_o.append(c_o)
                                         run_e.append(c_e)
@@ -239,8 +284,19 @@ def get_obs_exp_v(long[::1] mv_g_Ms, float[:, :, :, ::1] mv_expctd, short[:, :, 
                                         c_o = 0
                                         c_e = 0
                                         c_v = 0
-    """
 
+                    #  we calculate CIFs @ marks where model CIF takes large 
+                    #  value.  if model has predicts small CIF in  regions 
+                    #  where CIF should be large, c_e be too small and
+                    #  not trigger the above condition for inclusion into 
+                    #  run_e array.  
+                    lftovr_os.append(c_o)
+                    lftovr_es.append(c_e)
+                    run_os.append(run_o)
+                    run_es.append(run_e)
+                    run_vs.append(run_v)
+
+    """
 
     for i0 in xrange(0, p_g_Ms[0]-2, 2):
         for i1 in xrange(0, p_g_Ms[1]-2, 2):
@@ -262,6 +318,7 @@ def get_obs_exp_v(long[::1] mv_g_Ms, float[:, :, :, ::1] mv_expctd, short[:, :, 
                         c_e = 0
                         c_v = 0
 
+    """
 
 
-    return run_o, run_e, run_v
+    return run_os, run_es, run_vs, lftovr_os, lftovr_es

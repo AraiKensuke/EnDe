@@ -6,7 +6,7 @@ import matplotlib.pyplot as _plt
 import hc_bcast as _hb
 cimport hc_bcast as _hb
 from libc.stdio cimport printf
-from libc.math cimport sqrt, exp
+from libc.math cimport sqrt, exp, abs
 import cython
 cimport cython
 import fastnum as _fn
@@ -328,6 +328,12 @@ class GoFfuncs:
         cdef double[:, ::1] mv_cifs = cifs
         cdef double* p_cifs = &mv_cifs[0, 0]
         cdef long itt = -1
+
+        theseClose = _N.arange(M)   # (KDE) for each spike, keep all close spks
+        cdef long[::1] mv_theseClose = theseClose
+        cdef long* p_theseClose      = &mv_theseClose[0]
+        cdef long Nclose             = M
+
         ttt0 = _tm.time()
         if kde:
             iBm2 = iCovs[0, 0, 0]
@@ -347,7 +353,6 @@ class GoFfuncs:
                     for im in xrange(mdim):
                         p_mk[im] = mv_mkpos[t, 2+im]#oo.mkpos[t, 2+im]
                         p_rscldA[pmdim*itt + im+1] = p_mk[im]
-
 
                     if use_kde:
                         _hb.CIFatFxdMks_kde_nogil(p_mk, p_l0dt_i2pidcovs, p_us, iBm2, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, p_i_spc_occ_dt, M, ooNx, mdim, ddt)
@@ -413,6 +418,9 @@ class GoFfuncs:
         q2s  = _N.array(prms[4])
 
         cdef long M  = covs.shape[0]
+        theseClose = _N.arange(M)   # (KDE) for each spike, keep all close spks
+        cdef long[::1] mv_theseClose = theseClose
+        cdef long* p_theseClose      = &mv_theseClose[0]
 
         iSgs = _N.linalg.inv(prms[6])
         l0dt = _N.array(prms[0])#*oo.dt)
@@ -529,11 +537,16 @@ class GoFfuncs:
         cdef long I_0, I_1, I_2, I_3, I_4, I_5, I_6, I_7, I_8, I_9, I_10, I_11, I_12, I_13, I_14, I_15, id0, id1, id2, id3
         cdef double za, zb, zc, zd, ze, zf, zg, zh, zi, zk, zl, zm, zn, zo, zp
         cdef int im10, im11, im12, im20, im21, im22, im30, im31, im32, im40, im41, im42
+        cdef int Nclose, coi, coiK, cK, c, ic
+        cdef double close = covs[0, 0, 0]*4*sds_to_use*sds_to_use   # if kde, bandwidth^2.  both sides, so (2xsds_to_use)**2
+
 
         #_hb.CIFspatial_nogil(p_xp, p_l0dt_i2pidcovs, p_fs, p_iq2s, p_qdr_sp, M, ooNx, ddt)
 
         detcovs = _N.linalg.det(covs)
         sA      = detcovs.argsort()
+        cdef long[::1] mv_sA = sA
+        cdef long*     p_sA  = &mv_sA[0]
         
         cdef int skp_0_0, skp_0_1, skp_0_2, skp_0_3
 
@@ -562,7 +575,7 @@ class GoFfuncs:
             for ic in xrange(M):  
                 #  First, compute near peak of all clusters - no approximation
                 #  since near peak is very nonlinear so poor interpolation 
-                c   = sA[M-ic-1]  #  from narrowest to widest cluster
+                c   = p_sA[M-ic-1]  #  from narrowest to widest cluster
                 tt1 = _tm.time()
                 icnt = 0
                 cK = c*oo.mdim
@@ -610,11 +623,25 @@ class GoFfuncs:
                                         p_O[ii] *= ddt
 
         for ic in xrange(M):  #  now the rest of the mark space
-            c   = sA[M-ic-1]  #  from narrowest to widest cluster
+            c   = p_sA[M-ic-1]  #  from narrowest to widest cluster
             tt1 = _tm.time()
             icnt = 0
-            cK = c*oo.mdim
-            printf("doing cluster %d\n" % c)
+            cK = c*mdim
+
+            if (mdim > 1) and (use_kde == 1):
+                #  since for kde we're make a list of closest spikes to this one
+                Nclose = 0
+                for coi in xrange(M):
+                    coiK = coi*mdim
+
+                    if (((p_us[coiK] - p_us[cK])*(p_us[coiK] - p_us[cK])) + \
+                        ((p_us[coiK+1] - p_us[cK+1])*(p_us[coiK+1] - p_us[cK+1])) + \
+                        ((p_us[coiK+2] - p_us[cK+2])*(p_us[coiK+2] - p_us[cK+2])) + \
+                        ((p_us[coiK+3] - p_us[cK+3])*(p_us[coiK+3] - p_us[cK+3])) < close):
+                        p_theseClose[Nclose] = coi
+                        Nclose += 1
+
+                printf("doing cluster %d     close %ld\n", c, Nclose)
 
             if mdim == 1:
                 u0 = <int>((p_us[cK]   - LLcrnr0) / p_dm[0])
@@ -640,7 +667,7 @@ class GoFfuncs:
                             icnt += 1
                             #  mrngs   # mdim x g_M
                             if use_kde:
-                                _hb.CIFatFxdMks_kde_nogil(p_mk, p_l0dt_i2pidcovs, p_us, iBm2, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, p_i_spc_occ_dt, M, ooNx, mdim, ddt)
+                                _hb.CIFatFxdMks_kde_nogil_closeonly(p_mk, p_l0dt_i2pidcovs, p_us, iBm2, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, p_i_spc_occ_dt, M, ooNx, mdim, p_theseClose, Nclose, ddt)
                             else:
                                 _hb.CIFatFxdMks_nogil(p_mk, p_l0dt_i2pidcovs, p_us, p_iCovs, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, M, ooNx, mdim, ddt)
                             p_O[ii] = 0
@@ -688,8 +715,7 @@ class GoFfuncs:
                                 p_mk[0] = p_mrngs[i0]  #  mrngs[0, i0]  mrngs[0, 0:g_Ms[0]]
                                 p_mk[1] = p_mrngs[g_M + i1]   #  mrngs is 4 vecs of dim g_M
                                 if use_kde:
-
-                                    _hb.CIFatFxdMks_kde_nogil(p_mk, p_l0dt_i2pidcovs, p_us, iBm2, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, p_i_spc_occ_dt, M, ooNx, mdim, ddt)
+                                    _hb.CIFatFxdMks_kde_nogil_closeonly(p_mk, p_l0dt_i2pidcovs, p_us, iBm2, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, p_i_spc_occ_dt, M, ooNx, mdim, p_theseClose, Nclose, ddt)
                                 else:
                                     _hb.CIFatFxdMks_nogil(p_mk, p_l0dt_i2pidcovs, p_us, p_iCovs, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, M, ooNx, mdim, ddt)
                                 p_O[ii] = 0
@@ -772,7 +798,7 @@ class GoFfuncs:
                                         p_mk[3] = p_mrngs[3*g_M + i3]
                                         if use_kde:
 
-                                            _hb.CIFatFxdMks_kde_nogil(p_mk, p_l0dt_i2pidcovs, p_us, iBm2, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, p_i_spc_occ_dt, M, ooNx, mdim, ddt)
+                                            _hb.CIFatFxdMks_kde_nogil_closeonly(p_mk, p_l0dt_i2pidcovs, p_us, iBm2, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, p_i_spc_occ_dt, M, ooNx, mdim, p_theseClose, Nclose, ddt)
                                         else:
                                             _hb.CIFatFxdMks_nogil(p_mk, p_l0dt_i2pidcovs, p_us, p_iCovs, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, M, ooNx, mdim, ddt)
                                         p_O[ii] = 0
@@ -836,15 +862,18 @@ class GoFfuncs:
                                         zo  = p_O[I_14]
                                         zp  = p_O[I_15]
 
+                                        hi_0 = skip0 if i0 + skip0 < g_Ms[0] else g_Ms[0] - i0
+                                        hi_1 = skip1 if i1 + skip1 < g_Ms[1] else g_Ms[1] - i1
+                                        hi_2 = skip2 if i2 + skip2 < g_Ms[2] else g_Ms[2] - i2
+                                        hi_3 = skip3 if i3 + skip3 < g_Ms[3] else g_Ms[3] - i3
 
-
-                                        for id0 in xrange(skip0):
+                                        for id0 in xrange(hi_0):
                                             im12 = id0 + i0
-                                            for id1 in xrange(skip1):
+                                            for id1 in xrange(hi_1):
                                                 im22 = id1 + i1
-                                                for id2 in xrange(skip2):
+                                                for id2 in xrange(hi_2):
                                                     im32 = id2 + i2
-                                                    for id3 in xrange(skip3):
+                                                    for id3 in xrange(hi_3):
                                                         im42 = id3 + i3
                                                         iii = im12*g_M1+ im22*g_M2+ im32*g_M3+ im42
                                                         if p_O01[iii] == 0:

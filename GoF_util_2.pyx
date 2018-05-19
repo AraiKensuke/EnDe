@@ -7,7 +7,7 @@ from libc.math cimport sqrt
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def calc_volrat2(long g_T, long[::1] g_Ms, double[:, ::1] O, double[::1] trngs, double[:, ::1] volrat_mk):
+def calc_volrat2(long g_T, long[::1] g_Ms, float[:, ::1] O, double[::1] trngs, float[:, ::1] volrat_mk):
     #  changes in rescaled-time direction is abrupt, while over marks may not be so abrupt.  Cut box in mark direction in 4 
     cdef double tL, tH
     cdef double d1h, d2h, d3h, d4h, d1l, d2l, d3l, d4l
@@ -15,9 +15,9 @@ def calc_volrat2(long g_T, long[::1] g_Ms, double[:, ::1] O, double[::1] trngs, 
     cdef long m1, m2, m3, m4
 
     cdef long   *p_g_Ms  = &g_Ms[0]
-    cdef double *p_O     = &O[0, 0]
+    cdef float *p_O     = &O[0, 0]
     cdef double *p_trngs     = &trngs[0]
-    cdef double *p_volrat_mk = &volrat_mk[0, 0]
+    cdef float *p_volrat_mk = &volrat_mk[0, 0]
 
     cdef long it, inboundary, i_here, i_til_end
 
@@ -95,13 +95,13 @@ def calc_volrat2(long g_T, long[::1] g_Ms, double[:, ::1] O, double[::1] trngs, 
     return inside, outside, border, partials
                     
 
-def find_Occ2(long[::1] g_Ms, int NT, double[::1] attimes, double[::1] occ, double[:, ::1] O):
+def find_Occ2(long[::1] g_Ms, int NT, double[::1] attimes, double[::1] occ, float[:, ::1] O):
     #  at given rescaled time, number of mark voxels < boundary (rescaled time)
     cdef double maxt, att
     cdef int inboundary, i, j, k, l, it
     cdef double *p_attimes = &attimes[0]
     cdef double *p_occ    = &occ[0]
-    cdef double *p_O      = &O[0, 0]
+    cdef float *p_O      = &O[0, 0]
 
     cdef int ig_M1, g_M1
 
