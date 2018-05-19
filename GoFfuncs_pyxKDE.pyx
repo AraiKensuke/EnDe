@@ -595,7 +595,6 @@ class GoFfuncs:
 
         for c in xrange(M):   # pre-compute this
             qdr_sp[c] = (oo.xp - fs[c])*(oo.xp - fs[c])*iq2s[c]
-            #                 c = p_theseClose[ic]
         if use_kde == 0:
             if mdim == 4:  #  NEAR PEAKS
                 for ic in xrange(M):  
