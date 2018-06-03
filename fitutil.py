@@ -179,7 +179,7 @@ def kmBIC(ctrs, labs, X):
 
     return(BIC), m
 
-def emMKPOS_sep1A(nhmks, hmks, TR=5, wfNClstrs=[[1, 7], [1, 10]], spNClstrs=[[1, 2], [1, 7]], K=4):
+def emMKPOS_sep1A(nhmks, hmks, TR=5, wfNClstrs=[[1, 7], [1, 10]], spNClstrs=[[1, 2], [1, 7]], K=4, spcdim=1):
     #  wfNClstrs   [ non-hash(min, max), hash(min, max)  by waveform clustering
     TR = 2
 
@@ -216,10 +216,10 @@ def emMKPOS_sep1A(nhmks, hmks, TR=5, wfNClstrs=[[1, 7], [1, 10]], spNClstrs=[[1,
 
                 if LiTC > 2:   #  at least 2 spikes from this neuron
                     pbestLab = _N.ones(LiTC, dtype=_N.int) * -1   #  poslabs
-                    pos = mks[inThisClstr, 0]
+                    pos = mks[inThisClstr, 0:spcdim]
                     #_N.savetxt("clstr%(nh)d_%(iRM)d" % {"nh" : iNH, "iRM" : iRMv_ME}, mks[inThisClstr], fmt="%.4f %4f %.4f %4f %.4f")
                     iRMv_ME += 1
-                    pos = pos.reshape(LiTC, 1)
+                    pos = pos.reshape(LiTC, spcdim)
 
                     #  1 spk / clstr maxK == LiTC   want a few more than 1 / clstr
                     #  maxK is at most _maxK unless LiTC

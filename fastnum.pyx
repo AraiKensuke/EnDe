@@ -866,3 +866,29 @@ cdef double sum_random_inds_nogil(double* p_arr, long* p_these_inds, long t0, lo
     return tot
 
     
+
+
+
+#_N.sum(gz[frms[m]:ITERS, :, m], axis=1)   
+#  For each iteration, # of spikes assigned to cluster m
+
+#occ[m]   = _N.mean(_N.sum(gz[frms[m]:ITERS, :, m], axis=1), axis=0)
+#The mean value of this
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.cdivision(True)
+def avg_occ(char[:, :, ::1] mv_gz, long i0, long i1, long N, long M, long m):
+    #occ_m = _N.empty(i1 - i0, dtype=_N.int32)
+    cdef char* p_gz = &mv_gz[0, 0, 0]
+    cdef long itNMpm = 0
+    cdef long tot = 0
+    cdef long it, n
+
+    with nogil:
+        for it in xrange(i0, i1, 10):
+            itNMpm = it*N*M + m
+            for n in xrange(N):
+                tot += p_gz[itNMpm + n*M]
+
+    return (<double>tot) / ((i1-i0)*0.1)

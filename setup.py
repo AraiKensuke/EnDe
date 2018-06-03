@@ -9,9 +9,14 @@ from Cython.Distutils import build_ext   # Extension for a c-file, build_ext for
 
 #modules = ["hc_bcast", "par_intgrls_f", "par_intgrls_q2", "fastnum"]
 #modules = ["raw_random_access"]
-#modules = ["hc_bcast"]
+#modules = ["hc_bcast", "GoFfuncs_pyx", "GoF_util"]
 #modules = ["fastnum"]
-modules = ["hc_bcast", "GoFfuncs_pyx"]
+#modules  = ["GoFfuncs_pyxAd"]
+#modules  = ["GoF_util", "GoF_util_2", "GoF_util_4"]
+#modules  = ["cdf_smp_sumx_2d"]
+#modules  = ["cdf_smp"]
+modules = ["fastnum", "hc_bcast", "GoFfuncs_pyxKDE", "GoF_util", "GoF_util_2", "GoF_util_4"]
+#modules = ["fastnum"]
 
 ###  import LogitWrapper 
 ###  LogitWrapper

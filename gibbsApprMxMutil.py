@@ -14,20 +14,23 @@ import posteriorUtil as _pU
 twpi = 2*_N.pi
 wdSpc = 1
 
-def initClusters(oo, M_max, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneCluster=False):
+def initClusters(oo, M_max, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=3, oneCluster=False, spcdim=1):
     n0 = 0
     n1 = len(Asts)
     print "gibbsApprMxMutil.initClusters   %d spikes" % (n1-n0)
 
-    _x   = _N.empty((n1-n0, K+1))
-    _x[:, 0]    = x[Asts+t0]
-    _x[:, 1:]   = mks[Asts+t0]
+    
+    print (n1-n0)
+    _x   = _N.empty((n1-n0, K+spcdim))
+    
+    _x[:, 0:spcdim]    = x[Asts+t0]
+    _x[:, spcdim:]   = mks[Asts+t0]
 
     if oneCluster:
         unonhash = _N.arange(len(Asts))
         hashsp   = _N.array([])
         if len(Asts > 0):
-            hashthresh = _N.min(_x[:, 1:], axis=0)   #  no hash spikes
+            hashthresh = _N.min(_x[:, spcdim:], axis=0)   #  no hash spikes
         else:
             hashthresh = -100.
 
@@ -43,40 +46,21 @@ def initClusters(oo, M_max, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=
         if not doSepHash:
             unonhash = _N.arange(len(Asts))
             hashsp   = _N.array([])
-            hashthresh = _N.min(_x[:, 1:], axis=0)   #  no hash spikes
+            print _x.shape
+            hashthresh = _N.min(_x[:, spcdim:], axis=0)   #  no hash spikes
 
-            ###   1 cluster
-            # labS = _N.zeros(len(Asts), dtype=_N.int)
-            # labH = _N.array([], dtype=_N.int)
-            # clstrs = _N.array([0, 1])
+
         else:
             unonhash, hashsp, hashthresh = sepHash(_x, BINS=20, blksz=5, xlo=oo.xLo, xhi=oo.xHi, K=K)
-            #  hashthresh is dim 2
-
-            # print len(unonhash)
-            # print "--------"
-            # print len(hashsp)
-            # fig = _plt.figure(figsize=(5, 10))
-            # fig.add_subplot(3, 1, 1)
-            # _plt.scatter(_x[hashsp, 1], _x[hashsp, 2], color="red")
-            # _plt.scatter(_x[unonhash, 1], _x[unonhash, 2], color="black")
-            # fig.add_subplot(3, 1, 2)
-            # _plt.scatter(_x[hashsp, 0], _x[hashsp, 1], color="red")
-            # _plt.scatter(_x[unonhash, 0], _x[unonhash, 1], color="black")
-            # fig.add_subplot(3, 1, 3)
-            # _plt.scatter(_x[hashsp, 0], _x[hashsp, 2], color="red")
-            # _plt.scatter(_x[unonhash, 0], _x[unonhash, 2], color="black")
 
 
-        # len(hashsp)==len(labH)
-        # len(unonhash)==len(labS)
         if (len(unonhash) > 0) and (len(hashsp) > 0):  # REAL DATA
             labH, labS, clstrs = emMKPOS_sep1A(_x[unonhash], _x[hashsp], K=K, TR=3)
         elif len(unonhash) == 0:
-            labH, labS, clstrs = emMKPOS_sep1A(None, _x[hashsp], TR=5, K=K)
+            labH, labS, clstrs = emMKPOS_sep1A(None, _x[hashsp], TR=1, K=K)
         else:
-            print "---------  here"
-            labH, labS, clstrs = emMKPOS_sep1A(_x[unonhash], None, TR=5, K=K)
+            print "---------  doSepH==False"   #  doSepHash == False
+            labH, labS, clstrs = emMKPOS_sep1A(_x[unonhash], None, TR=1, K=K, spcdim=spcdim)
             #  labs, labh are at this point both starting from 0
         if doSepHash:
             contiguous_pack2(labH, startAt=0)
@@ -131,20 +115,28 @@ def initClusters(oo, M_max, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=
     return labS, labH, flatlabels, M_use, hashthresh, clstrs
 
 
-def declare_params(M, K, uAll=None, SgAll=None):
+def declare_params(M, K, uAll=None, SgAll=None, spcdim=1):
     ######################################  INITIAL VALUE OF PARAMS
     l0       = _N.array([11.,]*M)
-    q2       = _N.array([0.04]*M)
-    f        = _N.empty(M)
+    if spcdim == 1:
+        q2       = _N.array([0.04]*M)
+        f        = _N.empty(M)
+    else:
+        q2       = _N.array(([0.04]*M, spcdim))
+        f        = _N.empty((M, spcdim))
     u       = _N.zeros((M, K))   #  center
     Sg      = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*0.1
     return l0, f, q2, u, Sg
 
-def declare_prior_hyp_params(M, clstrs, K, x, mks, Asts, t0, priors, labS, labH):
+def declare_prior_hyp_params(M, clstrs, K, x, mks, Asts, t0, priors, labS, labH, spcdim=1):
     #  PRIORS.  These get updated after each EPOCH
     #  priors  prefixed w/ _
-    _f_u    = _N.zeros(M);    _f_q2  = _N.ones(M)*16 #  wide
-    _q2_a   = _N.ones(M)*0.01;    _q2_B  = _N.ones(M)*1e-3
+    if spcdim == 1:
+        _f_u    = _N.zeros(M);    _f_q2  = _N.ones(M)*16 #  wide
+        _q2_a   = _N.ones(M)*0.01;    _q2_B  = _N.ones(M)*1e-3
+    else:
+        _f_u    = _N.zeros((M, spcdim));    _f_q2  = _N.ones((M, spcdim))*16 #  wide
+        _q2_a   = _N.ones((M, spcdim))*0.01;    _q2_B  = _N.ones((M, spcdim))*1e-3
     _l0_a   = _N.ones(M)*0.5;     _l0_B  = _N.ones(M)
 
     iclstr  = -1
@@ -271,7 +263,13 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
         occ   = _N.empty(M_use)
         for m in xrange(M_use):
            #occ[m]   = _N.mean(_N.sum(gz[frms[m]:ITERS-1:10, :, m], axis=1), axis=0)
-            occ[m]   = _N.mean(_N.sum(gz[frms[m]:ITERS, :, m], axis=1), axis=0)
+            if ITERS-frms[m] > 3000:
+                occ[m]   = _N.mean(_N.sum(gz[frms[m]:ITERS:30, :, m], axis=1), axis=0)
+            elif ITERS-frms[m] > 2000:
+                occ[m]   = _N.mean(_N.sum(gz[frms[m]:ITERS:20, :, m], axis=1), axis=0)
+            else:
+                occ[m]   = _N.mean(_N.sum(gz[frms[m]:ITERS, :, m], axis=1), axis=0)
+
             print "occupation for m=%(m)d   %(o)f" % {"m" : m, "o" : occ[m]}
 
     ##  
@@ -384,7 +382,7 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
             if (oo.sp_prmPstMd[oo.ky_p_f+3*m] < oo.xLo-sq25[m]) or (oo.sp_prmPstMd[oo.ky_p_f+3*m] > oo.xHi+sq25[m]):
                 breset = True
                 print "spatial cener too far away from edges  %d" % m
-            elif v1 > 3.:
+            elif (v1 > 5.):
                 breset = True
                 print "high uncertainty relative to width  %d" % m
                 

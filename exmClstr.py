@@ -439,7 +439,7 @@ def timeline_v2(bfn, datfn, itvfn, outfn="timeline", ch1=0, ch2=1, xL=0, xH=3, y
     if ytpos == "right":
         fig.subplots_adjust(left=0.05, bottom=0.08, right=0.84, top=0.95, wspace=0.4, hspace=0.4)
     epochs = len(itv)-1
-    for fmt in ["png", "eps"]:
+    for fmt in ["eps"]:
         choutfn = "%(of)s.%(fmt)s" % {"of" : outfn, "fmt" : fmt}
         _plt.savefig(resFN(choutfn, dir=bfn), transparent=True)
     _plt.close()

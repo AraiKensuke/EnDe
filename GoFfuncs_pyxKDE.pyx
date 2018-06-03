@@ -1,6 +1,5 @@
 import numpy as _N
 from EnDedirs import resFN, datFN
-import kdeutil as _ku
 import time as _tm
 import matplotlib.pyplot as _plt
 import hc_bcast as _hb
@@ -11,6 +10,7 @@ import cython
 cimport cython
 import fastnum as _fn
 cimport fastnum as _fn
+import decodeutil as _du
 #import CIF_on_grid as CIFongrd
 
 mz_CRCL = 0
@@ -167,18 +167,16 @@ class GoFfuncs:
         his    = _N.empty((M, oo.mdim))
         cand_grd_szs = _N.empty((M, oo.mdim))
 
-        for m in xrange(M):
-            his[m]    = us[m] + sds_to_use*_N.sqrt(_N.diagonal(covs[m]))  #  unit
-            los[m]    = us[m] - sds_to_use*_N.sqrt(_N.diagonal(covs[m]))  #  unit
+        for m in xrange(M):  #  slightly larger area to make sure increasing
+            #  
+            his[m]    = us[m] + 1.5*sds_to_use*_N.sqrt(_N.diagonal(covs[m]))  #  unit
+            los[m]    = us[m] - 1.5*sds_to_use*_N.sqrt(_N.diagonal(covs[m]))  #  unit
 
             #print _N.sqrt(_N.diagonal(covs[m]))
             cand_grd_szs[m] = _N.sqrt(_N.diagonal(covs[m]))/smpsPerSD
 
         all_his = _N.max(his, axis=0)
         all_los = _N.min(los, axis=0)
-
-        obsvd_his = _N.max(obsvd_mks, axis=0)
-        obsvd_los = _N.min(obsvd_mks, axis=0)
 
         #nObsvd = obsvd_mks.shape[0]
         # for n in xrange(nObsvd):
@@ -199,12 +197,36 @@ class GoFfuncs:
         #     if (obsvd_mks[n, 3] < all_los[3]):
         #         print "too small %d in 3rd dim" % n
 
-        grd_szs = _N.min(cand_grd_szs, axis=0)
+
+
+        if (method == _du._KDE) or (method == _du._GT):
+            grd_szs = _N.min(cand_grd_szs, axis=0)
+        else:
+            l0s = prms[0]
+            covs= prms[2]
+            q2s = prms[4]
+            norms = l0s/((2*_N.pi**((oo.mdim+1)/2.))*_N.sqrt(_N.linalg.det(covs)*q2s))
+            grd_szs = _N.empty(oo.mdim)
+
+            for k in xrange(oo.mdim):
+                inds_incr = _N.argsort(cand_grd_szs[:, k])
+                print norms[inds_incr]
+                print _N.linalg.det(covs)[inds_incr]
+            
+                grd_szs[k] = cand_grd_szs[inds_incr[0], k]
+
 
         amps  = all_his - all_los
         g_Ms = _N.array(amps / grd_szs, dtype=_N.int)
 
+        #  quick hack, to allow me to calculate tetrode 11.
+        for im in xrange(oo.mdim):
+            if g_Ms[im] > 600:
+                print "g_Ms[%(im)d] == %(g_Ms)d.  lower to 600" % {"im" : im, "g_Ms" : g_Ms[im]}
+                g_Ms[im] = 600
+            #g_Ms[im] = 600 if (g_Ms[im] > 600) else g_Ms[im]
         g_M_max = _N.max(g_Ms)
+        
         print g_Ms
         print g_M_max
         mk_ranges = _N.empty((oo.mdim, g_M_max))
@@ -593,9 +615,52 @@ class GoFfuncs:
 
         print "M  is %d" % M
 
+        ##  if mdim == 1
+        ##  if use_kde
+        ##     if mdim == 4
+        ##  if not use_kde
         for c in xrange(M):   # pre-compute this
             qdr_sp[c] = (oo.xp - fs[c])*(oo.xp - fs[c])*iq2s[c]
-        if use_kde == 0:
+
+        if mdim == 1:  
+            u0 = <int>((p_us[cK]   - LLcrnr0) / p_dm[0])
+
+            if use_kde == 0:  #  all clusters have same width (KDE)
+                d_skip0 = (sqrt(covs[c, 0, 0]) / smpsPerSD)/p_dm[0]
+                skip0   = <int>_N.ceil(d_skip0 - 0.05)  #  allow for 1.01 to be 1
+                skip0   = 1
+            idl_grd_sz0 = p_dm[0]*skip0
+
+            w0 = <int>((sqrt(covs[c, 0, 0]) / idl_grd_sz0)*sds_to_use)
+
+            printf("skip0   %d\n" % skip0)
+            with nogil:
+                for i0 from 0 <= i0 < g_Ms[0]:
+                    p_mk[0] = p_mrngs[i0]  #  mrngs[0, i0]  mrngs[0, 0:g_Ms[0]]
+                    ii = i0
+                    if (not ((i0 > g_Ms[0]) or (i0 < 0)) and \
+                             (p_O01[ii] == 0)):
+                        #if p_O01[ii] == 0:
+                        p_O01[ii] = 1
+
+                        icnt += 1
+                        #  mrngs   # mdim x g_M
+                        if use_kde:
+                            _hb.CIFatFxdMks_kde_nogil(p_mk, p_l0dt_i2pidcovs, p_us, iBm2, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, p_i_spc_occ_dt, M, ooNx, mdim, ddt)
+                        else:
+                            _hb.CIFatFxdMks_nogil(p_mk, p_l0dt_i2pidcovs, p_us, p_iCovs, p_CIF_at_grid_mks, p_qdr_mk, p_qdr_sp, M, ooNx, mdim, ddt)
+                        p_O[ii] = 0
+
+                        for nn in xrange(ooNx):
+                            p_O[ii] += p_pos_hstgrm_t0t1[nn]*p_CIF_at_grid_mks[nn]
+                            #p_O[ii] += p_CIF_at_grid_mks[nn]
+                        p_O[ii] *= ddt
+
+                        ##  summing over entire path is VERY slow.  we get roughly 100x speed up when using histogram
+                        #for tt in xrange(0, t1-t0-1):
+                        #    p_O[ii] += p_CIF_at_grid_mks[p_disc_pos_t0t1[tt]]
+
+        if (use_kde == 0) and (mdim > 1):   #  be explicit
             if mdim == 4:  #  NEAR PEAKS
                 for ic in xrange(M):  
                     #  First, compute near peak of all clusters - no approximation
@@ -611,10 +676,10 @@ class GoFfuncs:
                     u2 = <int>((p_us[cK+2] - LLcrnr2) * p_idm[2])
                     u3 = <int>((p_us[cK+3] - LLcrnr3) * p_idm[3])
 
-                    w0 = <int>((sqrt(covs[c, 0, 0]) * p_idm[0]))
-                    w1 = <int>((sqrt(covs[c, 1, 1]) * p_idm[1]))
-                    w2 = <int>((sqrt(covs[c, 2, 2]) * p_idm[2]))
-                    w3 = <int>((sqrt(covs[c, 3, 3]) * p_idm[3]))
+                    w0 = <int>((sqrt(covs[c, 0, 0]) * p_idm[0])) + 1
+                    w1 = <int>((sqrt(covs[c, 1, 1]) * p_idm[1])) + 1
+                    w2 = <int>((sqrt(covs[c, 2, 2]) * p_idm[2])) + 1
+                    w3 = <int>((sqrt(covs[c, 3, 3]) * p_idm[3])) + 1
 
                     lo_0 = (u0 - w0) if (u0 - w0) >= 0 else 0
                     hi_0  = (u0 + w0+1) if (u0 + w0+1) <= g_Ms[0] else g_Ms[0]
@@ -691,10 +756,10 @@ class GoFfuncs:
                     idl_grd_sz2 = p_dm[2]*skip2
                     idl_grd_sz3 = p_dm[3]*skip3
 
-                    w0 = <int>((sqrt(covs[c, 0, 0]) / idl_grd_sz0)*sds_to_use)
-                    w1 = <int>((sqrt(covs[c, 1, 1]) / idl_grd_sz1)*sds_to_use)
-                    w2 = <int>((sqrt(covs[c, 2, 2]) / idl_grd_sz2)*sds_to_use)
-                    w3 = <int>((sqrt(covs[c, 3, 3]) / idl_grd_sz3)*sds_to_use)
+                    w0 = <int>((sqrt(covs[c, 0, 0]) / idl_grd_sz0)*sds_to_use) + 3
+                    w1 = <int>((sqrt(covs[c, 1, 1]) / idl_grd_sz1)*sds_to_use) + 3
+                    w2 = <int>((sqrt(covs[c, 2, 2]) / idl_grd_sz2)*sds_to_use) + 3
+                    w3 = <int>((sqrt(covs[c, 3, 3]) / idl_grd_sz3)*sds_to_use) + 3
 
                     lo_0 = (u0 - w0) if (u0 - w0) >= 0 else 0
                     hi_0  = (u0 + w0+1) if (u0 + w0+1) <= g_Ms[0] else g_Ms[0]
@@ -728,7 +793,8 @@ class GoFfuncs:
                                             p_O[ii] += p_pos_hstgrm_t0t1[nn]*p_CIF_at_grid_mks[nn]
                                         p_O[ii] *= ddt
 
-                    #  do intrapolation
+
+                    #  do intrapolation    part 1
                     for i0 from lo_0 <= i0 < (hi_0-skip0) by skip0:
                         im10 = i0
                         im11 = i0 + skip0
@@ -815,10 +881,100 @@ class GoFfuncs:
                                                                     zp * (im12-im10)*(im22-im20)*(im32-im30)*(im42-im40))
                                                         p_O[iii] = zint
                                                         p_O01[iii] = 1
+
+                    #  do intrapolation    part 2
+                    for i0 from hi_0-skip0 <= i0 < hi_0 by skip0:
+                        im10 = i0
+                        im11 = i0 + skip0
+                        for i1 from hi_1-skip1 <= i1 < hi_1 by skip1:
+                            im20 = i1
+                            im21 = i1 + skip1
+                            for i2 from hi_2-skip2 <= i2 < hi_2 by skip2:
+                                im30 = i2
+                                im31 = i2 + skip2
+                                for i3 from hi_3-skip3 <= i3 < hi_3 by skip3:
+                                    im40 = i3
+                                    im41 = i3 + skip3
+
+                                    I_0 = im10*g_M1 + im20*g_M2 + im30*g_M3 + im40
+
+                                    I_1 = im11*g_M1 + im20*g_M2 + im30*g_M3 + im40
+                                    I_2 = im10*g_M1 + im21*g_M2 + im30*g_M3 + im40
+                                    I_3 = im10*g_M1 + im20*g_M2 + im31*g_M3 + im40
+                                    I_4 = im10*g_M1 + im20*g_M2 + im30*g_M3 + im41
+
+                                    I_5 = im11*g_M1 + im21*g_M2 + im30*g_M3 + im40
+                                    I_6 = im11*g_M1 + im20*g_M2 + im31*g_M3 + im40
+                                    I_7 = im11*g_M1 + im20*g_M2 + im30*g_M3 + im41
+                                    I_8 = im10*g_M1 + im21*g_M2 + im31*g_M3 + im40
+                                    I_9 = im10*g_M1 + im21*g_M2 + im30*g_M3 + im41
+                                    I_10= im10*g_M1 + im20*g_M2 + im31*g_M3 + im41
+
+                                    I_11= im11*g_M1 + im21*g_M2 + im31*g_M3 + im40
+                                    I_12= im11*g_M1 + im21*g_M2 + im30*g_M3 + im41
+                                    I_13= im11*g_M1 + im20*g_M2 + im31*g_M3 + im41
+                                    I_14= im10*g_M1 + im21*g_M2 + im31*g_M3 + im41
+
+                                    I_15= im11*g_M1 + im21*g_M2 + im31*g_M3 + im41
+
+
+                                    za  = p_O[I_0]
+                                    zb  = p_O[I_1]
+                                    zc  = p_O[I_2]
+                                    zd  = p_O[I_3]
+                                    ze  = p_O[I_4]
+                                    zf  = p_O[I_5]
+                                    zg  = p_O[I_6]
+                                    zh  = p_O[I_7]
+                                    zi  = p_O[I_8]
+                                    zj  = p_O[I_9]
+                                    zk  = p_O[I_10]
+                                    zl  = p_O[I_11]
+                                    zm  = p_O[I_12]
+                                    zn  = p_O[I_13]
+                                    zo  = p_O[I_14]
+                                    zp  = p_O[I_15]
+
+
+
+                                    for id0 in xrange(skip0):
+                                        im12 = id0 + i0
+                                        for id1 in xrange(skip1):
+                                            im22 = id1 + i1
+                                            for id2 in xrange(skip2):
+                                                im32 = id2 + i2
+                                                for id3 in xrange(skip3):
+                                                    im42 = id3 + i3
+                                                    iii = im12*g_M1+ im22*g_M2+ im32*g_M3+ im42
+                                                    if p_O01[iii] == 0:
+                                                        printf("filling 2nd\n")
+                                                        zint  = iv*(za * (im11-im12)*(im21-im22)*(im31-im32)*(im41-im42) + \
+                                                                    ##########################################
+                                                                    zb * (im12-im10)*(im21-im22)*(im31-im32)*(im41-im42) + \
+                                                                    zc * (im11-im12)*(im22-im20)*(im31-im32)*(im41-im42) + \
+                                                                    zd * (im11-im12)*(im21-im22)*(im32-im30)*(im41-im42) + \
+                                                                    ze * (im11-im12)*(im21-im22)*(im31-im32)*(im42-im40) + \
+                                                                    ##########################################
+                                                                    zf * (im12-im10)*(im22-im20)*(im31-im32)*(im41-im42) + \
+                                                                    zg * (im12-im10)*(im21-im22)*(im32-im30)*(im41-im42) + \
+                                                                    zh * (im12-im10)*(im21-im22)*(im31-im32)*(im42-im40) + \
+                                                                    zi * (im11-im12)*(im22-im20)*(im32-im30)*(im41-im42) + \
+                                                                    zj * (im11-im12)*(im22-im20)*(im31-im32)*(im42-im40) + \
+                                                                    zk * (im11-im12)*(im21-im22)*(im32-im30)*(im42-im40) + \
+                                                                    ##########################################
+                                                                    zl * (im12-im10)*(im22-im20)*(im32-im30)*(im41-im42) + \
+                                                                    zm * (im12-im10)*(im22-im20)*(im31-im32)*(im42-im40) + \
+                                                                    zn * (im12-im10)*(im21-im22)*(im32-im30)*(im42-im40) + \
+                                                                    zo * (im11-im12)*(im22-im20)*(im32-im30)*(im42-im40) + \
+                                                ##########################################
+                                                                    zp * (im12-im10)*(im22-im20)*(im32-im30)*(im42-im40))
+                                                        p_O[iii] = zint
+                                                        p_O01[iii] = 1
+
                 tt2 = _tm.time()
                 printf("**done   %.4f, icnt  %d\n", (tt2-tt1), icnt)
 
-        if use_kde == 1:   #######KDEKDEKDE
+        if (use_kde == 1) and (mdim > 1):   #######KDEKDEKDE
             for icM in xrange(M):  #  now the rest of the mark space
                 tt1 = _tm.time()
                 icnt = 0

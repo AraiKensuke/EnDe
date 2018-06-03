@@ -191,6 +191,7 @@ def smp_f_2d(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
     cdef double* p_adtv_pdf_params = &v_adtv_pdf_params[0]
     cdef double U, FQ2
 
+    ##  spiking part of the likelihood
     for 0 <= m < M:
         if p_clstsz[m] > 0:
             tmp = 0

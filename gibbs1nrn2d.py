@@ -116,7 +116,7 @@ class MarkAndRF:
             oo.q2_lvls[i] = q2_mlt_steps*oo.q2_lvls[i-1]
             oo.Nupxy_lvls[i] = int(_N.ceil(((oo.xyHi-oo.xyLo)/_N.sqrt(oo.q2_lvls[i]))*bins_per_sd))
 
-    def gibbs(self, ITERS, K, priors, ep1=0, ep2=None, saveSamps=True, saveOcc=True, doSepHash=True, nz_pth=0., smth_pth_ker=0, f_STEPS=13, q2_STEPS=13, f_SMALL=10, q2_SMALL=10, f_cldz=10, q2_cldz=10, minSmps=20, diag_cov=False, earliest=20000, cmprs=20):
+    def gibbs(self, ITERS, K, priors, ep1=0, ep2=None, saveSamps=True, saveOcc=True, doSepHash=True, nz_pth=0., smth_pth_ker=0, f_STEPS=13, q2_STEPS=13, f_SMALL=10, q2_SMALL=10, f_cldz=10, q2_cldz=10, minSmps=20, diag_cov=False, earliest=20000, cmprs=1):
         """
         gtdiffusion:  use ground truth center of place field in calculating variance of center.  Meaning of diffPerMin different
         """
@@ -171,12 +171,16 @@ class MarkAndRF:
 
             xt0t1 = _N.array(x[t0:t1])#smthd_pos
             yt0t1 = _N.array(y[t0:t1])#smthd_pos
+            cmp_xt0t1 = xt0t1#smthd_pos
+            cmp_yt0t1 = yt0t1#smthd_pos
+
             Nt0t1 = t1-t0
+            cmp_Nt0t1 = t1-t0
 
-            _cdfs2d.setup_occ(oo.xLo, oo.xHi, oo.q2_lvls, oo.Nupx_lvls)
+            #_cdfs2d.setup_occ(oo.xLo, oo.xHi, oo.q2_lvls, oo.Nupx_lvls)
 
 
-            _cdfs2d.change_occ_hist(xt0t1, oo.xLo, oo.xHi)
+            #_cdfs2d.change_occ_hist(xt0t1, oo.xLo, oo.xHi)
 
             Asts    = _N.where(oo.dat[t0:t1, s01col] == 1)[0]   #  based at 0
 
@@ -247,12 +251,12 @@ class MarkAndRF:
                     m_rnds = _N.random.rand(M_use)
 
                     cmp_wgt_y  = _N.exp(-0.5*(cmp_yt0t1-fy)*(cmp_yt0t1-fy)/q2y)
-                    _cdfs.smp_f_2d(M_use, clstsz, cls_str_ind, v_sts, xt0t1, cmp_xt0t1, cmprs, t0, fx, q2x, l0, cmp_wgt_y, _f_u, q2pr, m_rnds)
+                    _cdfs2d.smp_f_2d(M_use, clstsz, cls_str_ind, v_sts, xt0t1, cmp_xt0t1, cmprs, t0, fx, q2x, l0, cmp_wgt_y, _f_u, q2pr, m_rnds)
 
                     #f   = _N.array([6.33])
                     smp_sp_prms[oo.ky_p_fx, itr] = fx
                     cmp_wgt_x  = _N.exp(-0.5*(cmp_xt0t1-fx)*(cmp_xt0t1-fx)/q2x)
-                    _cdfs.smp_f_2d(M_use, clstsz, cls_str_ind, v_sts, yt0t1, cmp_yt0t1, cmprs, t0, fy, q2y, l0, cmp_wgt_x, _f_u, q2pr, m_rnds)
+                    _cdfs2d.smp_f_2d(M_use, clstsz, cls_str_ind, v_sts, yt0t1, cmp_yt0t1, cmprs, t0, fy, q2y, l0, cmp_wgt_x, _f_u, q2pr, m_rnds)
                     smp_sp_prms[oo.ky_p_fy, itr] = fy
 
                     ##############
@@ -266,7 +270,7 @@ class MarkAndRF:
                     _Dq2_B = _q2_B
 
                     cmp_wgt_y  = _N.exp(-0.5*(cmp_yt0t1-fy)*(cmp_yt0t1-fy)/q2y)
-                    _cdfs.smp_q2_2d(M_use, clstsz, cls_str_ind, v_sts, xt0t1, cmp_xt0t1, cmprs, t0, fx, q2x, l0, cmp_wgt_y, _Dq2_a, _Dq2_B, m_rnds)
+                    _cdfs2d.smp_q2_2d(M_use, clstsz, cls_str_ind, v_sts, xt0t1, cmp_xt0t1, cmprs, t0, fx, q2x, l0, cmp_wgt_y, _Dq2_a, _Dq2_B, m_rnds)
                     smp_sp_prms[oo.ky_p_q2x, itr]   = q2x
                     # q2x = _N.array([1.])
                     # q2y = _N.array([0.05])
@@ -274,7 +278,7 @@ class MarkAndRF:
                     # smp_sp_prms[oo.ky_p_q2y, itr] = q2y
 
                     cmp_wgt_x  = _N.exp(-0.5*(cmp_xt0t1-fx)*(cmp_xt0t1-fx)/q2x)
-                    _cdfs.smp_q2_2d(M_use, clstsz, cls_str_ind, v_sts, yt0t1, cmp_yt0t1, cmprs, t0, fy, q2y, l0, cmp_wgt_x, _Dq2_a, _Dq2_B, m_rnds)
+                    _cdfs2d.smp_q2_2d(M_use, clstsz, cls_str_ind, v_sts, yt0t1, cmp_yt0t1, cmprs, t0, fy, q2y, l0, cmp_wgt_x, _Dq2_a, _Dq2_B, m_rnds)
                     smp_sp_prms[oo.ky_p_q2y, itr]   = q2y
 
 
@@ -282,7 +286,7 @@ class MarkAndRF:
                     ###############  CONDITIONAL l0
                     ###############
                     # _ss.gamma.rvs.  uses k, theta  k is 1/B (B is our thing)
-                    _cdfs.l0_spatial(cmp_xt0t1, cmp_yt0t1, cmprs, M_use, oo.dt, fx, q2x, fy, q2y, l0_exp_px)
+                    _cdfs2d.l0_spatial(cmp_xt0t1, cmp_yt0t1, cmprs, M_use, oo.dt, fx, q2x, fy, q2y, l0_exp_px)
 
                     BL  = l0_exp_px    #  dim M
 
@@ -295,6 +299,5 @@ class MarkAndRF:
 
                     l0 = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_), size=M_use)  #  check
 
-                    #l0  = _N.array([800.])
                     smp_sp_prms[oo.ky_p_l0, itr] = l0
 

@@ -206,7 +206,7 @@ def find_Occ4(long[::1] g_Ms, int NT, double[::1] attimes, double[::1] occ, floa
 #  quads=[[30, 67], [35, 73]]  # intermediate
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def get_obs_exp_v(g_Ms, float[:, :, :, ::1] mv_expctd, short[:, :, :, ::1] mv_chi2_boxes_mk, double low, quadrnts=None):
+def get_obs_exp_v(g_Ms, float[:, :, :, ::1] mv_expctd, char[:, :, :, ::1] mv_chi2_boxes_mk, double low, quadrnts=None):
 #def get_obs_exp_v(long[::1] mv_g_Ms, double[:, :, :, ::1] mv_expctd, short[:, :, :, ::1] mv_chi2_boxes_mk, double low):
     cdef double c_e = 0
     cdef short c_o = 0
@@ -269,15 +269,21 @@ def get_obs_exp_v(g_Ms, float[:, :, :, ::1] mv_expctd, short[:, :, :, ::1] mv_ch
                     run_o = []
                     run_e = []
                     run_v = []
-                    for i0 in xrange(lims0[q0], lims0[q0+1]):
-                        for i1 in xrange(lims1[q1], lims1[q1+1]):
-                            for i2 in xrange(lims2[q2], lims2[q2+1]):
-                                for i3 in xrange(lims3[q3], lims3[q3+1]):
-                                    c_e += mv_expctd[i0, i1, i2, i3]
-                                    c_o += mv_chi2_boxes_mk[i0, i1, i2, i3]
-                                    c_v += 1
+                    for i0 in xrange(lims0[q0], lims0[q0+1]-2, 2):
+                        for i1 in xrange(lims1[q1], lims1[q1+1]-2, 2):
+                            for i2 in xrange(lims2[q2], lims2[q2+1]-2, 2):
+                                for i3 in xrange(lims3[q3], lims3[q3+1]-2, 2):
+                                    for ii0 in xrange(i0, i0+2):
+                                        for ii1 in xrange(i1, i1+2):
+                                            for ii2 in xrange(i2, i2+2):
+                                                for ii3 in xrange(i3, i3+2):
+                                                    c_e += mv_expctd[ii0, ii1, ii2, ii3]
+                                                    c_o += mv_chi2_boxes_mk[ii0, ii1, ii2, ii3]
+                                    c_v += 16
 
-                                    if (c_o > low) and (c_e > low):
+                                    # power analysis on chisquare test:
+                                    # 6% rejection @ 5% level for expctd >= 6.  
+                                    if c_e > low:
                                         run_o.append(c_o)
                                         run_e.append(c_e)
                                         run_v.append(c_v)
@@ -322,3 +328,49 @@ def get_obs_exp_v(g_Ms, float[:, :, :, ::1] mv_expctd, short[:, :, :, ::1] mv_ch
 
 
     return run_os, run_es, run_vs, lftovr_os, lftovr_es
+
+
+
+#  quads=[[30, 67], [35, 73]]  # intermediate
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def get_obs_exp_v_classic(g_Ms, float[:, :, :, ::1] mv_expctd, char[:, :, :, ::1] mv_chi2_boxes_mk, double low):
+#def get_obs_exp_v(long[::1] mv_g_Ms, double[:, :, :, ::1] mv_expctd, short[:, :, :, ::1] mv_chi2_boxes_mk, double low):
+    cdef double c_e = 0
+    cdef short c_o = 0
+    cdef double c_v = 0
+    cdef long i0, i1, i2, i3, ii0, ii1, ii2, ii3
+    cdef long[::1] mv_g_Ms = g_Ms
+    cdef long* p_g_Ms = &mv_g_Ms[0]
+    #cdef double* p_expctd = &mv_expctd[0, 0, 0, 0]
+    #cdef int* p_chi2_boxes_mk = &mv_chi2_boxes_mk[0, 0, 0, 0]
+
+    run_o = []
+    run_e = []
+    run_v = []
+
+
+
+    for i0 in xrange(0, p_g_Ms[0]-2, 2):
+        for i1 in xrange(0, p_g_Ms[1]-2, 2):
+            for i2 in xrange(0, p_g_Ms[2]-2, 2):
+                for i3 in xrange(0, p_g_Ms[3]-2, 2):
+                    for ii0 in xrange(i0, i0+2):
+                        for ii1 in xrange(i1, i1+2):
+                            for ii2 in xrange(i2, i2+2):
+                                for ii3 in xrange(i3, i3+2):
+                                    c_e += mv_expctd[ii0, ii1, ii2, ii3]
+                                    c_o += mv_chi2_boxes_mk[ii0, ii1, ii2, ii3]
+
+                    c_v += 16
+                    # performed power analysis on chisquare test.
+                    #  6% rejection a 5% level for expected > 6.  
+                    if c_e > low:
+                        run_o.append(c_o)
+                        run_e.append(c_e)
+                        run_v.append(c_v)
+                        c_o = 0
+                        c_e = 0
+                        c_v = 0
+
+    return run_o, run_e, run_v
