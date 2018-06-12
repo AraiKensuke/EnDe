@@ -168,12 +168,13 @@ def adtv_smp_cdf_interp(double[::1] x, double[::1] log_p, int N, int m, double[:
 def smp_f_2d(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts, 
 #          double[::1] fx, double[::1] pxO_full, 
           double[::1] xt0t1, double[::1] cmp_xt0t1, double cmprs, int t0, 
-          double[::1] f, double[::1] q2, double[::1] l0, double[::1] cmp_wgt, 
+          double[::1] f, double[::1] q2, double[::1] l0, double[:, ::1] cmp_wgt, 
           double[::1] _f_u, double[::1] _f_q2, double[::1] m_rands):
     global f_STEPS, f_SMALL, f_cldz
     """
     f     parameter f
     _f_u  
+    cmp_wgt is M x Ncmp
     """
     cdef int m
     cdef double tmp
@@ -209,7 +210,7 @@ def smp_f_2d(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
         p_adtv_pdf_params[1] = FQ2
         p_adtv_pdf_params[2] = q2[m]
 
-        adtvInds, N = adtv_support_pdf_sum(fx2, cpf2, cmp_wgt, f_STEPS, f_cldz, f_SMALL, dt, l0[m], _NRM, adtv_pdf_params, cmp_xt0t1, cmprs)
+        adtvInds, N = adtv_support_pdf_sum(fx2, cpf2, cmp_wgt[m], f_STEPS, f_cldz, f_SMALL, dt, l0[m], _NRM, adtv_pdf_params, cmp_xt0t1, cmprs)
 
         p_f[m] = adtv_smp_cdf_interp(fx2[adtvInds], cpf2[adtvInds], N, m, m_rands)
 
@@ -219,8 +220,11 @@ def smp_f_2d(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
 @cython.wraparound(False)
 def smp_q2_2d(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts, 
            double[::1] xt0t1, double[::1] cmp_xt0t1, double cmprs, int t0, 
-           double[::1] f, double[::1] q2, double[::1] l0, double[::1] cmp_wgt, 
+           double[::1] f, double[::1] q2, double[::1] l0, double[:, ::1] cmp_wgt, 
            double[::1] _q2_a, double[::1] _q2_B, double[::1] m_rands):
+    """
+    cmp_xt0t1:   cmp_
+    """
     cdef int m
     cdef double tmp, fm
     cdef double* _p_q2_a = &_q2_a[0]
@@ -260,7 +264,7 @@ def smp_q2_2d(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
         p_adtv_pdf_params[1] = SL_B
         p_adtv_pdf_params[2] = fm
 
-        adtvInds, N = adtv_support_pdf_sum(qx2, cpq22, cmp_wgt, q2_STEPS, f_cldz, f_SMALL, dt, l0[m], _IG, adtv_pdf_params, cmp_xt0t1, cmprs)
+        adtvInds, N = adtv_support_pdf_sum(qx2, cpq22, cmp_wgt[m], q2_STEPS, f_cldz, f_SMALL, dt, l0[m], _IG, adtv_pdf_params, cmp_xt0t1, cmprs)
         p_q2[m] = adtv_smp_cdf_interp(qx2[adtvInds], cpq22[adtvInds], N, m, m_rands)
         dat = _N.empty((len(adtvInds), 2))
         dat[:, 0] = qx2[adtvInds]
@@ -320,7 +324,7 @@ cdef double pdfNRMsum(double *p_cmp_xt0t1, int cmp_Nt0t1, double cmprs, double* 
 
 ########################################################################
 @cython.cdivision(True)
-def l0_spatial(double[::1] cmp_xt0t1, double[::1] cmp_yt0t1, double cmprs, long M, double dt, double[::1] v_fxd_fc_x, double[::1] v_fxd_q2_x, double[::1] v_fxd_fc_y, double[::1] v_fxd_q2_y, double[::1] v_l0_exp_px):
+def l0_spatial(long M, double[::1] cmp_xt0t1, double[::1] cmp_yt0t1, double cmprs, double dt, double[::1] v_fxd_fc_x, double[::1] v_fxd_q2_x, double[::1] v_fxd_fc_y, double[::1] v_fxd_q2_y, double[::1] v_l0_exp_px):
     #  Value of pdf @ fc.  
     #  fxd_IIQ2    1./q2_c
     #  Mc          - spiking + prior  mean
@@ -344,7 +348,7 @@ def l0_spatial(double[::1] cmp_xt0t1, double[::1] cmp_yt0t1, double cmprs, long 
     cdef double *p_cmp_xt0t1     = &cmp_xt0t1[0]
     cdef double *p_cmp_yt0t1     = &cmp_yt0t1[0]
     cdef double fc_x, fc_y, q2c_x, q2c_y
-    cdef int cmp_Nt0t1       = cmp_xt0t1.shape[0]
+    cdef int cmp_Nt0t1       = cmp_xt0t1.shape[0]  #  cmp_xt0t1 is N
 
     ##  calculate 
     for m in xrange(M):

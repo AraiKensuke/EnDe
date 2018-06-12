@@ -403,6 +403,105 @@ def full_qdrtcs_K4(double[:, ::1] pkFRr, double [:, ::1] mkNrms, double[:, ::1] 
 
                 p_exp_arg[mNn] = pkFRr_m + mkNrms_m - 0.5*(p_qdrSPC[mNn] + p_qdrMKS[mNn])
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def full_qdrtcs_K4_2d(double[::1] pkFR, double [:, ::1] mkNrms, double[:, ::1] exp_arg, double[::1] fx, double[::1] fy, double [::1] xAS, double [::1] yAS, double[::1] iq2x, double[::1] iq2y, double [:, ::1] qdrSPC, double[:, ::1] mAS, double [:, ::1] u, double[:, :, ::1] iSg, double[:, ::1] qdrMKS, int M, int N, int k):
+    #  fxs       M x fss   
+    #  fxrux     Nupx    
+    #  f_intgrd  Nupx
+    cdef int n, m, mNk, mkk, nk, ik, mNk_nk, mN, mNn, mK, nK
+
+    cdef double *p_mAS   = &mAS[0, 0]
+    cdef double *p_u     = &u[0, 0]
+    #cdef double *p_v   = &v[0, 0, 0]
+    cdef double *p_iSg = &iSg[0, 0, 0]
+    cdef double *p_qdrMKS = &qdrMKS[0, 0]
+
+    cdef double pfxm, pfym
+    cdef double piq2xm, piq2ym
+    cdef double *p_qdrSPC   = &qdrSPC[0, 0]
+    cdef double *p_fx       = &fx[0]
+    cdef double *p_fy       = &fy[0]
+    cdef double *p_xAS     = &xAS[0]
+    cdef double *p_yAS     = &yAS[0]
+    cdef double *p_iq2x     = &iq2x[0]
+    cdef double *p_iq2y     = &iq2y[0]
+
+    cdef double *p_pkFR       = &pkFR[0]
+    cdef double *p_mkNrms     = &mkNrms[0, 0]
+    cdef double *p_exp_arg       = &exp_arg[0, 0]
+    cdef double pkFRr_m, mkNrms_m
+
+    cdef double iS00
+    cdef double iS11
+    cdef double iS22
+    cdef double iS33
+    cdef double iS01
+    cdef double iS02
+    cdef double iS03
+    cdef double iS12
+    cdef double iS13
+    cdef double iS23
+    cdef double u_m_0
+    cdef double u_m_1
+    cdef double u_m_2
+    cdef double u_m_3
+
+
+    with nogil:
+        for 0 <= m < M:
+            mkk  = m*k*k
+            mN   = m*N
+            #mNk   = m*N*k
+            #mNk   = m*N*k
+            mK =   m*k
+
+            #  write output to p_qdr[m, n].  (xn - um)iSg_m (xn - um)
+
+            iS00 = p_iSg[mkk]
+            iS11 = p_iSg[mkk+k+1]
+            iS22 = p_iSg[mkk+2*k+2]
+            iS33 = p_iSg[mkk+3*k+3]
+            iS01 = 2*p_iSg[mkk+1]   #  this
+            iS02 = 2*p_iSg[mkk+2]
+            iS03 = 2*p_iSg[mkk+3]
+            iS12 = 2*p_iSg[mkk+k+2]
+            iS13 = 2*p_iSg[mkk+k+3]
+            iS23 = 2*p_iSg[mkk+2*k+3]
+
+            u_m_0 = p_u[mK]
+            u_m_1 = p_u[mK + 1]
+            u_m_2 = p_u[mK + 2]
+            u_m_3 = p_u[mK + 3]
+
+            pfxm = p_fx[m]
+            pfym = p_fy[m]
+            piq2xm= p_iq2x[m]
+            piq2ym= p_iq2y[m]
+
+            pkFR_m = p_pkFR[m]
+            mkNrms_m = p_mkNrms[m]
+
+            for n in range(N):
+                #mNk_nk = mNk + n*k
+                mNn    = mN+n
+                nK     = n*k
+                p_qdrMKS[mNn] = (p_mAS[nK+3]-u_m_3)*iS33*(p_mAS[nK+3]-u_m_3) +\
+                                (p_mAS[nK]-u_m_0)*(iS00*(p_mAS[nK]-u_m_0) + \
+                                                   iS01*(p_mAS[nK+1]-u_m_1) + \
+                                                   iS02*(p_mAS[nK+2]-u_m_2) + \
+                                                   iS03*(p_mAS[nK+3]-u_m_3))+\
+                                (p_mAS[nK+1]-u_m_1)*(iS11*(p_mAS[nK+1]-u_m_1) + \
+                                                     iS12*(p_mAS[nK+2]-u_m_2) + \
+                                                     iS13*(p_mAS[nK+3]-u_m_3))+\
+                                (p_mAS[nK+2]-u_m_2)*(iS22*(p_mAS[nK+2]-u_m_2) + \
+                                                     iS23*(p_mAS[nK+3]-u_m_3))
+
+                p_qdrSPC[mNn] = (pfxm - p_xAS[n])*(pfxm - p_xAS[n])*piq2xm + (pfym - p_yAS[n])*(pfym - p_yAS[n])*piq2ym
+
+                p_exp_arg[mNn] = pkFR_m + mkNrms_m - 0.5*(p_qdrSPC[mNn] + p_qdrMKS[mNn])
+
+
 # @cython.boundscheck(False)
 # @cython.wraparound(False)
 # def full_qdrtcs_K4_diag(double[:, ::1] pkFRr, double [:, ::1] mkNrms, double[:, ::1] exp_arg, double[:, ::1] fr, double [:, ::1] xASr, double[:, ::1] iq2r, double [:, ::1] qdrSPC, double[:, :, ::1] v, double[:, :, ::1] iSg, double[:, ::1] qdrMKS, int M, int N, int k):

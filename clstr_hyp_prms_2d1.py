@@ -1,3 +1,5 @@
+import numpy as _N
+
 class priors:
     #  in array, value for [non_hash, hash]
     #  for hash
@@ -12,6 +14,8 @@ class priors:
     #  mean is B / (a-1) for a > 1
     #  mode is B / (a+1) for a > 1
     _q2x_a   = _N.array([1.1, 1.1])
+    _q2x_B   = _N.array([20., 2e-2])
+    _q2y_a   = _N.array([1.1, 1.1])
     _q2y_B   = _N.array([20., 2e-2])
 
     #  _ss.gamma.rvs(l0_a_, scale=(1/l0_B_))

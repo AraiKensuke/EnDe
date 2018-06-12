@@ -15,8 +15,8 @@ from Cython.Distutils import build_ext   # Extension for a c-file, build_ext for
 #modules  = ["GoF_util", "GoF_util_2", "GoF_util_4"]
 #modules  = ["cdf_smp_sumx_2d"]
 #modules  = ["cdf_smp"]
-modules = ["fastnum", "hc_bcast", "GoFfuncs_pyxKDE", "GoF_util", "GoF_util_2", "GoF_util_4"]
-#modules = ["fastnum"]
+#modules = ["fastnum", "hc_bcast", "GoFfuncs_pyxKDE", "GoF_util", "GoF_util_2", "GoF_util_4"]
+modules = ["fastnum", "cdf_smp_2d"]
 
 ###  import LogitWrapper 
 ###  LogitWrapper

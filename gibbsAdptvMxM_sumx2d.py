@@ -16,7 +16,7 @@ from filter import gauKer
 import gibbsApprMxMutil as gAMxMu
 import stochasticAssignment2d as _sA
 #import cdf_smp_tbl as _cdfs
-import cdf_smp_2d as _cdfs2d
+import cdf_smp_sumx_2d as _cdfs2d
 import ig_from_cdf_pkg as _ifcp
 import fastnum as _fm
 import clrs 
@@ -118,7 +118,7 @@ class MarkAndRF:
         oo.q2_L, oo.q2_H = q2x
         oo.f_L,  oo.f_H  = fx
     
-    def __init__(self, outdir, fn, intvfn, xLo=0, xHi=3, yLo=0, yHi=3, seed=1041, adapt=True, t_hlf_l0_mins=None, t_hlf_q2_mins=None, oneCluster=False, rotate=False, ):
+    def __init__(self, outdir, fn, intvfn, xyLo=0, xyHi=3, seed=1041, adapt=True, t_hlf_l0_mins=None, t_hlf_q2_mins=None, oneCluster=False, rotate=False, ):
         oo     = self
         oo.oneCluster = oneCluster
         oo.adapt = adapt
@@ -175,39 +175,8 @@ class MarkAndRF:
         oo.epochs    = oo.intvs.shape[0] - 1
         
         NT     = oo.dat.shape[0]
-        oo.xLo = xLo   #  this limit used for spatial path sum
-        oo.xHi = xHi   #  this limit used for spatial path sum
-        oo.yLo = yLo   #  this limit used for spatial path sum
-        oo.yHi = yHi   #  this limit used for spatial path sum
-
-    def setup_spatial_sum_params(self, q2x=None, fx=None, n_q2_lvls=12, q_mlt_steps=2, q_min=0.01, bins_per_sd=5): 
-        """
-        *q_mlt_steps=2  means spatial bins [0.01, 0.02, 0.04, 0.08]...
-        *if my q2 is bigger than max level, i'll just end up using more bins than neccessary. no prob
-        *bins_per_sd=5   heuristically, this is a good setting.
-        *q2x, fx     grid 
-        """
-        oo = self
-        oo.q2_lvls = _N.empty(n_q2_lvls)
-        oo.Nupx_lvls = _N.empty(n_q2_lvls, dtype=_N.int)
-        oo.Nupy_lvls = _N.empty(n_q2_lvls, dtype=_N.int)
-        oo.q2_lvls[0] = q_min**2
-        q2_mlt_steps = q_mlt_steps**2
-        oo.Nupx_lvls[0] = int(_N.ceil(((oo.xHi-oo.xLo)/_N.sqrt(oo.q2_lvls[0]))*bins_per_sd))
-        oo.Nupy_lvls[0] = int(_N.ceil(((oo.yHi-oo.yLo)/_N.sqrt(oo.q2_lvls[0]))*bins_per_sd))
-
-        for i in xrange(1, n_q2_lvls):
-            oo.q2_lvls[i] = q2_mlt_steps*oo.q2_lvls[i-1]
-            oo.Nupx_lvls[i] = int(_N.ceil(((oo.xHi-oo.xLo)/_N.sqrt(oo.q2_lvls[i]))*bins_per_sd))
-            oo.Nupy_lvls[i] = int(_N.ceil(((oo.yHi-oo.yLo)/_N.sqrt(oo.q2_lvls[i]))*bins_per_sd))
-            #  Nupx_lvls should not be too small.  how finely 
-            oo.Nupx_lvls[i] = 40 if oo.Nupx_lvls[i] < 40 else oo.Nupx_lvls[i]
-            oo.Nupy_lvls[i] = 40 if oo.Nupy_lvls[i] < 40 else oo.Nupy_lvls[i]
-
-        oo.binszs_x     = float(oo.xHi-oo.xLo)/oo.Nupx_lvls
-        oo.binszs_y     = float(oo.yHi-oo.yLo)/oo.Nupy_lvls
-        oo.q2_L, oo.q2_H = q2x   #  grid lims for calc of conditional posterior
-        oo.f_L,  oo.f_H  = fx
+        oo.xyLo = xyLo
+        oo.xyHi = xyHi
 
     def gibbs(self, ITERS, K, priors, ep1=0, ep2=None, saveSamps=True, saveOcc=True, doSepHash=True, nz_pth=0., smth_pth_ker=0, f_STEPS=13, q2_STEPS=13, f_SMALL=10, q2_SMALL=10, f_cldz=10, q2_cldz=10, minSmps=20, diag_cov=False, earliest=20000, cmprs=1):
         """
@@ -265,8 +234,6 @@ class MarkAndRF:
 
         _cdfs2d.init(oo.dt, oo.f_L, oo.f_H, oo.q2_L, oo.q2_H, f_STEPS, q2_STEPS, f_SMALL, q2_SMALL, f_cldz, q2_cldz, minSmps)
 
-        _cdfs2d.init_occ_resolutions(oo.xLo, oo.xHi, oo.yLo, oo.yHi, oo.q2_lvls, oo.Nupx_lvls, oo.Nupy_lvls)
-
         M_max   = 50   #  100 clusters, max
         M_use    = 0     #  number of non-free + 5 free clusters
 
@@ -293,10 +260,11 @@ class MarkAndRF:
 
             xt0t1 = _N.array(xy[t0:t1, 0])#smthd_pos
             yt0t1 = _N.array(xy[t0:t1, 1])#smthd_pos
+            cmp_xt0t1 = _N.array(xt0t1[t0:t1:cmprs])#smthd_pos
+            cmp_yt0t1 = _N.array(yt0t1[t0:t1:cmprs])#smthd_pos
+            cmp_Nt0t1 = (t1-t0) / cmprs  
 
             Asts    = _N.where(oo.dat[t0:t1, 2] == 1)[0]   #  based at 0
-            _cdfs2d.change_occ_hist(xt0t1, yt0t1, oo.xLo, oo.xHi, oo.yLo, oo.yHi)
-
 
             if epc == ep1:   ###  initialize
                 print "len(Asts)  %d" % len(Asts)
@@ -416,8 +384,6 @@ class MarkAndRF:
 
             Nt0t1 = t1-t0
 
-            l0_exp_px = _N.empty(M_use)
-
             nSpks    = len(Asts)
             v_sts = _N.empty(len(Asts), dtype=_N.int)
             cls_str_ind = _N.zeros(M_use+1, dtype=_N.int)
@@ -473,9 +439,6 @@ class MarkAndRF:
             BLK        = 1000
             iterBLOCKs = ITERS/BLK
 
-            q2x = _N.array([0.02]*M_use)
-            q2y = _N.array([0.02]*M_use)
-
             ###########  BEGIN GIBBS SAMPLING ##############################
             #for itr in xrange(ITERS):
             for itrB in xrange(iterBLOCKs):
@@ -483,9 +446,10 @@ class MarkAndRF:
                     #ttsw1 = _tm.time()
                     iSg = _N.linalg.inv(Sg)
                     #ttsw2 = _tm.time()
-                    if (itr % 100) == 0:    
+                    if (itr % 5) == 0:    
                         print "-------itr  %(i)d" % {"i" : itr}
 
+                    print "1"
                     if M_use > 1:
                         _sA.stochasticAssignment2d(oo, epc, itr, M_use, K, l0, fx, fy, q2x, q2y, u, Sg, iSg, _fx_u, _fy_u, _u_u, _fx_q2, _fy_q2, _u_Sg, Asts, t0, mAS, xAS, yAS, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, ((epc > 0) and (itr == 0)), diag_cov, clstsz)
                         _fm.cluster_bounds2(clstsz, Asts, cls_str_ind, v_sts, gz[itr], t0, M_use, nSpks)    # _fm.cluser_bounds provides no improvement
@@ -535,16 +499,24 @@ class MarkAndRF:
                     else:
                         q2xpr = _fx_q2
                         q2ypr = _fy_q2
+                    mx_rnds = _N.random.rand(M_use)
+                    my_rnds = _N.random.rand(M_use)
 
+                    #  q2y and fy are fixed, size M_use
+                    q2yr = q2y.reshape(M_use, 1)
+                    fyr  = fy.reshape(M_use, 1)
 
+                    cmp_wgt_y  = _N.exp(-0.5*(cmp_yt0t1-fyr)*(cmp_yt0t1-fyr)/q2yr)
 
-                    m_rnds_x = _N.random.rand(M_use)
-                    m_rnds_y = _N.random.rand(M_use)
-
-                    _cdfs2d.smp_f(0, M_use, clstsz, cls_str_ind, v_sts, xt0t1, yt0t1, t0, fx, fy, q2x, q2y, l0, _fx_u, _fx_q2, _fy_u, _fy_q2, m_rnds_x)
+                    _cdfs2d.smp_f_2d(M_use, clstsz, cls_str_ind, v_sts, xt0t1, cmp_xt0t1, cmprs, t0, fx, q2x, l0, cmp_wgt_y, _fx_u, _fx_q2, mx_rnds)
                     smp_sp_prms[oo.ky_p_fx, itr] = fx
+                    #  q2y and fy are fixed, size M_use
+                    q2xr = q2x.reshape(M_use, 1)
+                    fxr  = fx.reshape(M_use, 1)
 
-                    _cdfs2d.smp_f(1, M_use, clstsz, cls_str_ind, v_sts, xt0t1, yt0t1, t0, fx, fy, q2x, q2y, l0, _fx_u, _fx_q2, _fy_u, _fy_q2, m_rnds_y)
+                    cmp_wgt_x  = _N.exp(-0.5*(cmp_xt0t1-fxr)*(cmp_xt0t1-fxr)/q2xr)
+
+                    _cdfs2d.smp_f_2d(M_use, clstsz, cls_str_ind, v_sts, yt0t1, cmp_yt0t1, cmprs, t0, fy, q2y, l0, cmp_wgt_x, _fy_u, _fy_q2, my_rnds)
                     smp_sp_prms[oo.ky_p_fy, itr] = fy
 
                     #ttsw7 = _tm.time()
@@ -556,6 +528,7 @@ class MarkAndRF:
                     # tt6b = 0
                     # tt6c = 0
 
+                    print "3"
                     Sg_nu_ = _Sg_nu + clstsz                
                     if diag_cov:
                         _fm.Sg_PSI(cls_str_ind, clstsz, v_sts, fit_mks, _Sg_PSI, Sg_PSI_, u, M_use, K)
@@ -620,16 +593,16 @@ class MarkAndRF:
                     #ttsw9 = _tm.time()
 
 
-
-                    m_rnds_x = _N.random.rand(M_use)
-                    m_rnds_y = _N.random.rand(M_use)
-
-                    #  B' = MODE * (a' - 1)
-                    _cdfs2d.smp_q2(0, M_use, clstsz, cls_str_ind, v_sts, xt0t1, yt0t1, t0, fx, fy, q2x, q2y, l0, _Dq2_a, _Dq2_B, m_rnds_x)
-                    #print "-------   sampled q2x is %.4e" % q2x[0]
+                    q2yr = q2y.reshape(M_use, 1)
+                    fyr  = fy.reshape(M_use, 1)
+                    cmp_wgt_y  = _N.exp(-0.5*(cmp_yt0t1-fyr)*(cmp_yt0t1-fyr)/q2yr)
+                    _cdfs2d.smp_q2_2d(M_use, clstsz, cls_str_ind, v_sts, xt0t1, cmp_xt0t1, cmprs, t0, fx, q2x, l0, cmp_wgt_y, _Dq2_a, _Dq2_B, mx_rnds)
                     smp_sp_prms[oo.ky_p_q2x, itr]   = q2x
 
-                    _cdfs2d.smp_q2(1, M_use, clstsz, cls_str_ind, v_sts, xt0t1, yt0t1, t0, fx, fy, q2x, q2y, l0, _Dq2_a, _Dq2_B, m_rnds_x)
+                    q2xr = q2x.reshape(M_use, 1)
+                    fxr  = fx.reshape(M_use, 1)
+                    cmp_wgt_x  = _N.exp(-0.5*(cmp_xt0t1-fxr)*(cmp_xt0t1-fxr)/q2xr)
+                    _cdfs2d.smp_q2_2d(M_use, clstsz, cls_str_ind, v_sts, yt0t1, cmp_yt0t1, cmprs, t0, fy, q2y, l0, cmp_wgt_x, _Dq2_a, _Dq2_B, my_rnds)
                     smp_sp_prms[oo.ky_p_q2y, itr]   = q2y
 
                     #ttsw10 = _tm.time()
@@ -638,9 +611,8 @@ class MarkAndRF:
                     ###############  CONDITIONAL l0
                     ###############
                     #  _ss.gamma.rvs.  uses k, theta  k is 1/B (B is our thing)
-
-                    _cdfs2d.l0_spatial(M_use, oo.dt, fx, fy, q2x, q2y, l0_exp_px)
-                    BL  = l0_exp_px    #  dim M
+                    _cdfs2d.l0_spatial(M_use, cmp_xt0t1, cmp_yt0t1, cmprs, oo.dt, fx, q2x, fy, q2y, l0_exp_hist)
+                    BL  = l0_exp_hist    #  dim M
 
                     if (epc > 0) and oo.adapt:
                         _mn_nd= _l0_a / _l0_B

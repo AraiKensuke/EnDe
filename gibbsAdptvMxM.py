@@ -98,18 +98,26 @@ class MarkAndRF:
         oo = self
         oo.q2_lvls = _N.empty(n_q2_lvls)
         oo.Nupx_lvls = _N.empty(n_q2_lvls, dtype=_N.int)
+        oo.Nupy_lvls = _N.empty(n_q2_lvls, dtype=_N.int)
         oo.q2_lvls[0] = q_min**2
         q2_mlt_steps = q_mlt_steps**2
         oo.Nupx_lvls[0] = int(_N.ceil(((oo.xHi-oo.xLo)/_N.sqrt(oo.q2_lvls[0]))*bins_per_sd))
+        oo.Nupy_lvls[0] = int(_N.ceil(((oo.yHi-oo.yLo)/_N.sqrt(oo.q2_lvls[0]))*bins_per_sd))
 
         for i in xrange(1, n_q2_lvls):
             oo.q2_lvls[i] = q2_mlt_steps*oo.q2_lvls[i-1]
             oo.Nupx_lvls[i] = int(_N.ceil(((oo.xHi-oo.xLo)/_N.sqrt(oo.q2_lvls[i]))*bins_per_sd))
+            oo.Nupy_lvls[i] = int(_N.ceil(((oo.yHi-oo.yLo)/_N.sqrt(oo.q2_lvls[i]))*bins_per_sd))
             #  Nupx_lvls should not be too small.  how finely 
             oo.Nupx_lvls[i] = 40 if oo.Nupx_lvls[i] < 40 else oo.Nupx_lvls[i]
+            oo.Nupy_lvls[i] = 40 if oo.Nupy_lvls[i] < 40 else oo.Nupy_lvls[i]
 
-        oo.binszs     = float(oo.xHi-oo.xLo)/oo.Nupx_lvls
+        oo.binszs_x     = float(oo.xHi-oo.xLo)/oo.Nupx_lvls
+        oo.binszs_y     = float(oo.yHi-oo.yLo)/oo.Nupy_lvls
+
+        #####  these are for 
         oo.q2_L, oo.q2_H = q2x
+        oo.f_L,  oo.f_H  = fx
         oo.f_L,  oo.f_H  = fx
     
     def __init__(self, outdir, fn, intvfn, xLo=0, xHi=3, seed=1041, adapt=True, t_hlf_l0_mins=None, t_hlf_q2_mins=None, oneCluster=False, rotate=False):

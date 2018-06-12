@@ -1,5 +1,6 @@
 import numpy as _N
 cimport numpy as _N
+import cython
 cimport cython
 import time as _tm
 from libc.math cimport exp, sqrt, log
@@ -12,8 +13,7 @@ import utilities as _U
 twoPOW = _N.array([1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072], dtype=_N.int)
 cdef long[::1] v_twoPOW = twoPOW
 cdef long* p_twoPOW = &v_twoPOW[0]
-cdef double x_Lo
-cdef double x_Hi
+cdef double x_Lo, x_Hi, y_Lo, y_Hi
 
 cdef int __NRM = 0
 cdef int __IG  = 1
@@ -26,16 +26,23 @@ cdef double[::1] v_fx2
 cdef double[::1] v_qx2
 
 #####  variables for changing resolution of occupation function
-cdef double *p_x_on_path, *p_y_on_path
-cdef double *p_occ_cnts_on_path  #  1D C array for occ_cnts[x, y]
-cdef double *p_ibinszs
+#  riemann_xys:  sum over path replaced by occupation weighted sum over grid
+cdef double *p_riemann_xs
+cdef double *p_riemann_ys
+cdef long *p_hist_all
+cdef double *p_ibinszs_x, *p_ibinszs_y
 cdef double *p_q2_thr
-cdef int minSmps     #  how many points used to sample conditional PDF?
+cdef int minSmps
 
 cdef long *Nupxs
-cdef long *arr_0s
+cdef long *Nupys
+cdef long *p_Nupxys  #  grid # for sum over occ weighted spatial path 
+
+cdef long *arr_xy_0s
+cdef long *arr_x_0s
+cdef long *arr_y_0s
 cdef long n_res   #  number of different resolutions 
-cdef double x_lo, x_hi
+#cdef double x_lo, x_hi
 
 f_STEPS   = None
 q2_STEPS  = None
@@ -51,8 +58,8 @@ cpq22 = None
 _NRM = 0   #  for outside visibility
 _IG  = 1
 
-fx2 = None
-qx2 = None    # adaptive points where cond. post f, q2 defined
+fx2 = None    # grid where cond posterior function is defined and adptvly smpld
+qx2 = None    # grid where cond posterior function is defined and adptvly smpld
 
 
 f_lo = None
@@ -61,14 +68,19 @@ q2_lo = None
 q2_hi = None
 dt    = None
 
-adtv_pdf_params = _N.empty(3)
+adtv_pdf_params = _N.empty(4)
 
 ########################################################################
 def init(_dt, _f_lo, _f_hi, _q2_lo, _q2_hi, _f_STEPS, _q2_STEPS, _f_SMALL, _q2_SMALL, _f_cldz, _q2_cldz, _minSmps):
+    """
+    init the grid used to sample the conditional posterior functions
+    unless maze is highly rectangular, _f_lo, _f_hi being set same for both 
+    x and y direction not a problem
+    """
     global fx2, qx2, cpf2, cpq22, 
     global v_fx2, v_qx2, v_cpf2, v_cpq22, 
     global dt
-    global f_lo, f_hi, q2_lo, q2_hi
+    global fx_lo, fx_hi, fy_lo, fy_hi, q2_lo, q2_hi
     global f_SMALL, q2_SMALL, f_STEPS, q2_STEPS, f_cldz, q2_cldz
     global minSmps
 
@@ -102,7 +114,6 @@ def init(_dt, _f_lo, _f_hi, _q2_lo, _q2_hi, _f_STEPS, _q2_STEPS, _f_SMALL, _q2_S
     #q2_thrs
     #Nupxs
     
-
 ########################################################################
 @cython.cdivision(True)
 @cython.boundscheck(False)
@@ -160,38 +171,56 @@ def adtv_smp_cdf_interp(double[::1] x, double[::1] log_p, int N, int m, double[:
 @cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def smp_f(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts, 
-#          double[::1] fx, double[::1] pxO_full, 
-          double[::1] xt0t1, int t0, 
-          double[::1] f, double[::1] q2, double[::1] l0, 
-          double[::1] _f_u, double[::1] _f_q2, double[::1] m_rands):
-    global f_STEPS, f_SMALL, f_cldz
+def smp_f(int cmpnt, int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts, 
+          double[::1] xt0t1, double[::1] yt0t1, int t0, double[::1] fx, double[::1] fy, 
+          double[::1] q2x, double[::1] q2y, double[::1] l0, 
+          double[::1] _fx_u, double[::1] _fx_q2, 
+          double[::1] _fy_u, double[::1] _fy_q2, double[::1] m_rands):
+    """
+    f_smv is the component of being sampled, f_fx is the fixed component
+    _f_sm_u are the prior hyperparameters for f_xmv
+    """
+    global f_STEPS, f_SMALL, f_cldz, fx2, cpf2
     """
     f     parameter f
     _f_u  
     """
     cdef int m
     cdef double tmp
-    cdef double* _p_q2pr = &_f_q2[0]
-    cdef double* _p_f_u  = &_f_u[0]
-    cdef double* p_f     = &f[0]
-    cdef double* p_q2    = &q2[0]
-    cdef double fs, fq2
-
-    cdef long* p_clstsz  = &clstsz[0]
-    cdef double* p_xt0t1 = &xt0t1[0]
-    cdef long* p_strt_inds = &cls_strt_inds[0]
-    cdef long* p_sts     = &sts[0]
     cdef double[::1]     v_adtv_pdf_params = adtv_pdf_params
     cdef double* p_adtv_pdf_params = &v_adtv_pdf_params[0]
+
+    cdef double* _p_q2pr       #  prior hyperparameter
+    cdef double* _p_f_u        #  prior hyperparameter
+    cdef double* p_f           #  component of f to be sampled
+    cdef double* p_q2          #  q2 of that component
+    cdef double fs, fq2        #  temporary variables
+
+    cdef double* p_pt0t1 
+    if cmpnt == 0:
+        _p_q2pr = &_fx_q2[0]      #  prior hyperparameter
+        _p_f_u  = &_fx_u[0]       #  prior hyperparameter
+        p_pt0t1 = &xt0t1[0]
+        p_f     = &fx[0]
+        p_q2    = &q2x[0]
+    elif cmpnt == 1:
+        _p_q2pr = &_fy_q2[0]      #  prior hyperparameter
+        _p_f_u  = &_fy_u[0]       #  prior hyperparameter
+        p_pt0t1 = &yt0t1[0]
+        p_f     = &fy[0]
+        p_q2    = &q2y[0]
+
+    cdef long* p_clstsz  = &clstsz[0]
+    cdef long* p_strt_inds = &cls_strt_inds[0]
+    cdef long* p_sts     = &sts[0]
     cdef double U, FQ2
 
     for 0 <= m < M:
         if p_clstsz[m] > 0:
             tmp = 0
             for p_strt_inds[m] <= i < p_strt_inds[m+1]:
-                tmp += p_xt0t1[p_sts[i]-t0]
-            fs = tmp/p_clstsz[m]
+                tmp += p_pt0t1[p_sts[i]-t0]
+            fs = tmp/p_clstsz[m]      #  spiking part
             fq2= p_q2[m]/p_clstsz[m]
             U = (fs*_p_q2pr[m] + _p_f_u[m]*fq2) / (_p_q2pr[m] + fq2)
             FQ2 = (_p_q2pr[m]*fq2) / (_p_q2pr[m] + fq2)
@@ -201,9 +230,18 @@ def smp_f(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
 
         p_adtv_pdf_params[0] = U
         p_adtv_pdf_params[1] = FQ2
-        p_adtv_pdf_params[2] = q2[m]
+        if cmpnt == 0:
+            p_adtv_pdf_params[2] = q2x[m]
+            p_adtv_pdf_params[3] = fy[m]
+            p_adtv_pdf_params[4] = q2y[m]
+        elif cmpnt == 1:
+            p_adtv_pdf_params[2] = q2y[m]  #  same component as cmptnt
+            p_adtv_pdf_params[3] = fx[m]
+            p_adtv_pdf_params[4] = q2x[m]
 
-        adtvInds, N = adtv_support_pdf(fx2, cpf2, f_STEPS, f_cldz, f_SMALL, dt, l0[m], _NRM, adtv_pdf_params, )
+
+        #printf("--------------  coming from smp_f\n")
+        adtvInds, N = adtv_support_pdf(cmpnt, fx2, cpf2, f_STEPS, f_cldz, f_SMALL, dt, l0[m], _NRM, adtv_pdf_params, )
 
         p_f[m] = adtv_smp_cdf_interp(fx2[adtvInds], cpf2[adtvInds], N, m, m_rands)
 
@@ -211,35 +249,53 @@ def smp_f(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
 #@cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def smp_q2(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts, 
-           double[::1] xt0t1, int t0, 
-           double[::1] f, double[::1] q2, double[::1] l0, 
-           double[::1] _q2_a, double[::1] _q2_B, double[::1] m_rands):
+def smp_q2(int cmpnt, int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts, 
+          double[::1] xt0t1, double[::1] yt0t1, int t0, double[::1] fx, double[::1] fy, 
+          double[::1] q2x, double[::1] q2y, double[::1] l0, 
+          double[::1] _q2_a, double[::1] _q2_B, double[::1] m_rands):
+    """
+    f_smv is the component of being sampled, f_fx is the fixed component
+    _f_sm_u are the prior hyperparameters for f_xmv
+    """
+    global f_STEPS, f_SMALL, f_cldz, qx2, cpq22
+    """
+    f     parameter f
+    _f_u  
+    """
     cdef int m
-    cdef double tmp, fm
-    cdef double* _p_q2_a = &_q2_a[0]
-    cdef double* _p_q2_B  = &_q2_B[0]
-    cdef double* p_f     = &f[0]
-    cdef double* p_q2    = &q2[0]
-    cdef double fs, fq2
-
-    cdef long* p_clstsz  = &clstsz[0]
-    cdef double* p_xt0t1 = &xt0t1[0]
-    cdef long* p_strt_inds = &cls_strt_inds[0]
-    cdef long* p_sts     = &sts[0]
+    cdef double tmp
     cdef double[::1]     v_adtv_pdf_params = adtv_pdf_params
     cdef double* p_adtv_pdf_params = &v_adtv_pdf_params[0]
+
+    cdef double* _p_q2_a = &_q2_a[0]
+    cdef double* _p_q2_B  = &_q2_B[0]
+    cdef double* p_f           #  component of f to be sampled
+    cdef double* p_q2          #  q2 of that component
+    cdef double fs, fq2        #  temporary variables
+
+    cdef double* p_pt0t1 
+    _p_q2_a = &_q2_a[0]
+    _p_q2_B = &_q2_B[0]
+    if cmpnt == 0:
+        p_pt0t1 = &xt0t1[0]
+        p_f     = &fx[0]
+        p_q2    = &q2x[0]
+    elif cmpnt == 1:
+        p_pt0t1 = &yt0t1[0]
+        p_f     = &fy[0]
+        p_q2    = &q2y[0]
+
+    cdef long* p_clstsz  = &clstsz[0]
+    cdef long* p_strt_inds = &cls_strt_inds[0]
+    cdef long* p_sts     = &sts[0]
     cdef double SL_a, SL_B
 
     #  v_sts   spike times, (5 10 11 16) (3 7 9)
-    #  
     for m in xrange(M):
         if p_clstsz[m] > 0:
-            fm = f[m]
-
             SL_B= 0
             for p_strt_inds[m] <= i < p_strt_inds[m+1]:
-                SL_B += (p_xt0t1[p_sts[i]-t0]-fm)*(p_xt0t1[p_sts[i]-t0]-fm)
+                SL_B += (p_pt0t1[p_sts[i]-t0]-p_f[m])*(p_pt0t1[p_sts[i]-t0]-p_f[m])
             SL_B *= 0.5
             SL_B += _p_q2_B[m]
 
@@ -248,127 +304,190 @@ def smp_q2(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
         else:
             SL_a = _p_q2_a[m]
             SL_B = _p_q2_B[m]
-            fm = f[m]
 
         p_adtv_pdf_params[0] = SL_a
         p_adtv_pdf_params[1] = SL_B
-        p_adtv_pdf_params[2] = fm
 
-        adtvInds, N = adtv_support_pdf(qx2, cpq22, q2_STEPS, f_cldz, f_SMALL, dt, l0[m], _IG, adtv_pdf_params, )
+        if cmpnt == 0:
+            p_adtv_pdf_params[2] = fx[m]
+            p_adtv_pdf_params[3] = q2y[m]
+            p_adtv_pdf_params[4] = fy[m]
+        elif cmpnt == 1:
+            p_adtv_pdf_params[2] = fy[m]  #  same component as cmptnt
+            p_adtv_pdf_params[3] = q2x[m]
+            p_adtv_pdf_params[4] = fx[m]
+
+        #printf("adtv_pdf_params  %.3f  %.3f  %.3f\n", p_adtv_pdf_params[2], p_adtv_pdf_params[3], p_adtv_pdf_params[4])
+        adtvInds, N = adtv_support_pdf(cmpnt, qx2, cpq22, q2_STEPS, f_cldz, f_SMALL, dt, l0[m], _IG, adtv_pdf_params, )
+
         p_q2[m] = adtv_smp_cdf_interp(qx2[adtvInds], cpq22[adtvInds], N, m, m_rands)
-        dat = _N.empty((len(adtvInds), 2))
-        dat[:, 0] = qx2[adtvInds]
-        dat[:, 1] = cpq22[adtvInds]
-        # fn = _U.uniqFN("adtv%d" % m, serial=True, iStart=0)
-        # _N.savetxt(fn, dat, fmt="%.4e %.4e")
+        if p_clstsz[m] > 0:
+            if p_q2[m] > 10:
+                s = _N.empty((len(adtvInds), 2))
+                s[:, 0] = qx2[adtvInds]
+                s[:, 1] = cpq22[adtvInds]
+                _N.savetxt("bad.dat", s, fmt="%.4e %.4e")
 
-
-########################################################################
 @cython.cdivision(True)
-cdef double pdfIG(double q2c, double fxd_f, double a, double B, double* p_riemann_x, double *p_hist, long Nupx, double ibnsz, double dt, double l0, double xL, double xH) nogil:
-    #  
-    cdef double hlfIIQ2 = -0.5/q2c
-    cdef double sptlIntgrl = 0.0
-    cdef double dd
-    cdef int n, iL, iR
-    cdef double sd = sqrt(q2c)
-
-    iL = int((fxd_f-7*sd-xL)*ibnsz)
-    iR = int((fxd_f+7*sd-xL)*ibnsz)
-    iL = iL if iL >= 0 else 0
-    iR = iR if iR <= Nupx else Nupx
-
-    #for n in xrange(Nupx):   #  spatial integral
-    for iL <= n < iR:    #  integrate
-        dd = fxd_f-p_riemann_x[n]
-        sptlIntgrl += exp(dd*dd*hlfIIQ2)*p_hist[n]
-    sptlIntgrl *= ((dt*l0)/sqrt(twpi*q2c))
-    
-    return -(a + 1)*log(q2c) - B/q2c-sptlIntgrl
-
-########################################################################
-@cython.cdivision(True)
-cdef double pdfNRM(double fc, double fxd_q2, double fxd_IIQ2, double Mc, double Sigma2c, double *p_riemann_x, double *p_hist, long Nupx, double ibnsz, double dt, double l0, double xL, double xH) nogil:
+cdef double pdfIG(int cmpnt, double fc_x, double fc_y, double q2_x, double q2_y, double a, double B, double *p_riemann_x, double *p_riemann_y, long *p_hist, long Nupx, long Nupy, double ibnsz_x, double ibnsz_y, double dt, double l0, double xL, double xH, double yL, double yH) nogil:
     #  Value of pdf @ fc.  
     #  fxd_IIQ2    1./q2_c
     #  Mc          - spiking + prior  mean
     #  Sigma2c     - spiking + prior  variance
     #  p_riemann_x - points at which integral discretized
     #  p_px        - occupancy
-    cdef double hlfIIQ2 = -0.5*fxd_IIQ2
+    cdef double hlfIIQ2_x = -0.5/q2_x
+    cdef double hlfIIQ2_y = -0.5/q2_y
     cdef double sptlIntgrl = 0.0
-    cdef double dd = 0
-    cdef int n, iL, iR, iL_, iR_
-    cdef double sd = sqrt(fxd_q2)
-    
-    iL = int((fc-7*sd-xL)*ibnsz)
-    iR = int((fc+7*sd-xL)*ibnsz)
-    iL = iL if iL >= 0 else 0
-    iR = iR if iR <= Nupx else Nupx
+    cdef double ddx2 = 0
+    cdef int nxY, nx, ny, m, iLx, iRx, iLy, iRy
+    cdef double sdx = sqrt(q2_x)
+    cdef double sdy = sqrt(q2_y)
 
-    ##  calculate 
-    #for n in xrange(Nupx):    #  integrate
-    for iL <= n < iR:    #  integrate
-        dd = fc-p_riemann_x[n]
-        sptlIntgrl += exp(dd*dd*hlfIIQ2)*p_hist[n]
-    sptlIntgrl *= ((dt*l0)/sqrt(twpi*fxd_q2))
+    iLx = int((fc_x-7*sdx-xL)*ibnsz_x)
+    iRx = int((fc_x+7*sdx-xL)*ibnsz_x)
+    iLx = iLx if iLx >= 0 else 0
+    iRx = iRx if iRx <= Nupx else Nupx
+    iLy = int((fc_y-7*sdy-yL)*ibnsz_y)
+    iRy = int((fc_y+7*sdy-yL)*ibnsz_y)
+    iLy = iLy if iLy >= 0 else 0
+    iRy = iRy if iRy <= Nupy else Nupy
 
-    # if iDBG == 1:
-    #     iL_ = int((fc-6*sd-xL)*ibnsz)
-    #     iR_ = int((fc+6*sd-xL)*ibnsz)
-    #     printf("Nupx---  %d", Nupx)
-    #     printf("sptlIntgrl----  %d  %d    %.4f   %d %d\n", iL, iR, sptlIntgrl, iL_, iR_)
-    #     printf("fc %.4e   sd %.4e    Mc %.4e  Sigma2c %.4e\n", fc, sd, Mc, Sigma2c)
+    for iLx <= nx < iRx:    #  integrate
+        nxY = nx * Nupy
+        #ddx2 = (fc_x-p_riemann_xs[nx]) * (fc_x-p_riemann_xs[nx])*hlfIIQ2_x
+        ddx2 = (fc_x-p_riemann_x[nx]) * (fc_x-p_riemann_x[nx])*hlfIIQ2_x
+        for iLy <= ny < iRy:    #  integrate
+            if p_hist[nxY + ny] > 0:
+                ddy = fc_y-p_riemann_y[ny]
+                sptlIntgrl += exp(ddx2 + ddy*ddy*hlfIIQ2_y)*p_hist[nxY + ny]
+    sptlIntgrl *= ((dt*l0)/sqrt(twpi*q2_x*q2_y))
 
-    return -0.5*(fc-Mc)*(fc-Mc)/Sigma2c-sptlIntgrl
+    #printf("***  a  %.3e  q2_x  %.3e    q2_y  %.3e   B  %.3e   %.3e\n", a, q2_x, q2_y, B, sptlIntgrl)
+    if cmpnt == 0:
+        return -(a + 1)*log(q2_x) - B/q2_x-sptlIntgrl
+    else:
+        return -(a + 1)*log(q2_y) - B/q2_y-sptlIntgrl
+
+
 
 
 ########################################################################
 @cython.cdivision(True)
-def l0_spatial(long M, double dt, double[::1] v_fxd_fc, double[::1] v_fxd_q2, double[::1] v_l0_exp_hist):
+cdef double pdfNRM(int cmpnt, double fc_x, double fc_y, double q2_x, double q2_y, double fxd_IIQ2, double Mc, double Sigma2c, double *p_riemann_x, double *p_riemann_y, long *p_hist, long Nupx, long Nupy, double ibnsz_x, double ibnsz_y, double dt, double l0, double xL, double xH, double yL, double yH) nogil:
     #  Value of pdf @ fc.  
     #  fxd_IIQ2    1./q2_c
     #  Mc          - spiking + prior  mean
     #  Sigma2c     - spiking + prior  variance
     #  p_riemann_x - points at which integral discretized
     #  p_px        - occupancy
-    global p_riemann_xs;      global p_hist_all
-    global x_Lo, x_Hi
-
-    cdef double hlfIIQ2
+    cdef double hlfIIQ2_x = -0.5/q2_x
+    cdef double hlfIIQ2_y = -0.5/q2_y
     cdef double sptlIntgrl = 0.0
-    cdef long Nupx, iStart
-    cdef int n, m, iL, iR
-    cdef double ibnsz, sd
+    cdef double ddx2 = 0
+    cdef int nxY, nx, ny, m, iLx, iRx, iLy, iRy
+    cdef double sdx = sqrt(q2_x)
+    cdef double sdy = sqrt(q2_y)
+
+    iLx = int((fc_x-7*sdx-xL)*ibnsz_x)
+    iRx = int((fc_x+7*sdx-xL)*ibnsz_x)
+    iLx = iLx if iLx >= 0 else 0
+    iRx = iRx if iRx <= Nupx else Nupx
+    iLy = int((fc_y-7*sdy-yL)*ibnsz_y)
+    iRy = int((fc_y+7*sdy-yL)*ibnsz_y)
+    iLy = iLy if iLy >= 0 else 0
+    iRy = iRy if iRy <= Nupy else Nupy
+
+    for iLx <= nx < iRx:    #  integrate
+        nxY = nx * Nupy
+        #ddx2 = (fc_x-p_riemann_xs[nx]) * (fc_x-p_riemann_xs[nx])*hlfIIQ2_x
+        ddx2 = (fc_x-p_riemann_x[nx]) * (fc_x-p_riemann_x[nx])*hlfIIQ2_x
+        for iLy <= ny < iRy:    #  integrate
+            if p_hist[nxY + ny] > 0:
+                ddy = fc_y-p_riemann_y[ny]
+                sptlIntgrl += exp(ddx2 + ddy*ddy*hlfIIQ2_y)*p_hist[nxY + ny]
+    sptlIntgrl *= ((dt*l0)/sqrt(twpi*q2_x*q2_y))
+
+    if cmpnt == 0:
+        return -0.5*(fc_x-Mc)*(fc_x-Mc)/Sigma2c-sptlIntgrl
+    else:
+        return -0.5*(fc_y-Mc)*(fc_y-Mc)/Sigma2c-sptlIntgrl
+
+
+########################################################################
+@cython.cdivision(True)
+def l0_spatial(long M, double dt, double[::1] v_fxd_fc_x, double[::1] v_fxd_fc_y, double[::1] v_fxd_q2_x, double[::1] v_fxd_q2_y, double[::1] v_l0_exp_hist):
+    #  Value of pdf @ fc.  
+    #  fxd_IIQ2    1./q2_c
+    #  Mc          - spiking + prior  mean
+    #  Sigma2c     - spiking + prior  variance
+    #  p_riemann_x - points at which integral discretized
+    #  p_px        - occupancy
+    global p_riemann_xs;      p_riemann_ys;  global p_hist_all
+    global x_Lo, x_Hi, y_Lo, y_Hi
+
+    cdef double hlfIIQ2_x, hlfIIQ2_y
+    cdef double sptlIntgrl = 0.0
+    cdef long Nupx, Nupy, iStart_xy, iStart_x, iStart_y
+    cdef int nxY, nx, ny, m, iLx, iRx, iLy, iRy
+    cdef double ibnsz_x, ibnsz_y, sd_x, sd_y
     cdef double *p_l0_exp_hist = &v_l0_exp_hist[0]
-    cdef double *p_fxd_fc    = &v_fxd_fc[0]
-    cdef double *p_fxd_q2    = &v_fxd_q2[0]
+    cdef double *p_fxd_fc_x    = &v_fxd_fc_x[0]
+    cdef double *p_fxd_fc_y    = &v_fxd_fc_y[0]
+    cdef double *p_fxd_q2_x    = &v_fxd_q2_x[0]
+    cdef double *p_fxd_q2_y    = &v_fxd_q2_y[0]
+    cdef double fc_x, fc_y, q2c_x, q2c_y
 
     ##  calculate 
     for m in xrange(M):
-        fc = p_fxd_fc[m]
-        q2c= p_fxd_q2[m]
-        getOccHist(q2c, &Nupx, &iStart, &ibnsz)
+        fc_x = p_fxd_fc_x[m]
+        q2c_x= p_fxd_q2_x[m]
+        fc_y = p_fxd_fc_y[m]
+        q2c_y= p_fxd_q2_y[m]
+
+        getOccHist(q2c_x, q2c_y, &Nupx, &Nupy, &iStart_xy, &iStart_x, &iStart_y, &ibnsz_x, &ibnsz_y)
         sptlIntgrl = 0.0
-        hlfIIQ2 = -0.5/q2c
-        sd = sqrt(q2c)
+        hlfIIQ2_x = -0.5/q2c_x
+        hlfIIQ2_y = -0.5/q2c_y
+        
+        sd_x = sqrt(q2c_x)
+        sd_y = sqrt(q2c_y)
 
-        iL = int((fc-7*sd-x_Lo)*ibnsz)
+        iLx = int((fc_x-7*sd_x-x_Lo)*ibnsz_x)
+        iRx = int((fc_x+7*sd_x-x_Lo)*ibnsz_x)
+        iLx = iLx if iLx >= 0 else 0
+        iRx = iRx if iRx <= Nupx else Nupx
+        iLy = int((fc_y-7*sd_y-y_Lo)*ibnsz_y)
+        iRy = int((fc_y+7*sd_y-y_Lo)*ibnsz_y)
+        iLy = iLy if iLy >= 0 else 0
+        iRy = iRy if iRy <= Nupy else Nupy
 
-        iR = int((fc+7*sd-x_Lo)*ibnsz)
-        iL = iL if iL >= 0 else 0
-        iR = iR if iR <= Nupx else Nupx
+        # printf("%f  %f\n", ibnsz_x, ibnsz_y)
 
-        #for n in xrange(Nupx):
-        for iL <= n < iR:
-            sptlIntgrl += exp(((p_riemann_xs[iStart+n]-fc)*(p_riemann_xs[iStart+n]-fc))*hlfIIQ2)*p_hist_all[iStart+n]
-        sptlIntgrl *= (dt/sqrt(twpi*q2c))
+        #printf("iStart_xy  %ld   iStart_x  %ld   iStart_y  %ld\n", iStart_xy, iStart_x, iStart_y)
+        # printf("iLx %d   iLy %d\n", iLx, iLy)
+        # printf("iRx %d   iRy %d\n", iRx, iRy)
+        # printf("fc  %.3f  %.3f\n", fc_x, fc_y)
+        # printf("sd  %.3f  %.3f\n", sd_x, sd_y)
+
+        for iLx <= nx < iRx:    #  integrate
+            nxY = nx * Nupy
+            ddx2 = (fc_x-p_riemann_xs[iStart_x + nx]) * (fc_x-p_riemann_xs[iStart_x + nx])*hlfIIQ2_x
+            for iLy <= ny < iRy:    #  integrate
+                #printf("---%d\n", iStart + nxY + ny)
+                if p_hist_all[iStart_xy + nxY + ny] != 0:
+                    #printf("%.3f\n", ddx2 + ddy*ddy*hlfIIQ2_y)
+                    ddy = fc_y-p_riemann_ys[iStart_y + ny]
+                    #sptlIntgrl += exp(ddx2 + ddy*ddy*hlfIIQ2_y)*p_hist_all[iStart+nxY + ny]
+                    sptlIntgrl += exp(ddx2 + ddy*ddy*hlfIIQ2_y)*p_hist_all[iStart_xy+nxY + ny]
+        sptlIntgrl *= (dt/sqrt(twpi*q2c_x*q2c_y))
+
         p_l0_exp_hist[m] = sptlIntgrl
 
 
 ########################################################################
 @cython.cdivision(True)
-def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
+def adtv_support_pdf(int cmpnt, double[::1] gx, double[::1] cond_pstr,
                      int STEPS, int cldz, int small,
                      double dt, double l0, 
                      int dist, double[::1] params):
@@ -402,7 +521,7 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
 
     #cldz = 5   # current level of discretization.  initl_skp  = 2**cldz
     #  Skip sizes go like 8 8 4 2.   2**
-    global p_riemann_xs;      global p_hist_all;      global p_ibinszs
+    global p_riemann_xs;      global p_riemann_ys;  global p_hist_all;      global p_ibinszs_x, p_ibinszs_y
     global x_Lo, x_Hi
     global minSmps
 
@@ -434,8 +553,6 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
 
     ####  
     ####  params conditioned on
-    cdef fxd_f, fxd_q2
-    #fxd_f, fxd_q2
     ####  priors    
     cdef double _q2_a, _q2_B
     cdef double _f_u, _f_q2
@@ -443,29 +560,47 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
     #_f_u, _f_q2
     ####  likelihood terms :  f_c
     cdef double fc = 0
-    cdef long Nupx, iStart
-    cdef double ibnsz
+    cdef long Nupx, Nupy, iStart_xy, iStart_x, iStart_y
+    cdef double ibnsz_x, ibnsz_y
     cdef int istepbck = 0
 
-    cdef double Mc, Sigma2c, q2_cnd_on, a, B, f_cnd_on, iq2_cnd_on
+    cdef double Mc, Sigma2c, q2_cnd_on, a, B, f_cnd_on, iq2_cnd_on, f_smp_cmp, q2_smp_cmp
 
     if dist == __NRM:
-        Mc        = p_params[0]
-        Sigma2c   = p_params[1]
-        q2_cnd_on = p_params[2]
-        iq2_cnd_on= 1./q2_cnd_on
+        Mc        = p_params[0]   #  observed spikes part
+        Sigma2c   = p_params[1]   #  observed spikes part
+        q2_smp_cmp= p_params[2]   #  if gx is range of fx, this is q2x
+        f_cnd_on  = p_params[3]   #  component of f conditioned on (set fixed)
+        q2_cnd_on = p_params[4]   #  other f comp and q2 (both comps) conditioned on
     else:
-        a         = p_params[0]
-        B         = p_params[1]
-        f_cnd_on  = p_params[2]
+        a         = p_params[0]   #  observed spikes part
+        B         = p_params[1]   #  observed spikes part
+        f_smp_cmp = p_params[2]   #  if gx is range of q2x, this is fx
+        q2_cnd_on = p_params[3]   #  other f comp and q2 (both comps) conditione
+        f_cnd_on  = p_params[4]   #  component of f conditioned on (set fixed)
+        #printf("q2_cnd_on  %.4f\n", q2_cnd_on)
+
 
     #initial point, set pmax, gmax
-    if dist == __NRM:
-        getOccHist(q2_cnd_on, &Nupx, &iStart, &ibnsz)
-        p_cond_pstr[0] = pdfNRM(p_gx[0], q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, &p_riemann_xs[iStart], &p_hist_all[iStart], Nupx, ibnsz, dt, l0, x_Lo, x_Hi)
-    elif dist == __IG:
-        getOccHist(p_gx[0], &Nupx, &iStart, &ibnsz)
-        p_cond_pstr[0] = pdfIG(p_gx[0], f_cnd_on, a, B, &p_riemann_xs[iStart], &p_hist_all[iStart], Nupx, ibnsz, dt, l0, x_Lo, x_Hi)
+    if dist == __NRM:   ################## __NRM
+        getOccHist(q2_smp_cmp, q2_cnd_on, &Nupx, &Nupy, &iStart_xy, &iStart_x, &iStart_y, &ibnsz_x, &ibnsz_y)
+        if cmpnt == 0:
+            p_cond_pstr[0] = pdfNRM(cmpnt, p_gx[0], f_cnd_on, q2_smp_cmp, q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+        else:  #  cmpnt == 1
+            p_cond_pstr[0] = pdfNRM(cmpnt, f_cnd_on, p_gx[0], q2_cnd_on, q2_smp_cmp, iq2_cnd_on, Mc, Sigma2c, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+    if dist == __IG:   ################## __IG
+        getOccHist(p_gx[0], q2_cnd_on, &Nupx, &Nupy, &iStart_xy, &iStart_x, &iStart_y, &ibnsz_x, &ibnsz_y)
+        #printf("p_gx %.3e   cn %.3f   %ld  %ld\n", p_gx[0], q2_cnd_on, Nupx, Nupy)
+        #printf("p_gx %.3e   cn %.3f   %ld  %ld\n", p_gx[1], q2_cnd_on, Nupx, Nupy)
+        #printf("xy %ld   x %ld   y %ld\n", iStart_xy, iStart_x, iStart_y)
+        if cmpnt == 0:
+            p_cond_pstr[0] = pdfIG(cmpnt, f_smp_cmp, f_cnd_on, p_gx[0], q2_cnd_on, a, B, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+        else:  #  cmpnt == 1
+            p_cond_pstr[0] = pdfIG(cmpnt, f_cnd_on, f_smp_cmp, q2_cnd_on, p_gx[0], a, B, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+
+    # elif dist == __IG:
+    #     getOccHist(p_gx[0], &Nupx, &iStart, &ibnsz)
+    #     p_cond_pstr[0] = pdfIG(p_gx[0], f_cnd_on, a, B, &p_riemann_xs[iStart], &p_hist_all[iStart], Nupx, ibnsz, dt, l0, x_Lo, x_Hi)
     pmax = p_cond_pstr[0]
     gmax = pmax
     imax = 0
@@ -499,25 +634,48 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
             #   - Sigma2c (likelihood + prior) width of observation
             #   prior
 
-            getOccHist(q2_cnd_on, &Nupx, &iStart, &ibnsz)
+            getOccHist(q2_smp_cmp, q2_cnd_on, &Nupx, &Nupy, &iStart_xy, &iStart_x, &iStart_y, &ibnsz_x, &ibnsz_y)
             for strt <= ix < stop+1 by skp:
-                p_cond_pstr[ix] = pdfNRM(p_gx[ix], q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, &p_riemann_xs[iStart], &p_hist_all[iStart], Nupx, ibnsz, dt, l0, x_Lo, x_Hi)
+                if cmpnt == 0:
+                    p_cond_pstr[ix] = pdfNRM(cmpnt, p_gx[ix], f_cnd_on, q2_smp_cmp, q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+                else:
+                    p_cond_pstr[ix] = pdfNRM(cmpnt, f_cnd_on, p_gx[ix], q2_cnd_on, q2_smp_cmp, iq2_cnd_on, Mc, Sigma2c, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
 
                 if p_cond_pstr[ix] > pmax:
                     pmax = p_cond_pstr[ix]   # pmax updated each time grid made finer
                     imax = ix
-        else:
-            ##  for each q2 cond posterior calculated at:
-            #   we need mean of x @ spikes, q2, # of spikes
+        if dist == __IG:
+            ##  for each f cond posterior calculated at:
+            #   - q2 conditioned on
+            #   - Mc (likelihood + prior) center of observation
+            #   - Sigma2c (likelihood + prior) width of observation
             #   prior
-            #   p_gx[ix]   values of q2
-            for strt <= ix < stop+1 by skp:
-                getOccHist(p_gx[ix], &Nupx, &iStart, &ibnsz)
-                p_cond_pstr[ix] = pdfIG(p_gx[ix], f_cnd_on, a, B, &p_riemann_xs[iStart], &p_hist_all[iStart], Nupx, ibnsz, dt, l0, x_Lo, x_Hi)
 
+            for strt <= ix < stop+1 by skp:
+                #printf("p_gx %.3e   cn %.3f   %ld  %ld\n", p_gx[ix], q2_cnd_on, Nupx, Nupy)
+
+                if cmpnt == 0:
+                    getOccHist(p_gx[ix], q2_cnd_on, &Nupx, &Nupy, &iStart_xy, &iStart_x, &iStart_y, &ibnsz_x, &ibnsz_y)   
+                    p_cond_pstr[ix] = pdfIG(cmpnt, f_smp_cmp, f_cnd_on, p_gx[ix], q2_cnd_on, a, B, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+                else:  #  cmpnt == 1
+                    getOccHist(q2_cnd_on, p_gx[ix], &Nupx, &Nupy, &iStart_xy, &iStart_x, &iStart_y, &ibnsz_x, &ibnsz_y)
+                    p_cond_pstr[ix] = pdfIG(cmpnt, f_cnd_on, f_smp_cmp, q2_cnd_on, p_gx[ix], a, B, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
                 if p_cond_pstr[ix] > pmax:
                     pmax = p_cond_pstr[ix]   # pmax updated each time grid made finer
                     imax = ix
+
+        # else:
+        #     ##  for each q2 cond posterior calculated at:
+        #     #   we need mean of x @ spikes, q2, # of spikes
+        #     #   prior
+        #     #   p_gx[ix]   values of q2
+        #     for strt <= ix < stop+1 by skp:
+        #         getOccHist(p_gx[ix], &Nupx, &iStart, &ibnsz)
+        #         p_cond_pstr[ix] = pdfIG(p_gx[ix], f_cnd_on, a, B, &p_riemann_xs[iStart], &p_hist_all[iStart], Nupx, ibnsz, dt, l0, x_Lo, x_Hi)
+
+        #         if p_cond_pstr[ix] > pmax:
+        #             pmax = p_cond_pstr[ix]   # pmax updated each time grid made finer
+        #             imax = ix
 
         if pmax > gpmax:   #  stop when 
             gpmax = pmax
@@ -645,7 +803,8 @@ def adtv_support_pdf(double[::1] gx, double[::1] cond_pstr,
 ###########################################################################
 ###########################################################################
 #####################  OCCUPATION FUNCTIONS
-def setup_occ_at_resolutions(_x_Lo, _x_Hi, v_q2_thr, v_Nupxs, ):    
+
+def init_occ_resolutions(_x_Lo, _x_Hi, _y_Lo, _y_Hi, v_q2_thr, v_Nupxs, v_Nupys):
     #  BIN a bit smaller than width
     # q2_thr, Nupxs
     # 0.02^2         0.05^2          0.1^2,          0.2^2,    
@@ -658,103 +817,119 @@ def setup_occ_at_resolutions(_x_Lo, _x_Hi, v_q2_thr, v_Nupxs, ):
     # x_Hi upper limit for integration
 
     #  p_pxs[i], bins = _N.histogram(Nupx[i]+1)
+    #  gets called once per epoch
     #  
-    global p_hist_all;    global Nupxs;    global n_res
-    global p_q2_thr;    global arr_0s;   global p_riemann_xs
-    global p_ibinszs
-    global x_Lo, x_Hi
 
-    cdef int i, j, tot = 0
+    global p_hist_all;    global Nupxs;    global Nupys;  global n_res
+    global p_q2_thr;  global arr_xy_0s; global arr_x_0s; global arr_y_0s
+    global p_riemann_xs;  global p_riemann_ys
+    global p_ibinszs_x, p_ibinszs_y
+    global x_Lo, x_Hi, y_Lo, y_Hi
+
+    cdef int i, j, totxy = 0, totx = 0, toty = 0
     cdef double dx, x
 
-    xH, yH = _N.max(path_xy, axis=0)
-    xL, yL = _N.min(path_xy, axis=0)
-
-    AMP    = _N.array([xH - xL, yH - yL])*0.005
-    xL     = xL - AMP[0]
-    xH     = xH + AMP[0]
-    yL     = yL - AMP[1]
-    yH     = yH + AMP[1]
-
-    x_Lo = _x_Lo
-    x_Hi = _x_Hi
-    n_res         = len(v_Nupxs)
+    x_Lo = _x_Lo;    x_Hi = _x_Hi
+    y_Lo = _y_Lo;    y_Hi = _y_Hi
+    
+    n_res         = len(v_Nupxs)  # n_res resolutions for occupational histgrm
 
     Nupxs        = <long*>malloc(n_res*sizeof(long))
-    p_ibinszs    = <double*>malloc(n_res*sizeof(double))
-    arr_0s       = <long*>malloc(n_res*sizeof(long))
+    Nupys        = <long*>malloc(n_res*sizeof(long))
+    p_ibinszs_x  = <double*>malloc(n_res*sizeof(double))
+    p_ibinszs_y  = <double*>malloc(n_res*sizeof(double))
+    arr_xy_0s       = <long*>malloc(n_res*sizeof(long)) 
+    arr_x_0s       = <long*>malloc(n_res*sizeof(long)) 
+    arr_y_0s       = <long*>malloc(n_res*sizeof(long)) 
     p_q2_thr     = <double*>malloc(n_res*sizeof(double))
-    p_hist_all     = <double*>malloc(_N.sum(v_Nupxs)*sizeof(double))  # histogram stored 
+    #  all n_res histograms to be stored in a flat array
+    print("size  %d\n" % _N.sum(v_Nupxs*v_Nupys))
+    p_hist_all     = <long*>malloc(_N.sum(v_Nupxs*v_Nupys)*sizeof(long))
     p_riemann_xs = <double*>malloc(_N.sum(v_Nupxs)*sizeof(double))
-
+    p_riemann_ys = <double*>malloc(_N.sum(v_Nupys)*sizeof(double))
 
     for 0 <= i < n_res:
         p_q2_thr[i] = v_q2_thr[i]
         Nupxs[i] = v_Nupxs[i]
-        arr_0s[i] = tot
+        Nupys[i] = v_Nupys[i]
+
+        arr_xy_0s[i] = totxy
+        arr_x_0s[i] = totx
+        arr_y_0s[i] = toty
+
+        printf("**  %d  %d  %d\n", totx, toty, totxy)
 
         dx = float(x_Hi - x_Lo) / Nupxs[i]
-        p_ibinszs[i] = 1./dx
+        dy = float(y_Hi - y_Lo) / Nupys[i]
+        p_ibinszs_x[i] = 1./dx
+        p_ibinszs_y[i] = 1./dy
         x  = x_Lo + 0.5*dx
+        y  = y_Lo + 0.5*dy
+
         for 0 <= j < Nupxs[i]:
-            p_riemann_xs[tot+j] = x
-            #print "%.4f" % p_riemann_xs[tot+j]
+            p_riemann_xs[totx+j] = x
             x += dx
 
-        tot += Nupxs[i]
+        for 0 <= j < Nupys[i]:
+            p_riemann_ys[toty+j] = y
+            y += dy
 
-    #print "ibinszs"
-    #for 0 <= i < n_res:
-    #    print("%.4f\n" %  p_ibinszs[i])
+
+        totxy += Nupxs[i] * Nupys[i]
+        totx += Nupxs[i]
+        toty += Nupys[i]
+
 
 def clean_occ_resolutions():
     global p_hist_all;   global p_riemann_xs;   global p_q2_thr
-    global Nupxs;      global arr_0s
+    global Nupxs;      global arr_xy_0s
     free(p_hist_all);    free(p_riemann_xs);    free(p_q2_thr)
-    free(Nupxs);       free(arr_0s)
+    free(Nupxs);       free(arr_xy_0s)
 
-def change_occ_hist(pth, _x_Lo, _x_Hi):
-    global p_hist_all;    global Nupxs;         global n_res
-    global p_q2_thr;    global arr_0s;        global p_riemann_xs
-    N_pth = len(pth)
-    #  Nupx has a different meaning here.
+def change_occ_hist(pthx, pthy, _x_Lo, _x_Hi, _y_Lo, _y_Hi):
+    global p_hist_all;    global Nupxs;         global Nupys
+    global n_res
+    global p_q2_thr;    global arr_xy_0s;        global p_riemann_xs
+    #N_pth = len(pthx)
 
-    cdef int i, j
+    ##  
+    cdef int i, j, iNy
+    for 0 <= n < n_res:
+        hist, bns, v3 = _N.histogram2d(pthx, pthy, bins=[_N.linspace(_x_Lo, _x_Hi, Nupxs[n]+1), _N.linspace(_y_Lo, _y_Hi, Nupys[n]+1)], normed=False)
 
-    for 0 <= i < n_res:
-        BNS = Nupxs[i]
-        occ_cnts, bnsx, bnsy = _N.histogram2d(path_xy[:, 0], path_xy[:, 1], bins=(_N.linspace(xL, xH, BNS+1), _N.linspace(yL, yH, BNS+1)))
-        
-        occ_cnts, bnsx, bnsy = _N.histogram2d(pth, bins=(_N.linspace(_xy_Lo, _xy_Hi, Nupxs[i]+1), _N.linspace(_xy_Lo, _xy_Hi, Nupxs[i]+1)), normed=False)
+        for 0 <= i < Nupxs[n]:
+            iNy = i * Nupys[n]
+            for 0 <= j < Nupys[n]:
+                p_hist_all[arr_xy_0s[n] + iNy+j] = hist[i, j]
 
-        x, y = _N.where(occ_cnts > 0)
-        x_on_pth = _N.empty(x.shape[0])
-        y_on_pth = _N.empty(x.shape[0])
-
-        #  or select only those near fx, fy  -  i can 
-
-        b_dx   = (xH-xL)/BNS
-        b_dy   = (yH-yL)/BNS
-
-        x_on_pth = bnsx[x] + 0.5*b_dx
-        y_on_pth = bnsy[y] + 0.5*b_dy
-
-        occ_cnts_on_path = occ_cnts[x, y]
-
-        ind1D = x*BNS+y
-
+    #  for each
     
     
 # set BOTH the correct occupation density AND riemann_x
-cdef void getOccHist(double gau_q2, long *Nupx, long *iStart, double *ibnsz):
-    global Nupxs;      global arr_0s
+cdef void getOccHist(double gau_q2_x, double gau_q2_y, long *Nupx, long *Nupy, long *iStart_xy, long *iStart_x, long *iStart_y, double *ibnsz_x, double *ibnsz_y):
+    global Nupxs;      global Nupys;  global arr_xy_0s
     global n_res;      global p_q2_thr
-    global p_ibinszs
+    global p_ibinszs_x; p_ibinszs_y
     cdef int i
 
-    for 0 <= i < n_res:
-        if gau_q2 < p_q2_thr[i]:
+    #  for higher q2 (wider), lower resolution OK
+    #  each Nupx[i] set so spatial resolution for sum is 1/3 (i-1)th level
+    for 0 <= i < n_res:  
+        if (gau_q2_x < p_q2_thr[i]) and (gau_q2_y < p_q2_thr[i]):
             Nupx[0]   = Nupxs[i]
-            iStart[0] = arr_0s[i]
-            ibnsz[0]= p_ibinszs[i]
+            Nupy[0]   = Nupys[i]
+            iStart_xy[0] = arr_xy_0s[i]
+            iStart_x[0] = arr_x_0s[i]
+            iStart_y[0] = arr_y_0s[i]
+            ibnsz_x[0]= p_ibinszs_x[i]
+            ibnsz_y[0]= p_ibinszs_y[i]
+            #printf("returning   i %d    n_res %d\n", i, n_res)
             return 
+    #  
+    Nupx[0]   = Nupxs[n_res-1]
+    Nupy[0]   = Nupxs[n_res-1]
+    iStart_xy[0] = arr_xy_0s[n_res-1]
+    iStart_x[0] = arr_x_0s[n_res-1]
+    iStart_y[0] = arr_y_0s[n_res-1]
+    ibnsz_x[0]= p_ibinszs_x[n_res-1]
+    ibnsz_y[0]= p_ibinszs_y[n_res-1]

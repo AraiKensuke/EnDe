@@ -97,7 +97,7 @@ def initClusters(oo, M_max, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=
         print flatlabels
 
         MS     = int(clstrs[1]) 
-        MS = MS + 5
+        #MS = MS + 5
         M_use      = clstrs[0] + MS
         print "------------"
         print "hash clusters %d" % clstrs[0]
@@ -122,11 +122,16 @@ def declare_params(M, K, uAll=None, SgAll=None, spcdim=1):
         q2       = _N.array([0.04]*M)
         f        = _N.empty(M)
     else:
-        q2       = _N.array(([0.04]*M, spcdim))
-        f        = _N.empty((M, spcdim))
+        q2x       = _N.array([0.04]*M)
+        q2y       = _N.array([0.04]*M)
+        fx        = _N.empty(M)
+        fy        = _N.empty(M)
     u       = _N.zeros((M, K))   #  center
     Sg      = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*0.1
-    return l0, f, q2, u, Sg
+    if spcdim == 1:
+        return l0, f, q2, u, Sg
+    else:
+        return l0, fx, fy, q2x, q2y, u, Sg
 
 def declare_prior_hyp_params(M, clstrs, K, x, mks, Asts, t0, priors, labS, labH, spcdim=1):
     #  PRIORS.  These get updated after each EPOCH
@@ -134,9 +139,11 @@ def declare_prior_hyp_params(M, clstrs, K, x, mks, Asts, t0, priors, labS, labH,
     if spcdim == 1:
         _f_u    = _N.zeros(M);    _f_q2  = _N.ones(M)*16 #  wide
         _q2_a   = _N.ones(M)*0.01;    _q2_B  = _N.ones(M)*1e-3
-    else:
-        _f_u    = _N.zeros((M, spcdim));    _f_q2  = _N.ones((M, spcdim))*16 #  wide
-        _q2_a   = _N.ones((M, spcdim))*0.01;    _q2_B  = _N.ones((M, spcdim))*1e-3
+    else:  #  
+        _fx_u    = _N.zeros(M);    _fx_q2  = _N.ones(M)*16 #  wide
+        _fy_u    = _N.zeros(M);    _fy_q2  = _N.ones(M)*16 #  wide
+        _q2x_a   = _N.ones(M)*0.01;    _q2x_B  = _N.ones(M)*1e-3
+        _q2y_a   = _N.ones(M)*0.01;    _q2y_B  = _N.ones(M)*1e-3
     _l0_a   = _N.ones(M)*0.5;     _l0_B  = _N.ones(M)
 
     iclstr  = -1
@@ -148,11 +155,23 @@ def declare_prior_hyp_params(M, clstrs, K, x, mks, Asts, t0, priors, labS, labH,
         for clstr_id in lab:
             iprior = 0 if clstr_id < clstrs[0] else 1
 
-            _f_u[clstr_id]    = priors._f_u[iprior]
-            _f_q2[clstr_id]   = priors._f_q2[iprior]
-            #  inverse gamma
-            _q2_a[clstr_id]   = priors._q2_a[iprior]
-            _q2_B[clstr_id]   = priors._q2_B[iprior]
+            if spcdim == 1:
+                _f_u[clstr_id]    = priors._f_u[iprior]
+                _f_q2[clstr_id]   = priors._f_q2[iprior]
+                #  inverse gamma
+                _q2_a[clstr_id]   = priors._q2_a[iprior]
+                _q2_B[clstr_id]   = priors._q2_B[iprior]
+            else:
+                _fx_u[clstr_id]    = priors._fx_u[iprior]
+                _fy_u[clstr_id]    = priors._fy_u[iprior]
+                _fx_q2[clstr_id]   = priors._fx_q2[iprior]
+                _fy_q2[clstr_id]   = priors._fy_q2[iprior]
+                #  inverse gamma
+                _q2x_a[clstr_id]   = priors._q2x_a[iprior]
+                _q2x_B[clstr_id]   = priors._q2x_B[iprior]
+                _q2y_a[clstr_id]   = priors._q2y_a[iprior]
+                _q2y_B[clstr_id]   = priors._q2y_B[iprior]
+
             _l0_a[clstr_id]   = priors._l0_a[iprior]
             _l0_B[clstr_id]   = priors._l0_B[iprior]
 
@@ -161,6 +180,12 @@ def declare_prior_hyp_params(M, clstrs, K, x, mks, Asts, t0, priors, labS, labH,
     ############
     #_u_u    = _N.tile(mkmn, M).T.reshape((M, K))
     #_u_Sg   = _N.tile(_N.identity(K), M).T.reshape((M, K, K))*20  #  this 
+
+    if mks is None:  #  when analyzing single, isolated neuron
+        if spcdim == 1:
+            return _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B
+        else:
+            return _l0_a, _l0_B, _fx_u, _fy_u, _fx_q2, _fy_q2, _q2x_a, _q2y_a, _q2x_B, _q2y_B
 
     if len(Asts) > 0:
         allSg   = _N.zeros((K, K))
@@ -211,7 +236,10 @@ def declare_prior_hyp_params(M, clstrs, K, x, mks, Asts, t0, priors, labS, labH,
     priors._Sg_nu = _N.array(_Sg_nu[0])
     priors._Sg_PSI = _N.array(_Sg_PSI[0])
 
-    return _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI
+    if spcdim == 1:
+        return _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI
+    else:
+        return _l0_a, _l0_B, _fx_u, _fy_u, _fx_q2, _fy_q2, _q2x_a, _q2y_a, _q2x_B, _q2y_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI
 
 def init_params_hyps(oo, M, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, Asts, t0, x, mks, flatlabels, nHSclusters, signalClusters=None):
     """
@@ -247,6 +275,53 @@ def init_params_hyps(oo, M, K, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, _q2_
     oo.mk_prmPstMd[oo.ky_p_u][0:M] = u
     oo.mk_prmPstMd[oo.ky_p_Sg][0:M] = Sg
 
+
+def init_params_hyps_2d(oo, M, K, l0, fx, fy, q2x, q2y, u, Sg, _l0_a, _l0_B, _fx_u, _fy_u, _fx_q2, _fy_q2, _q2x_a, _q2y_a, _q2x_B, _q2y_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, Asts, t0, xy, mks, flatlabels, nHSclusters, signalClusters=None):
+    """
+    M is # of clusters excluding noize
+    u is None when assuming 1 isolated neuron.  test receptive field fit only.
+    """
+
+    for im in xrange(M):  #if lab < 0, these marks not used for init
+        kinds = _N.where(flatlabels == im)[0]  #  inds
+        nSpks = len(kinds)
+        print "im  %(im)d  len   %(n)d" % {"im" : im, "n" : len(kinds)}
+        if nSpks > 0:
+            print xy[Asts[kinds]+t0].shape
+            fx[im], fy[im]  = _N.mean(xy[Asts[kinds]+t0], axis=0)
+            if u is not None:
+                u[im]  = _N.mean(mks[Asts[kinds]+t0], axis=0)
+            if len(kinds) > 1:
+                q2x[im] = _N.std(xy[Asts[kinds]+t0, 0], axis=0)**2
+                q2y[im] = _N.std(xy[Asts[kinds]+t0, 1], axis=0)**2
+            else:
+                q2x[im] = 0.1  #   just don't know about this one
+                q2y[im] = 0.1  #   just don't know about this one
+            if u is not None:
+                if len(kinds) > K:
+                    Sg[im] = _N.cov(mks[Asts[kinds]+t0], rowvar=0)
+                else:
+                    Sg[im] = _N.cov(mks[Asts+t0], rowvar=0)
+
+                l0[im] = (len(kinds) / float(nSpks))*100
+        else:
+            fx[im]  = 0
+            fy[im]  = 0
+            if u is not None:
+                u[im]  = _N.zeros(K)
+                Sg[im] = _N.eye(K)
+            q2x[im] = 1.
+            q2y[im] = 1.
+            l0[im] = 1
+
+    oo.sp_prmPstMd[oo.ky_p_l0:oo.ky_p_l0+5*M:5] = l0
+    oo.sp_prmPstMd[oo.ky_p_fx:oo.ky_p_fx+5*M:5] = fx
+    oo.sp_prmPstMd[oo.ky_p_fy:oo.ky_p_fy+5*M:5] = fy
+    oo.sp_prmPstMd[oo.ky_p_q2x:oo.ky_p_q2x+5*M:5] = q2x
+    oo.sp_prmPstMd[oo.ky_p_q2y:oo.ky_p_q2y+5*M:5] = q2y
+    if u is not None:
+        oo.mk_prmPstMd[oo.ky_p_u][0:M] = u
+        oo.mk_prmPstMd[oo.ky_p_Sg][0:M] = Sg
 
 def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_prms, smp_mk_prms, smp_mk_hyps, freeClstr, M_use, K, priors, m1stSignalClstr, ):
     #  finish epoch doesn't deal with noise cluster
@@ -427,6 +502,17 @@ def copy_slice_params(M_use, l0_M, f_M, q2_M, u_M, Sg_M):
 
     return l0, f, q2, u, Sg
 
+def copy_slice_params_2d(M_use, l0_M, fx_M, fy_M, q2x_M, q2y_M, u_M, Sg_M):
+    l0 = _N.array(l0_M[0:M_use], copy=True)
+    fx  = _N.array(fx_M[0:M_use], copy=True)
+    fy  = _N.array(fy_M[0:M_use], copy=True)
+    q2x = _N.array(q2x_M[0:M_use], copy=True)
+    q2y = _N.array(q2y_M[0:M_use], copy=True)
+    u  = _N.array(u_M[0:M_use], copy=True)
+    Sg = _N.array(Sg_M[0:M_use], copy=True)
+
+    return l0, fx, fy, q2x, q2y, u, Sg
+
 
 def copy_slice_hyp_params(M_use, _l0_a_M, _l0_B_M, _f_u_M, _f_q2_M, _q2_a_M, _q2_B_M, _u_u_M, _u_Sg_M, _Sg_nu_M, _Sg_PSI_M):
     _l0_a  = _N.array(_l0_a_M[0:M_use], copy=True)
@@ -441,6 +527,25 @@ def copy_slice_hyp_params(M_use, _l0_a_M, _l0_B_M, _f_u_M, _f_q2_M, _q2_a_M, _q2
     _Sg_PSI= _N.array(_Sg_PSI_M[0:M_use], copy=True)
 
     return _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI
+
+def copy_slice_hyp_params_2d(M_use, _l0_a_M, _l0_B_M, _fx_u_M, _fy_u_M, _fx_q2_M, _fy_q2_M, _q2x_a_M, _q2y_a_M, _q2x_B_M, _q2y_B_M, _u_u_M, _u_Sg_M, _Sg_nu_M, _Sg_PSI_M):
+    _l0_a  = _N.array(_l0_a_M[0:M_use], copy=True)
+    _l0_B  = _N.array(_l0_B_M[0:M_use], copy=True)
+    _fx_u   = _N.array(_fx_u_M[0:M_use], copy=True)
+    _fy_u   = _N.array(_fy_u_M[0:M_use], copy=True)
+    _fx_q2  = _N.array(_fx_q2_M[0:M_use], copy=True)
+    _fy_q2  = _N.array(_fy_q2_M[0:M_use], copy=True)
+    _q2x_a  = _N.array(_q2x_a_M[0:M_use], copy=True)
+    _q2y_a  = _N.array(_q2y_a_M[0:M_use], copy=True)
+    _q2x_B  = _N.array(_q2x_B_M[0:M_use], copy=True)
+    _q2y_B  = _N.array(_q2y_B_M[0:M_use], copy=True)
+    _u_u   = _N.array(_u_u_M[0:M_use], copy=True)
+    _u_Sg  = _N.array(_u_Sg_M[0:M_use], copy=True)
+    _Sg_nu = _N.array(_Sg_nu_M[0:M_use], copy=True)
+    _Sg_PSI= _N.array(_Sg_PSI_M[0:M_use], copy=True)
+
+    return _l0_a, _l0_B, _fx_u, _fy_u, _fx_q2, _fy_q2, _q2x_a, _q2y_a, _q2x_B, _q2y_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI
+
 
 def reset_cluster(epc, m, l0, f, q2, freeClstr, _q2_a, _q2_B, _f_u, _f_q2, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, oo, priors, m1stSignalClstr):
     #print "resetting  cluster %(m)d   %(l0).3f  %(f).3f" % {"m" : m, "l0" : (l0[m] / _N.sqrt(twpi*q2[m])), "f" : f[m]}

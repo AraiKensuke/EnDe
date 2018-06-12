@@ -234,9 +234,8 @@ def smp_q2(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
     #  v_sts   spike times, (5 10 11 16) (3 7 9)
     #  
     for m in xrange(M):
+        fm = f[m]
         if p_clstsz[m] > 0:
-            fm = f[m]
-
             SL_B= 0
             for p_strt_inds[m] <= i < p_strt_inds[m+1]:
                 SL_B += (p_xt0t1[p_sts[i]-t0]-fm)*(p_xt0t1[p_sts[i]-t0]-fm)
@@ -248,7 +247,6 @@ def smp_q2(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
         else:
             SL_a = _p_q2_a[m]
             SL_B = _p_q2_B[m]
-            fm = f[m]
 
         p_adtv_pdf_params[0] = SL_a
         p_adtv_pdf_params[1] = SL_B
