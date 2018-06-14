@@ -299,14 +299,14 @@ class MarkAndRF:
                     #print "-------   sampled q2x is %.4e" % q2x[0]
 
                     #q2x[:] = q2xt
-                    smp_sp_prms[oo.ky_p_q2x, itr]   = q2xt
+                    smp_sp_prms[oo.ky_p_q2x, itr]   = q2x
 
                     _Dq2_a = _q2y_a
                     _Dq2_B = _q2y_B
 
                     _cdfs2d.smp_q2(1, M_use, clstsz, cls_str_ind, v_sts, xt0t1, yt0t1, t0, fx, fy, q2x, q2y, l0, _Dq2_a, _Dq2_B, m_rnds_x)
                     #q2y[:] = q2yt
-                    smp_sp_prms[oo.ky_p_q2y, itr]   = q2yt
+                    smp_sp_prms[oo.ky_p_q2y, itr]   = q2y
                     #print "-------   sampled q2y is %.4e" % q2y[0]
 
                     ###############

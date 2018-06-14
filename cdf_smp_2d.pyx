@@ -18,7 +18,7 @@ cdef double x_Lo, x_Hi, y_Lo, y_Hi
 cdef int __NRM = 0
 cdef int __IG  = 1
 
-cdef double twpi = 6.283185307
+cdef double fourpi2 = 39.47841760435743
 
 cdef double[::1] v_cpf2
 cdef double[::1] v_cpq22
@@ -33,6 +33,14 @@ cdef long *p_hist_all
 cdef double *p_ibinszs_x, *p_ibinszs_y
 cdef double *p_q2_thr
 cdef int minSmps
+
+py_Nupxs  = None
+py_Nupys  = None
+py_riemann_xs = None
+py_riemann_ys = None
+py_ibinszs_x = None
+py_ibinszs_y = None
+py_hist_all = None
 
 cdef long *Nupxs
 cdef long *Nupys
@@ -197,6 +205,7 @@ def smp_f(int cmpnt, int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1]
     cdef double fs, fq2        #  temporary variables
 
     cdef double* p_pt0t1 
+
     if cmpnt == 0:
         _p_q2pr = &_fx_q2[0]      #  prior hyperparameter
         _p_f_u  = &_fx_u[0]       #  prior hyperparameter
@@ -247,8 +256,8 @@ def smp_f(int cmpnt, int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1]
 
 ########################################################################
 #@cython.cdivision(True)
-@cython.boundscheck(False)
-@cython.wraparound(False)
+#@cython.boundscheck(False)
+#@cython.wraparound(False)
 def smp_q2(int cmpnt, int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts, 
           double[::1] xt0t1, double[::1] yt0t1, int t0, double[::1] fx, double[::1] fy, 
           double[::1] q2x, double[::1] q2y, double[::1] l0, 
@@ -329,13 +338,63 @@ def smp_q2(int cmpnt, int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1
                 _N.savetxt("bad.dat", s, fmt="%.4e %.4e")
 
 @cython.cdivision(True)
-cdef double pdfIG(int cmpnt, double fc_x, double fc_y, double q2_x, double q2_y, double a, double B, double *p_riemann_x, double *p_riemann_y, long *p_hist, long Nupx, long Nupy, double ibnsz_x, double ibnsz_y, double dt, double l0, double xL, double xH, double yL, double yH) nogil:
+cdef double pdfIG(int cmpnt, double fc_x, double fc_y, double q2_x, double q2_y, double a, double B, long iStart_x, long iStart_y, long iStart_xy, long Nupx, long Nupy, double ibnsz_x, double ibnsz_y, double dt, double l0, double xL, double xH, double yL, double yH) nogil:
     #  Value of pdf @ fc.  
     #  fxd_IIQ2    1./q2_c
     #  Mc          - spiking + prior  mean
     #  Sigma2c     - spiking + prior  variance
     #  p_riemann_x - points at which integral discretized
     #  p_px        - occupancy
+    global py_riemann_xs
+    global py_riemann_ys
+    global py_hist_all
+
+    cdef double hlfIIQ2_x = -0.5/q2_x
+    cdef double hlfIIQ2_y = -0.5/q2_y
+    cdef double sptlIntgrl = 0.0
+    cdef double ddx2 = 0
+    cdef int nxY, nx, ny, m, iLx, iRx, iLy, iRy
+    cdef double sdx = sqrt(q2_x)
+    cdef double sdy = sqrt(q2_y)
+
+    iLx = int((fc_x-7*sdx-xL)*ibnsz_x)
+    iRx = int((fc_x+7*sdx-xL)*ibnsz_x)
+    iLx = iLx if iLx >= 0 else 0
+    iRx = iRx if iRx <= Nupx else Nupx
+    iLy = int((fc_y-7*sdy-yL)*ibnsz_y)
+    iRy = int((fc_y+7*sdy-yL)*ibnsz_y)
+    iLy = iLy if iLy >= 0 else 0
+    iRy = iRy if iRy <= Nupy else Nupy
+
+    for iLx <= nx < iRx:    #  integrate
+        nxY = nx * Nupy + iStart_xy
+        #ddx2 = (fc_x-p_riemann_xs[nx]) * (fc_x-p_riemann_xs[nx])*hlfIIQ2_x
+        ddx2 = (fc_x-p_riemann_xs[iStart_x + nx]) * (fc_x-p_riemann_xs[iStart_x + nx])*hlfIIQ2_x
+        for iLy <= ny < iRy:    #  integrate
+            if p_hist_all[nxY + ny] > 0:
+                ddy = fc_y-p_riemann_ys[iStart_y + ny]
+                sptlIntgrl += exp(ddx2 + ddy*ddy*hlfIIQ2_y)*p_hist_all[nxY + ny]
+    sptlIntgrl *= ((dt*l0)/sqrt(fourpi2*q2_x*q2_y))
+
+    #printf("***  a  %.3e  q2_x  %.3e    q2_y  %.3e   B  %.3e   %.3e\n", a, q2_x, q2_y, B, sptlIntgrl)
+    if cmpnt == 0:
+        return -(a + 1)*log(q2_x) - B/q2_x-sptlIntgrl
+    else:
+        return -(a + 1)*log(q2_y) - B/q2_y-sptlIntgrl
+
+"""
+def pdfIG(int cmpnt, double fc_x, double fc_y, double q2_x, double q2_y, double a, double B, long iStart_x, long iStart_y, long iStart_xy, long Nupx, long Nupy, double ibnsz_x, double ibnsz_y, double dt, double l0, double xL, double xH, double yL, double yH):
+
+    #  Value of pdf @ fc.  
+    #  fxd_IIQ2    1./q2_c
+    #  Mc          - spiking + prior  mean
+    #  Sigma2c     - spiking + prior  variance
+    #  p_riemann_x - points at which integral discretized
+    #  p_px        - occupancy
+    global py_riemann_xs
+    global py_riemann_ys
+    global py_hist_all
+    global fourpi2
     cdef double hlfIIQ2_x = -0.5/q2_x
     cdef double hlfIIQ2_y = -0.5/q2_y
     cdef double sptlIntgrl = 0.0
@@ -356,19 +415,22 @@ cdef double pdfIG(int cmpnt, double fc_x, double fc_y, double q2_x, double q2_y,
     for iLx <= nx < iRx:    #  integrate
         nxY = nx * Nupy
         #ddx2 = (fc_x-p_riemann_xs[nx]) * (fc_x-p_riemann_xs[nx])*hlfIIQ2_x
-        ddx2 = (fc_x-p_riemann_x[nx]) * (fc_x-p_riemann_x[nx])*hlfIIQ2_x
+        #ddx2 = (fc_x-p_riemann_x[nx]) * (fc_x-p_riemann_x[nx])*hlfIIQ2_x
+        ddx2 = (fc_x-py_riemann_xs[iStart_x + nx]) * (fc_x-py_riemann_xs[iStart_x + nx])*hlfIIQ2_x
         for iLy <= ny < iRy:    #  integrate
-            if p_hist[nxY + ny] > 0:
-                ddy = fc_y-p_riemann_y[ny]
-                sptlIntgrl += exp(ddx2 + ddy*ddy*hlfIIQ2_y)*p_hist[nxY + ny]
-    sptlIntgrl *= ((dt*l0)/sqrt(twpi*q2_x*q2_y))
+            if py_hist_all[iStart_xy + nxY + ny] > 0:
+                #ddy = fc_y-p_riemann_y[ny]
+                ddy = fc_y-py_riemann_ys[iStart_y + ny]
+                #sptlIntgrl += exp(ddx2 + ddy*ddy*hlfIIQ2_y)*p_hist[nxY + ny]
+                sptlIntgrl += exp(ddx2 + ddy*ddy*hlfIIQ2_y)*py_hist_all[iStart_xy + nxY + ny]
+    sptlIntgrl *= ((dt*l0)/sqrt(fourpi2*q2_x*q2_y))
 
     #printf("***  a  %.3e  q2_x  %.3e    q2_y  %.3e   B  %.3e   %.3e\n", a, q2_x, q2_y, B, sptlIntgrl)
     if cmpnt == 0:
         return -(a + 1)*log(q2_x) - B/q2_x-sptlIntgrl
     else:
         return -(a + 1)*log(q2_y) - B/q2_y-sptlIntgrl
-
+"""
 
 
 
@@ -381,6 +443,7 @@ cdef double pdfNRM(int cmpnt, double fc_x, double fc_y, double q2_x, double q2_y
     #  Sigma2c     - spiking + prior  variance
     #  p_riemann_x - points at which integral discretized
     #  p_px        - occupancy
+    global fourpi2
     cdef double hlfIIQ2_x = -0.5/q2_x
     cdef double hlfIIQ2_y = -0.5/q2_y
     cdef double sptlIntgrl = 0.0
@@ -406,7 +469,7 @@ cdef double pdfNRM(int cmpnt, double fc_x, double fc_y, double q2_x, double q2_y
             if p_hist[nxY + ny] > 0:
                 ddy = fc_y-p_riemann_y[ny]
                 sptlIntgrl += exp(ddx2 + ddy*ddy*hlfIIQ2_y)*p_hist[nxY + ny]
-    sptlIntgrl *= ((dt*l0)/sqrt(twpi*q2_x*q2_y))
+    sptlIntgrl *= ((dt*l0)/sqrt(fourpi2*q2_x*q2_y))
 
     if cmpnt == 0:
         return -0.5*(fc_x-Mc)*(fc_x-Mc)/Sigma2c-sptlIntgrl
@@ -425,6 +488,7 @@ def l0_spatial(long M, double dt, double[::1] v_fxd_fc_x, double[::1] v_fxd_fc_y
     #  p_px        - occupancy
     global p_riemann_xs;      p_riemann_ys;  global p_hist_all
     global x_Lo, x_Hi, y_Lo, y_Hi
+    global fourpi2
 
     cdef double hlfIIQ2_x, hlfIIQ2_y
     cdef double sptlIntgrl = 0.0
@@ -480,13 +544,15 @@ def l0_spatial(long M, double dt, double[::1] v_fxd_fc_x, double[::1] v_fxd_fc_y
                     ddy = fc_y-p_riemann_ys[iStart_y + ny]
                     #sptlIntgrl += exp(ddx2 + ddy*ddy*hlfIIQ2_y)*p_hist_all[iStart+nxY + ny]
                     sptlIntgrl += exp(ddx2 + ddy*ddy*hlfIIQ2_y)*p_hist_all[iStart_xy+nxY + ny]
-        sptlIntgrl *= (dt/sqrt(twpi*q2c_x*q2c_y))
+        sptlIntgrl *= (dt/sqrt(fourpi2*q2c_x*q2c_y))
 
         p_l0_exp_hist[m] = sptlIntgrl
 
 
 ########################################################################
 @cython.cdivision(True)
+@cython.boundscheck(False)
+@cython.wraparound(False)
 def adtv_support_pdf(int cmpnt, double[::1] gx, double[::1] cond_pstr,
                      int STEPS, int cldz, int small,
                      double dt, double l0, 
@@ -593,10 +659,13 @@ def adtv_support_pdf(int cmpnt, double[::1] gx, double[::1] cond_pstr,
         #printf("p_gx %.3e   cn %.3f   %ld  %ld\n", p_gx[0], q2_cnd_on, Nupx, Nupy)
         #printf("p_gx %.3e   cn %.3f   %ld  %ld\n", p_gx[1], q2_cnd_on, Nupx, Nupy)
         #printf("xy %ld   x %ld   y %ld\n", iStart_xy, iStart_x, iStart_y)
+
         if cmpnt == 0:
-            p_cond_pstr[0] = pdfIG(cmpnt, f_smp_cmp, f_cnd_on, p_gx[0], q2_cnd_on, a, B, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+            #p_cond_pstr[0] = pdfIG(cmpnt, f_smp_cmp, f_cnd_on, p_gx[0], q2_cnd_on, a, B, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+            p_cond_pstr[0] = pdfIG(cmpnt, f_smp_cmp, f_cnd_on, p_gx[0], q2_cnd_on, a, B, iStart_x, iStart_y, iStart_xy, Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
         else:  #  cmpnt == 1
-            p_cond_pstr[0] = pdfIG(cmpnt, f_cnd_on, f_smp_cmp, q2_cnd_on, p_gx[0], a, B, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+            #p_cond_pstr[0] = pdfIG(cmpnt, f_cnd_on, f_smp_cmp, q2_cnd_on, p_gx[0], a, B, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+            p_cond_pstr[0] = pdfIG(cmpnt, f_cnd_on, f_smp_cmp, q2_cnd_on, p_gx[0], a, B, iStart_x, iStart_y, iStart_xy, Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
 
     # elif dist == __IG:
     #     getOccHist(p_gx[0], &Nupx, &iStart, &ibnsz)
@@ -656,10 +725,12 @@ def adtv_support_pdf(int cmpnt, double[::1] gx, double[::1] cond_pstr,
 
                 if cmpnt == 0:
                     getOccHist(p_gx[ix], q2_cnd_on, &Nupx, &Nupy, &iStart_xy, &iStart_x, &iStart_y, &ibnsz_x, &ibnsz_y)   
-                    p_cond_pstr[ix] = pdfIG(cmpnt, f_smp_cmp, f_cnd_on, p_gx[ix], q2_cnd_on, a, B, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+                    #p_cond_pstr[ix] = pdfIG(cmpnt, f_smp_cmp, f_cnd_on, p_gx[ix], q2_cnd_on, a, B, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+                    p_cond_pstr[ix] = pdfIG(cmpnt, f_smp_cmp, f_cnd_on, p_gx[ix], q2_cnd_on, a, B, iStart_x, iStart_y, iStart_xy, Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
                 else:  #  cmpnt == 1
                     getOccHist(q2_cnd_on, p_gx[ix], &Nupx, &Nupy, &iStart_xy, &iStart_x, &iStart_y, &ibnsz_x, &ibnsz_y)
-                    p_cond_pstr[ix] = pdfIG(cmpnt, f_cnd_on, f_smp_cmp, q2_cnd_on, p_gx[ix], a, B, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+                    #p_cond_pstr[ix] = pdfIG(cmpnt, f_cnd_on, f_smp_cmp, q2_cnd_on, p_gx[ix], a, B, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+                    p_cond_pstr[ix] = pdfIG(cmpnt, f_cnd_on, f_smp_cmp, q2_cnd_on, p_gx[ix], a, B, iStart_x, iStart_y, iStart_xy, Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
                 if p_cond_pstr[ix] > pmax:
                     pmax = p_cond_pstr[ix]   # pmax updated each time grid made finer
                     imax = ix
@@ -820,6 +891,9 @@ def init_occ_resolutions(_x_Lo, _x_Hi, _y_Lo, _y_Hi, v_q2_thr, v_Nupxs, v_Nupys)
     #  gets called once per epoch
     #  
 
+    global py_Nupxs;      global py_Nupys;    
+    global py_ibinszs_x;  global py_ibinszs_y
+    global py_hist_all;   global py_riemann_xs;   global py_riemann_ys
     global p_hist_all;    global Nupxs;    global Nupys;  global n_res
     global p_q2_thr;  global arr_xy_0s; global arr_x_0s; global arr_y_0s
     global p_riemann_xs;  global p_riemann_ys
@@ -834,20 +908,52 @@ def init_occ_resolutions(_x_Lo, _x_Hi, _y_Lo, _y_Hi, v_q2_thr, v_Nupxs, v_Nupys)
     
     n_res         = len(v_Nupxs)  # n_res resolutions for occupational histgrm
 
-    Nupxs        = <long*>malloc(n_res*sizeof(long))
-    Nupys        = <long*>malloc(n_res*sizeof(long))
-    p_ibinszs_x  = <double*>malloc(n_res*sizeof(double))
-    p_ibinszs_y  = <double*>malloc(n_res*sizeof(double))
+    print "init_occ_res 0"
+    py_Nupxs     = _N.empty(n_res, dtype=_N.int)
+    cdef long[::1] mv_Nupxs     = py_Nupxs
+    Nupxs = &mv_Nupxs[0]
+    py_Nupys     = _N.empty(n_res, dtype=_N.int)
+    cdef long[::1] mv_Nupys     = py_Nupys
+    Nupys = &mv_Nupys[0]
+    py_ibinszs_x     = _N.empty(n_res)
+    cdef double[::1] mv_ibinszs_x     = py_ibinszs_x
+    p_ibinszs_x = &mv_ibinszs_x[0]
+    py_ibinszs_y     = _N.empty(n_res)
+    cdef double[::1] mv_ibinszs_y     = py_ibinszs_y
+    p_ibinszs_y = &mv_ibinszs_y[0]
+    print "init_occ_res 1"
+    py_hist_all   = _N.empty(_N.sum(v_Nupxs*v_Nupys), dtype=_N.int)
+    cdef long[::1] mv_hist_all = py_hist_all
+    p_hist_all     = &mv_hist_all[0]
+
+    py_riemann_xs   = _N.empty(_N.sum(v_Nupxs))
+    cdef double[::1] mv_riemann_xs = py_riemann_xs
+    p_riemann_xs     = &mv_riemann_xs[0]
+    py_riemann_ys   = _N.empty(_N.sum(v_Nupys))
+    cdef double[::1] mv_riemann_ys = py_riemann_ys
+    p_riemann_ys     = &mv_riemann_ys[0]
+    print "init_occ_res 2"
+
+    #p_hist_all     = <long*>malloc(_N.sum(v_Nupxs*v_Nupys)*sizeof(long))
+    #p_riemann_xs = <double*>malloc(_N.sum(v_Nupxs)*sizeof(double))
+    #p_riemann_ys = <double*>malloc(_N.sum(v_Nupys)*sizeof(double))
+
+
+    #Nupxs        = <long*>malloc(n_res*sizeof(long))
+    #Nupys        = <long*>malloc(n_res*sizeof(long))
+    #p_ibinszs_x  = <double*>malloc(n_res*sizeof(double))
+    #p_ibinszs_y  = <double*>malloc(n_res*sizeof(double))
     arr_xy_0s       = <long*>malloc(n_res*sizeof(long)) 
     arr_x_0s       = <long*>malloc(n_res*sizeof(long)) 
     arr_y_0s       = <long*>malloc(n_res*sizeof(long)) 
     p_q2_thr     = <double*>malloc(n_res*sizeof(double))
     #  all n_res histograms to be stored in a flat array
-    print("size  %d\n" % _N.sum(v_Nupxs*v_Nupys))
-    p_hist_all     = <long*>malloc(_N.sum(v_Nupxs*v_Nupys)*sizeof(long))
-    p_riemann_xs = <double*>malloc(_N.sum(v_Nupxs)*sizeof(double))
-    p_riemann_ys = <double*>malloc(_N.sum(v_Nupys)*sizeof(double))
+    #print("size  %d\n" % _N.sum(v_Nupxs*v_Nupys))
+    #p_hist_all     = <long*>malloc(_N.sum(v_Nupxs*v_Nupys)*sizeof(long))
+    #p_riemann_xs = <double*>malloc(_N.sum(v_Nupxs)*sizeof(double))
+    #p_riemann_ys = <double*>malloc(_N.sum(v_Nupys)*sizeof(double))
 
+    print "init_occ_res 3"
     for 0 <= i < n_res:
         p_q2_thr[i] = v_q2_thr[i]
         Nupxs[i] = v_Nupxs[i]
@@ -878,7 +984,7 @@ def init_occ_resolutions(_x_Lo, _x_Hi, _y_Lo, _y_Hi, v_q2_thr, v_Nupxs, v_Nupys)
         totxy += Nupxs[i] * Nupys[i]
         totx += Nupxs[i]
         toty += Nupys[i]
-
+    print "init_occ_res 4"
 
 def clean_occ_resolutions():
     global p_hist_all;   global p_riemann_xs;   global p_q2_thr

@@ -266,6 +266,7 @@ class MarkAndRF:
         _cdfs2d.init(oo.dt, oo.f_L, oo.f_H, oo.q2_L, oo.q2_H, f_STEPS, q2_STEPS, f_SMALL, q2_SMALL, f_cldz, q2_cldz, minSmps)
 
         _cdfs2d.init_occ_resolutions(oo.xLo, oo.xHi, oo.yLo, oo.yHi, oo.q2_lvls, oo.Nupx_lvls, oo.Nupy_lvls)
+        print "done occ_resolu"
 
         M_max   = 50   #  100 clusters, max
         M_use    = 0     #  number of non-free + 5 free clusters
