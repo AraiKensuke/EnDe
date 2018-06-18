@@ -264,6 +264,9 @@ class MarkAndRF:
             #for itr in xrange(ITERS):
             fx = _N.array([0.6])
             fy = _N.array([-0.5])
+            fx_throwaway = _N.array([0.6])
+            fy_throwaway = _N.array([-0.5])
+
             q2xt = _N.array([0.029])
             q2yt = _N.array([0.014])
 
@@ -317,6 +320,7 @@ class MarkAndRF:
 
                     BL  = l0_exp_px    #  dim M
 
+
                     _Dl0_a = _l0_a
                     _Dl0_B = _l0_B
 
@@ -325,6 +329,5 @@ class MarkAndRF:
                     l0_B_ = BL# + _Dl0_B
 
                     l0 = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_), size=M_use)  #  check
-
                     smp_sp_prms[oo.ky_p_l0, itr] = l0
 

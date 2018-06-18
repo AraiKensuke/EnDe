@@ -417,6 +417,10 @@ class MarkAndRF:
 
             Nt0t1 = t1-t0
 
+
+
+            print "printing priors._fy_u"
+            print priors._fy_u
             l0_exp_px = _N.empty(M_use)
 
             nSpks    = len(Asts)
@@ -471,7 +475,7 @@ class MarkAndRF:
             outs1 = _N.empty((M_use, K))
             outs2 = _N.empty((M_use, K))
 
-            BLK        = 1000
+            BLK        = 200
             iterBLOCKs = ITERS/BLK
 
             q2x = _N.array([0.02]*M_use)
@@ -480,6 +484,9 @@ class MarkAndRF:
             ###########  BEGIN GIBBS SAMPLING ##############################
             #for itr in xrange(ITERS):
             for itrB in xrange(iterBLOCKs):
+                print "printing priors._fy_u"
+                print priors._fy_u
+
                 for itr in xrange(itrB*BLK, (itrB+1)*BLK):
                     #ttsw1 = _tm.time()
                     iSg = _N.linalg.inv(Sg)
@@ -630,7 +637,7 @@ class MarkAndRF:
                     #print "-------   sampled q2x is %.4e" % q2x[0]
                     smp_sp_prms[oo.ky_p_q2x, itr]   = q2x
 
-                    _cdfs2d.smp_q2(1, M_use, clstsz, cls_str_ind, v_sts, xt0t1, yt0t1, t0, fx, fy, q2x, q2y, l0, _Dq2_a, _Dq2_B, m_rnds_x)
+                    _cdfs2d.smp_q2(1, M_use, clstsz, cls_str_ind, v_sts, xt0t1, yt0t1, t0, fx, fy, q2x, q2y, l0, _Dq2_a, _Dq2_B, m_rnds_y)
                     smp_sp_prms[oo.ky_p_q2y, itr]   = q2y
 
                     #ttsw10 = _tm.time()
@@ -641,6 +648,7 @@ class MarkAndRF:
                     #  _ss.gamma.rvs.  uses k, theta  k is 1/B (B is our thing)
 
                     _cdfs2d.l0_spatial(M_use, oo.dt, fx, fy, q2x, q2y, l0_exp_px)
+                    
                     BL  = l0_exp_px    #  dim M
 
                     if (epc > 0) and oo.adapt:
@@ -686,20 +694,21 @@ class MarkAndRF:
                     # print "t11t10+=%.4e" % (#ttsw11-#ttsw10)
                     # print "#timing end  %.5f" % (#ttsw10-#ttsw1)
 
-                frms = _pU.find_good_clstrs_and_stationary_from(M_use, smp_sp_prms[:, 0:itr+1])
-                if (itr >= oo.earliest) and (len(_N.where(frms - 4000 < 0)[0]) == M_use):
-                    break
+                #frms = _pU.find_good_clstrs_and_stationary_from(M_use, smp_sp_prms[:, 0:itr+1])
+                #if (itr >= oo.earliest) and (len(_N.where(frms - 4000 < 0)[0]) == M_use):
+                #    break
 
             ttB = _tm.time()
             print (ttB-ttA)
 
+
             print "itr is %d" % itr
-            gAMxMu.finish_epoch2(oo, nSpks, epc, itr+1, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_a, _q2_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_prms, smp_mk_prms, smp_mk_hyps, freeClstr, M_use, K, priors, m1stSignalClstr)
+            gAMxMu.finish_epoch2_2d(oo, nSpks, epc, itr+1, gz, l0, fx, fy, q2x, q2y, u, Sg, _fx_u, _fy_u, _fx_q2, _fy_q2, _q2x_a, _q2y_a, _q2x_B, _q2y_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_prms, smp_mk_prms, smp_mk_hyps, freeClstr, M_use, K, priors, m1stSignalClstr)
             #  _l0_a is a copy of a subset of _l0_a_M
             #  we need to copy back the values _l0_a back into _l0_a_M
-            gAMxMu.contiguous_inuse(M_use, M_max, K, freeClstr, l0, f, q2, u, Sg, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_prms, smp_mk_prms, oo.sp_prmPstMd, oo.mk_prmPstMd, gz, priors)
-            gAMxMu.copy_back_params(M_use, l0, f, q2, u, Sg, M_max, l0_M, f_M, q2_M, u_M, Sg_M)
-            gAMxMu.copy_back_hyp_params(M_use, _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, M_max, _l0_a_M, _l0_B_M, _f_u_M, _f_q2_M, _q2_a_M, _q2_B_M, _u_u_M, _u_Sg_M, _Sg_nu_M, _Sg_PSI_M)
+            gAMxMu.contiguous_inuse_2d(M_use, M_max, K, freeClstr, l0, fx, fy, q2x, q2y, u, Sg, _l0_a, _l0_B, _fx_u, _fy_u, _fx_q2, _fy_q2, _q2x_a, _q2y_a, _q2x_B, _q2y_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_prms, smp_mk_prms, oo.sp_prmPstMd, oo.mk_prmPstMd, gz, priors)
+            gAMxMu.copy_back_params_2d(M_use, l0, fx, fy, q2x, q2y, u, Sg, M_max, l0_M, fx_M, fy_M, q2x_M, q2y_M, u_M, Sg_M)
+            gAMxMu.copy_back_hyp_params_2d(M_use, _l0_a, _l0_B, _fx_u, _fy_u, _fx_q2, _fy_q2, _q2x_a, _q2y_a, _q2x_B, _q2y_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, M_max, _l0_a_M, _l0_B_M, _fx_u_M, _fy_u_M, _fx_q2_M, _fy_q2_M, _q2x_a_M, _q2y_a_M, _q2x_B_M, _q2y_B_M, _u_u_M, _u_Sg_M, _Sg_nu_M, _Sg_PSI_M)
             
             #  MAP of nzclstr
             if saveSamps:

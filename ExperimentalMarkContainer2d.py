@@ -2,9 +2,9 @@ import EnDedirs as _edd
 #import pickle
 import cPickle as _pkl
 
-class ExperimentalMarkContainer:
+class ExperimentalMarkContainer2d:
     tetlist  = None
-    pos      = None
+    rawpos   = None
     marks    = None
 
     Nx       = None

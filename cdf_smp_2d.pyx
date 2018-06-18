@@ -46,6 +46,11 @@ cdef long *Nupxs
 cdef long *Nupys
 cdef long *p_Nupxys  #  grid # for sum over occ weighted spatial path 
 
+py_arr_xy_0s = None
+py_arr_x_0s  = None
+py_arr_y_0s  = None
+py_q2_th     = None
+
 cdef long *arr_xy_0s
 cdef long *arr_x_0s
 cdef long *arr_y_0s
@@ -76,7 +81,7 @@ q2_lo = None
 q2_hi = None
 dt    = None
 
-adtv_pdf_params = _N.empty(4)
+adtv_pdf_params = _N.empty(5)
 
 ########################################################################
 def init(_dt, _f_lo, _f_hi, _q2_lo, _q2_hi, _f_STEPS, _q2_STEPS, _f_SMALL, _q2_SMALL, _f_cldz, _q2_cldz, _minSmps):
@@ -875,6 +880,8 @@ def adtv_support_pdf(int cmpnt, double[::1] gx, double[::1] cond_pstr,
 ###########################################################################
 #####################  OCCUPATION FUNCTIONS
 
+
+
 def init_occ_resolutions(_x_Lo, _x_Hi, _y_Lo, _y_Hi, v_q2_thr, v_Nupxs, v_Nupys):
     #  BIN a bit smaller than width
     # q2_thr, Nupxs
@@ -899,6 +906,8 @@ def init_occ_resolutions(_x_Lo, _x_Hi, _y_Lo, _y_Hi, v_q2_thr, v_Nupxs, v_Nupys)
     global p_riemann_xs;  global p_riemann_ys
     global p_ibinszs_x, p_ibinszs_y
     global x_Lo, x_Hi, y_Lo, y_Hi
+    global py_q2_thr;     global py_arr_xy_0s;  
+    global py_arr_x_0s;   global py_arr_y_0s
 
     cdef int i, j, totxy = 0, totx = 0, toty = 0
     cdef double dx, x
@@ -921,7 +930,6 @@ def init_occ_resolutions(_x_Lo, _x_Hi, _y_Lo, _y_Hi, v_q2_thr, v_Nupxs, v_Nupys)
     py_ibinszs_y     = _N.empty(n_res)
     cdef double[::1] mv_ibinszs_y     = py_ibinszs_y
     p_ibinszs_y = &mv_ibinszs_y[0]
-    print "init_occ_res 1"
     py_hist_all   = _N.empty(_N.sum(v_Nupxs*v_Nupys), dtype=_N.int)
     cdef long[::1] mv_hist_all = py_hist_all
     p_hist_all     = &mv_hist_all[0]
@@ -932,7 +940,6 @@ def init_occ_resolutions(_x_Lo, _x_Hi, _y_Lo, _y_Hi, v_q2_thr, v_Nupxs, v_Nupys)
     py_riemann_ys   = _N.empty(_N.sum(v_Nupys))
     cdef double[::1] mv_riemann_ys = py_riemann_ys
     p_riemann_ys     = &mv_riemann_ys[0]
-    print "init_occ_res 2"
 
     #p_hist_all     = <long*>malloc(_N.sum(v_Nupxs*v_Nupys)*sizeof(long))
     #p_riemann_xs = <double*>malloc(_N.sum(v_Nupxs)*sizeof(double))
@@ -943,10 +950,23 @@ def init_occ_resolutions(_x_Lo, _x_Hi, _y_Lo, _y_Hi, v_q2_thr, v_Nupxs, v_Nupys)
     #Nupys        = <long*>malloc(n_res*sizeof(long))
     #p_ibinszs_x  = <double*>malloc(n_res*sizeof(double))
     #p_ibinszs_y  = <double*>malloc(n_res*sizeof(double))
-    arr_xy_0s       = <long*>malloc(n_res*sizeof(long)) 
-    arr_x_0s       = <long*>malloc(n_res*sizeof(long)) 
-    arr_y_0s       = <long*>malloc(n_res*sizeof(long)) 
-    p_q2_thr     = <double*>malloc(n_res*sizeof(double))
+
+    py_arr_xy_0s  = _N.empty(n_res, dtype=_N.int)
+    cdef long[::1] mv_arr_xy_0s = py_arr_xy_0s
+    arr_xy_0s       = &mv_arr_xy_0s[0]#<long*>malloc(n_res*sizeof(long)) 
+    py_arr_x_0s   = _N.empty(n_res, dtype=_N.int)
+    cdef long[::1] mv_arr_x_0s  = py_arr_x_0s
+    arr_x_0s        = &mv_arr_x_0s[0]#<long*>malloc(n_res*sizeof(long)) 
+    py_arr_y_0s   = _N.empty(n_res, dtype=_N.int)
+    cdef long[::1] mv_arr_y_0s = py_arr_y_0s
+    arr_y_0s       = &mv_arr_y_0s[0]#<long*>malloc(n_res*sizeof(long)) 
+    py_q2_thr   = _N.empty(n_res)
+    cdef double[::1] mv_q2_thr = py_q2_thr
+    p_q2_thr       = &mv_q2_thr[0]#<long*>malloc(n_res*sizeof(long)) 
+
+    # arr_x_0s       = <long*>malloc(n_res*sizeof(long)) 
+    # arr_y_0s       = <long*>malloc(n_res*sizeof(long)) 
+    # p_q2_thr     = <double*>malloc(n_res*sizeof(double))
     #  all n_res histograms to be stored in a flat array
     #print("size  %d\n" % _N.sum(v_Nupxs*v_Nupys))
     #p_hist_all     = <long*>malloc(_N.sum(v_Nupxs*v_Nupys)*sizeof(long))
@@ -967,24 +987,31 @@ def init_occ_resolutions(_x_Lo, _x_Hi, _y_Lo, _y_Hi, v_q2_thr, v_Nupxs, v_Nupys)
 
         dx = float(x_Hi - x_Lo) / Nupxs[i]
         dy = float(y_Hi - y_Lo) / Nupys[i]
-        p_ibinszs_x[i] = 1./dx
-        p_ibinszs_y[i] = 1./dy
+        py_ibinszs_x[i] = 1./dx
+        py_ibinszs_y[i] = 1./dy
         x  = x_Lo + 0.5*dx
         y  = y_Lo + 0.5*dy
 
         for 0 <= j < Nupxs[i]:
-            p_riemann_xs[totx+j] = x
+            py_riemann_xs[totx+j] = x
             x += dx
 
         for 0 <= j < Nupys[i]:
-            p_riemann_ys[toty+j] = y
+            py_riemann_ys[toty+j] = y
             y += dy
 
 
-        totxy += Nupxs[i] * Nupys[i]
-        totx += Nupxs[i]
-        toty += Nupys[i]
+        totxy += py_Nupxs[i] * py_Nupys[i]
+        totx += py_Nupxs[i]
+        toty += py_Nupys[i]
     print "init_occ_res 4"
+
+
+
+
+
+
+
 
 def clean_occ_resolutions():
     global p_hist_all;   global p_riemann_xs;   global p_q2_thr
