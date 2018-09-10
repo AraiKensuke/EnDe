@@ -747,11 +747,11 @@ def exp_on_arr(double[:, ::1] inp, double[:, ::1] out, long M, long N):
         for 0 <= m < M:
             mN = m*N
             for 0 <= n < N:
-                #p_out[mN + n] = exp(p_inp[mN + n])
+                p_out[mN + n] = exp(p_inp[mN + n])
                 #  most of the time, we're evaluating exp(VERY NEGATIVE).
                 #  instead of wasting time evaluating this, just set these
                 #  ones to 0.  assignment ratio is << exp(0), practically 0.
-                p_out[mN+n] = 0 if (p_inp[mN+n] < -10) else exp(p_inp[mN + n])
+                #p_out[mN+n] = 0 if (p_inp[mN+n] < -10) else exp(p_inp[mN + n])
 
 
 @cython.boundscheck(False)

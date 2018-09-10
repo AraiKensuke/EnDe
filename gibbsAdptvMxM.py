@@ -98,22 +98,22 @@ class MarkAndRF:
         oo = self
         oo.q2_lvls = _N.empty(n_q2_lvls)
         oo.Nupx_lvls = _N.empty(n_q2_lvls, dtype=_N.int)
-        oo.Nupy_lvls = _N.empty(n_q2_lvls, dtype=_N.int)
+        #oo.Nupy_lvls = _N.empty(n_q2_lvls, dtype=_N.int)
         oo.q2_lvls[0] = q_min**2
         q2_mlt_steps = q_mlt_steps**2
         oo.Nupx_lvls[0] = int(_N.ceil(((oo.xHi-oo.xLo)/_N.sqrt(oo.q2_lvls[0]))*bins_per_sd))
-        oo.Nupy_lvls[0] = int(_N.ceil(((oo.yHi-oo.yLo)/_N.sqrt(oo.q2_lvls[0]))*bins_per_sd))
+        #oo.Nupy_lvls[0] = int(_N.ceil(((oo.yHi-oo.yLo)/_N.sqrt(oo.q2_lvls[0]))*bins_per_sd))
 
         for i in xrange(1, n_q2_lvls):
             oo.q2_lvls[i] = q2_mlt_steps*oo.q2_lvls[i-1]
             oo.Nupx_lvls[i] = int(_N.ceil(((oo.xHi-oo.xLo)/_N.sqrt(oo.q2_lvls[i]))*bins_per_sd))
-            oo.Nupy_lvls[i] = int(_N.ceil(((oo.yHi-oo.yLo)/_N.sqrt(oo.q2_lvls[i]))*bins_per_sd))
+            #oo.Nupy_lvls[i] = int(_N.ceil(((oo.yHi-oo.yLo)/_N.sqrt(oo.q2_lvls[i]))*bins_per_sd))
             #  Nupx_lvls should not be too small.  how finely 
             oo.Nupx_lvls[i] = 40 if oo.Nupx_lvls[i] < 40 else oo.Nupx_lvls[i]
-            oo.Nupy_lvls[i] = 40 if oo.Nupy_lvls[i] < 40 else oo.Nupy_lvls[i]
+            #oo.Nupy_lvls[i] = 40 if oo.Nupy_lvls[i] < 40 else oo.Nupy_lvls[i]
 
         oo.binszs_x     = float(oo.xHi-oo.xLo)/oo.Nupx_lvls
-        oo.binszs_y     = float(oo.yHi-oo.yLo)/oo.Nupy_lvls
+        #oo.binszs_y     = float(oo.yHi-oo.yLo)/oo.Nupy_lvls
 
         #####  these are for 
         oo.q2_L, oo.q2_H = q2x
@@ -218,7 +218,7 @@ class MarkAndRF:
         # else:
         #     oo.dat[:, 0] += nz_pth*_N.random.randn(len(oo.dat[:, 0]))
         x      = oo.dat[:, 0]
-
+        xr    = x.reshape((x.shape[0], 1))
 
         if oo.rotate:
             init_mks    = _N.array(oo.dat[:, 2:2+K])  #  init using non-rot
@@ -273,7 +273,7 @@ class MarkAndRF:
                 print "Asts" 
                 print  "t0   %(0)d     t1  %(1)d" % {"0" : t0, "1" : t1}
                 
-                labS, labH, flatlabels, M_use, hashthresh, nHSclusters = gAMxMu.initClusters(oo, M_max, K, x, init_mks, t0, t1, Asts, doSepHash=doSepHash, xLo=oo.xLo, xHi=oo.xHi, oneCluster=oo.oneCluster)
+                labS, labH, flatlabels, M_use, hashthresh, nHSclusters = gAMxMu.initClusters(oo, M_max, K, xr, init_mks, t0, t1, Asts, doSepHash=doSepHash, xLo=oo.xLo, xHi=oo.xHi, oneCluster=oo.oneCluster)
 
                 m1stSignalClstr = 0 if oo.oneCluster else nHSclusters[0]
 
@@ -304,7 +304,6 @@ class MarkAndRF:
                 oo.mk_prmPstMd = [_N.zeros((M_use, K)),
                                   _N.zeros((M_use, K, K))]
                       # mode of params
-
 
                 #  list of freeClstrs
                 freeClstr = _N.empty(M_max, dtype=_N.bool)   #  Actual cluster
@@ -436,6 +435,9 @@ class MarkAndRF:
             BLK        = 1000
             iterBLOCKs = ITERS/BLK
 
+            q2[:] = _N.random.rand(M_use)
+            f[:]   = _N.random.randn(M_use)
+
             ###########  BEGIN GIBBS SAMPLING ##############################
             #for itr in xrange(ITERS):
             for itrB in xrange(iterBLOCKs):
@@ -497,7 +499,7 @@ class MarkAndRF:
 
                     m_rnds = _N.random.rand(M_use)
 
-                    _cdfs.smp_f(M_use, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _f_u, q2pr, m_rnds)
+                    _cdfs.smp_f(itr, M_use, clstsz, cls_str_ind, v_sts, xt0t1, t0, f, q2, l0, _f_u, q2pr, m_rnds)
                     #f   = _N.array([6.33])
                     smp_sp_prms[oo.ky_p_f, itr] = f
 
@@ -625,9 +627,9 @@ class MarkAndRF:
                     # print "t11t10+=%.4e" % (#ttsw11-#ttsw10)
                     # print "#timing end  %.5f" % (#ttsw10-#ttsw1)
 
-                frms = _pU.find_good_clstrs_and_stationary_from(M_use, smp_sp_prms[:, 0:itr+1])
-                if (itr >= oo.earliest) and (len(_N.where(frms - 4000 < 0)[0]) == M_use):
-                    break
+                # frms = _pU.find_good_clstrs_and_stationary_from(M_use, smp_sp_prms[:, 0:itr+1], spcdim=1)
+                # if (itr >= oo.earliest) and (len(_N.where(frms - 4000 < 0)[0]) == M_use):
+                #     break
 
             ttB = _tm.time()
             print (ttB-ttA)

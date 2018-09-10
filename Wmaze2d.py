@@ -39,7 +39,7 @@ for an in animals[0:1]:
     anim2 = an[1]
     anim3 = an[2]
 
-    for day in xrange(3, 4):
+    for day in xrange(10, 11):
         sdy    = ("0%d" % day) if (day < 10) else "%d" % day
 
         frip = "%(bd)s/%(s3)s/%(s1)sripplescons%(sdy)s.mat" % {"s1" : anim1, "sdy" : sdy, "s3" : anim3, "bd" : basedir}
@@ -51,14 +51,13 @@ for an in animals[0:1]:
             mLp = _sio.loadmat(flnp)
             mRp = _sio.loadmat(frwp)
 
-
-
             ex   = rip["ripplescons"].shape[1] - 1
             _pts=mLp["linpos"][0,ex]
 
 
             #for epc in range(0, _pts.shape[1], 2):
-            for epc in range(0, 1):
+            #for epc in range(0, 1):
+            for epc in range(2, 3):
                 ep=epc+1;
 
                 #  these are in seconds
@@ -73,7 +72,6 @@ for an in animals[0:1]:
 
                 _pts=mLp["linpos"][0,ex][0,ep] 
                 if (_pts.shape[1] > 0):     #  might be empty epoch
-                    print "here"
                     pts = _pts["statematrix"][0][0]["time"][0,0].T[0]
                     a = mLp["linpos"][0,ex][0,ep]["statematrix"][0,0]["segmentIndex"]
                     r = mRp["rawpos"][0,ex][0,ep]["data"][0,0]
@@ -84,15 +82,14 @@ for an in animals[0:1]:
                             r[it, 2] = r[it-1, 2]
 
                     tmp = _N.convolve(gk2d, r[:, 1], mode="same")
-                    r[:, 1] = tmp
+                    r[4:r.shape[0]-4, 1] = tmp[4:r.shape[0]-4]
                     tmp = _N.convolve(gk2d, r[:, 2], mode="same")
-                    r[:, 2] = tmp
-                    
+                    r[4:r.shape[0]-4, 2] = tmp[4:r.shape[0]-4]
 
                     time=mLp["linpos"][0,ex][0,ep]["statematrix"][0][0]["time"][0,0].T[0]   #  30Hz sampling of position
                     lindist=mLp["linpos"][0,ex][0,ep]["statematrix"][0][0]["lindist"][0,0].T[0]
 
-                    svecT  = pts
+                    svecT = pts
                     t0 = int(svecT[0]  * 1000)
                     t1 = int(svecT[-1] * 1000)
 
@@ -111,8 +108,30 @@ for an in animals[0:1]:
                             tetlistlen += 1
                             tetlist.append(tet)
 
-
                     marks   =  _N.empty((t1-t0+1, tetlistlen), dtype=list)
+
+                    path2D= _N.empty((t1-t0+1, 2), dtype=_N.float32)
+
+                    for tt in xrange(len(svecT)):
+                        t   = svecT[tt]
+                        path2D[int(t*1000)-t0] = r[tt, 1:3]
+
+                    dfnd = _N.array(svecT*1000-t0, dtype=_N.int)
+
+                    path2D[:, 0] = _N.interp(_N.arange(t1-t0+1), dfnd, r[:, 1])
+                    path2D[:, 1] = _N.interp(_N.arange(t1-t0+1), dfnd, r[:, 2])
+                    tmp = _N.convolve(gkpth, path2D[:, 0], mode="same")
+                    path2D[200:t1-t0+1-200, 0] = tmp[200:t1-t0+1-200]
+                    tmp = _N.convolve(gkpth, path2D[:, 1], mode="same")
+                    path2D[200:t1-t0+1-200, 1] = tmp[200:t1-t0+1-200]
+
+                    dpath2D = _N.diff(path2D, axis=0)
+                    spd = _N.sqrt(_N.sum(dpath2D*dpath2D, axis=1))
+                    spd = _N.convolve(gkspd, spd, mode="same")
+
+                    AMPS = _N.max(path2D, axis=0) - _N.min(path2D, axis=0)
+                    spdthr = AMPS[0] / 10000.  #  spd where it takes 30 seconds to move 1 arm length is considered very slow
+                    #spdthresh = AMPS
 
                     it      = -1
 
@@ -125,8 +144,6 @@ for an in animals[0:1]:
                             it += 1
                             A = _sio.loadmat(prmfn)
                             t_champs = _N.array(A["filedata"][0,0]["params"][:, 0:5], dtype=_N.float32)  # time and amplitudes
-
-
 
                             #  tm/10000.    -->  seconds
                             #  vecT  is sampled every 33.4 ms?     #  let's intrapolate this 
@@ -146,27 +163,6 @@ for an in animals[0:1]:
                             #  t = 0 for the marks is 
 
                             rngT = []
-
-                            path2D= _N.empty((t1-t0+1, 2), dtype=_N.float32)
-
-                            for tt in xrange(len(svecT)):
-                                t   = svecT[tt]
-                                path2D[int(t*1000)-t0] = r[tt, 1:3]
-
-                            dfnd = _N.array(svecT*1000-t0, dtype=_N.int)
-
-                            path2D[:, 0] = _N.interp(_N.arange(t1-t0+1), dfnd, r[:, 1])
-                            path2D[:, 1] = _N.interp(_N.arange(t1-t0+1), dfnd, r[:, 2])
-                            path2D[:, 0] = _N.convolve(gkpth, path2D[:, 0], mode="same")
-                            path2D[:, 1] = _N.convolve(gkpth, path2D[:, 1], mode="same")
-
-                            dpath2D = _N.diff(path2D, axis=0)
-                            spd = _N.sqrt(_N.sum(dpath2D*dpath2D, axis=1))
-                            spd = _N.convolve(gkspd, spd, mode="same")
-
-                            AMPS = _N.max(path2D, axis=0) - _N.min(path2D, axis=0)
-                            spdthr = AMPS[0] / 30000.  #  spd where it takes 30 seconds to move 1 arm length is considered very slow
-                            #spdthresh = AMPS
 
                             #  recording goes from svecT[0] to svecT[-1]
                             for imk in xrange(t_champs.shape[0]):  #  more marks than there is behavioral data

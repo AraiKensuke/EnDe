@@ -576,7 +576,7 @@ class mkdecoder:
         rscld = []
 
         for t in xrange(t0+1, t1): # start at 1 because initial condition
-            if (oo.mkpos[nt][t, 1] == 1):
+            if (oo.mkpos[nt][t, 1] == 1):  #  found spike
                 fxdMks[:, 1:] = oo.mkpos[nt][t, 2:]
                 if kde:   #  kerFr returns lambda(m, x) for all x
                     mkint = _ku.kerFr(fxdMks[0, 1:], sptl[nt], oo.tr_marks[nt], oo.mdim, oo.Bx, oo.Bm, oo.bx, oo.dxp, oo.occ)

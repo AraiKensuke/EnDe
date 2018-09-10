@@ -3,6 +3,7 @@ cimport numpy as _N
 import cython
 cimport cython
 import time as _tm
+import utilities as _U
 from libc.math cimport exp, sqrt, log
 from libc.stdlib cimport malloc, free
 from libc.stdio cimport printf
@@ -19,6 +20,7 @@ cdef int __NRM = 0
 cdef int __IG  = 1
 
 cdef double fourpi2 = 39.47841760435743
+cdef double twpi    = 6.283185307179586
 
 cdef double[::1] v_cpf2
 cdef double[::1] v_cpq22
@@ -131,7 +133,7 @@ def init(_dt, _f_lo, _f_hi, _q2_lo, _q2_hi, _f_STEPS, _q2_STEPS, _f_SMALL, _q2_S
 @cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def adtv_smp_cdf_interp(double[::1] x, double[::1] log_p, int N, int m, double[::1] m_rnds):
+def adtv_smp_cdf_interp(int itr, int forq, int cmpnt, double[::1] x, double[::1] log_p, int N, int m, double[::1] m_rnds):
     """
     each cluster has independent x over which conditional likelihood defined
     xt0t1    relative coordinates
@@ -168,6 +170,11 @@ def adtv_smp_cdf_interp(double[::1] x, double[::1] log_p, int N, int m, double[:
         p_cdf[i] = p_cdf[i-1] + 0.5*(p[i-1]+p[i])*dx[i-1]#*itot
 
     cdf /= cdf[N-1]     #  even if U[0,1] rand is 1, we still have some room at the end to add a bit of noise.
+    # if (itr > 2720) and (itr < 2745) and (forq == 1) and (cmpnt == 0):
+    #     dat = _N.empty((N, 2))
+    #     dat[:, 0] = x
+    #     dat[:, 1] = cdf
+    #     _N.savetxt("q2_cdf_%d" % itr, dat, fmt="%.4e %.4e")
 
     #  btwn cdf[isg2] and cdf[isg2+1]
     #  (rnds[m,0] - cdf[isg2]) * (cdf[isg2+1] - cdf[isg2]) * d_sg2s[isg2]
@@ -184,7 +191,7 @@ def adtv_smp_cdf_interp(double[::1] x, double[::1] log_p, int N, int m, double[:
 @cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def smp_f(int cmpnt, int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts, 
+def smp_f(int itr, int cmpnt, int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts, 
           double[::1] xt0t1, double[::1] yt0t1, int t0, double[::1] fx, double[::1] fy, 
           double[::1] q2x, double[::1] q2y, double[::1] l0, 
           double[::1] _fx_u, double[::1] _fx_q2, 
@@ -257,13 +264,22 @@ def smp_f(int cmpnt, int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1]
         #printf("--------------  coming from smp_f\n")
         adtvInds, N = adtv_support_pdf(cmpnt, fx2, cpf2, f_STEPS, f_cldz, f_SMALL, dt, l0[m], _NRM, adtv_pdf_params, )
 
-        p_f[m] = adtv_smp_cdf_interp(fx2[adtvInds], cpf2[adtvInds], N, m, m_rands)
+        p_f[m] = adtv_smp_cdf_interp(itr, 0, cmpnt, fx2[adtvInds], cpf2[adtvInds], N, m, m_rands)
+        #if ((itr > 4000) and (itr < 4500)):
+        # if (itr > 1000):
+        #     #printf("iter %d   m %d   cmp  %d---   clstsz %d  fs %.3f   U %.3f\n", itr, m, cmpnt, p_clstsz[m], fs, U)
+        #     dat = _N.empty((len(adtvInds), 2))
+        #     dat[:, 0] = fx2[adtvInds]
+        #     dat[:, 1] = cpf2[adtvInds]
+        #     _U.savetxtWCom("f_%(i)d_%(c)d_%(m)d.txt" % {"i" : itr, "c" : cmpnt, "m" : m}, dat, fmt="%.4e %.4e", com=("#clstsz %(cs)d  U %(U).3e   Q2 %(Q).3e\n#l0 %(l0).3e  const comp f %(f).3e  const comp q2 %(q2c).3e  var comp q2 %(q2v).3e" % {"cs" : p_clstsz[m], "U" : U, "Q" : FQ2, "f" : p_adtv_pdf_params[3], "q2c" : p_adtv_pdf_params[4], "q2v" : p_adtv_pdf_params[2], "l0" : l0[m]}))
+        #     #_N.savetxt("f_%(i)d_%(c)d_%(m)d.txt" % {"i" : itr, "c" : cmpnt, "m" : m}, dat, fmt="%.4f %.4f")
+
 
 ########################################################################
 #@cython.cdivision(True)
 #@cython.boundscheck(False)
 #@cython.wraparound(False)
-def smp_q2(int cmpnt, int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts, 
+def smp_q2(int itr, int cmpnt, int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts, 
           double[::1] xt0t1, double[::1] yt0t1, int t0, double[::1] fx, double[::1] fy, 
           double[::1] q2x, double[::1] q2y, double[::1] l0, 
           double[::1] _q2_a, double[::1] _q2_B, double[::1] m_rands):
@@ -311,6 +327,8 @@ def smp_q2(int cmpnt, int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1
             for p_strt_inds[m] <= i < p_strt_inds[m+1]:
                 SL_B += (p_pt0t1[p_sts[i]-t0]-p_f[m])*(p_pt0t1[p_sts[i]-t0]-p_f[m])
             SL_B *= 0.5
+            #  (2 SL/B - _p_q2_B) / (2SL_a - 2 _p_q2_a - 2)   -->  estimator
+            #   [sum( )^2+ B-B] / [M + 2a + -1 2 - 2a - 2 ]
             SL_B += _p_q2_B[m]
 
             #  -S/2 (likelihood)  -(a+1)
@@ -334,13 +352,21 @@ def smp_q2(int cmpnt, int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1
         #printf("adtv_pdf_params  %.3f  %.3f  %.3f\n", p_adtv_pdf_params[2], p_adtv_pdf_params[3], p_adtv_pdf_params[4])
         adtvInds, N = adtv_support_pdf(cmpnt, qx2, cpq22, q2_STEPS, f_cldz, f_SMALL, dt, l0[m], _IG, adtv_pdf_params, )
 
-        p_q2[m] = adtv_smp_cdf_interp(qx2[adtvInds], cpq22[adtvInds], N, m, m_rands)
+        p_q2[m] = adtv_smp_cdf_interp(itr, 1, cmpnt, qx2[adtvInds], cpq22[adtvInds], N, m, m_rands)
         if p_clstsz[m] > 0:
             if p_q2[m] > 10:
                 s = _N.empty((len(adtvInds), 2))
                 s[:, 0] = qx2[adtvInds]
                 s[:, 1] = cpq22[adtvInds]
                 _N.savetxt("bad.dat", s, fmt="%.4e %.4e")
+        
+        # if (itr > 1000):
+        #     #printf("iter %d   m %d   cmp  %d---   clstsz %d  fs %.3f   U %.3f\n", itr, m, cmpnt, p_clstsz[m], fs, U)
+        #     dat = _N.empty((len(adtvInds), 2))
+        #     dat[:, 0] = qx2[adtvInds]
+        #     dat[:, 1] = cpq22[adtvInds]
+        #     _U.savetxtWCom("q2_%(i)d_%(c)d_%(m)d.txt" % {"i" : itr, "c" : cmpnt, "m" : m}, dat, fmt="%.4e %.4e", com=("#clstsz %(cs)d  a %(a).3f   B %(B).3f\n#l0 %(l0).3e  const comp q2 %(q2).3e  const comp f %(fc).3e  var comp f %(fv).3e" % {"cs" : p_clstsz[m], "a" : SL_a, "B" : SL_B, "q2" : p_adtv_pdf_params[3], "fc" : p_adtv_pdf_params[4], "fv" : p_adtv_pdf_params[2], "l0" : l0[m]}))
+
 
 @cython.cdivision(True)
 cdef double pdfIG(int cmpnt, double fc_x, double fc_y, double q2_x, double q2_y, double a, double B, long iStart_x, long iStart_y, long iStart_xy, long Nupx, long Nupy, double ibnsz_x, double ibnsz_y, double dt, double l0, double xL, double xH, double yL, double yH) nogil:
@@ -362,12 +388,13 @@ cdef double pdfIG(int cmpnt, double fc_x, double fc_y, double q2_x, double q2_y,
     cdef double sdx = sqrt(q2_x)
     cdef double sdy = sqrt(q2_y)
 
-    iLx = int((fc_x-7*sdx-xL)*ibnsz_x)
-    iRx = int((fc_x+7*sdx-xL)*ibnsz_x)
+    #iLx = int((fc_x-7*sdx-xL)*ibnsz_x) - 2
+    iLx = <int>((fc_x-7*sdx-xL)*ibnsz_x) - 2
+    iRx = <int>((fc_x+7*sdx-xL)*ibnsz_x) + 2
     iLx = iLx if iLx >= 0 else 0
     iRx = iRx if iRx <= Nupx else Nupx
-    iLy = int((fc_y-7*sdy-yL)*ibnsz_y)
-    iRy = int((fc_y+7*sdy-yL)*ibnsz_y)
+    iLy = <int>((fc_y-7*sdy-yL)*ibnsz_y) - 2
+    iRy = <int>((fc_y+7*sdy-yL)*ibnsz_y) + 2
     iLy = iLy if iLy >= 0 else 0
     iRy = iRy if iRy <= Nupy else Nupy
 
@@ -441,9 +468,8 @@ def pdfIG(int cmpnt, double fc_x, double fc_y, double q2_x, double q2_y, double 
 
 ########################################################################
 @cython.cdivision(True)
-cdef double pdfNRM(int cmpnt, double fc_x, double fc_y, double q2_x, double q2_y, double fxd_IIQ2, double Mc, double Sigma2c, double *p_riemann_x, double *p_riemann_y, long *p_hist, long Nupx, long Nupy, double ibnsz_x, double ibnsz_y, double dt, double l0, double xL, double xH, double yL, double yH) nogil:
+cdef double pdfNRM(int cmpnt, double fc_x, double fc_y, double q2_x, double q2_y, double Mc, double Sigma2c, double *p_riemann_x, double *p_riemann_y, long *p_hist, long Nupx, long Nupy, double ibnsz_x, double ibnsz_y, double dt, double l0, double xL, double xH, double yL, double yH) nogil:
     #  Value of pdf @ fc.  
-    #  fxd_IIQ2    1./q2_c
     #  Mc          - spiking + prior  mean
     #  Sigma2c     - spiking + prior  variance
     #  p_riemann_x - points at which integral discretized
@@ -457,12 +483,12 @@ cdef double pdfNRM(int cmpnt, double fc_x, double fc_y, double q2_x, double q2_y
     cdef double sdx = sqrt(q2_x)
     cdef double sdy = sqrt(q2_y)
 
-    iLx = int((fc_x-7*sdx-xL)*ibnsz_x)
-    iRx = int((fc_x+7*sdx-xL)*ibnsz_x)
+    iLx = <int>((fc_x-7*sdx-xL)*ibnsz_x) - 2
+    iRx = <int>((fc_x+7*sdx-xL)*ibnsz_x) + 2
     iLx = iLx if iLx >= 0 else 0
     iRx = iRx if iRx <= Nupx else Nupx
-    iLy = int((fc_y-7*sdy-yL)*ibnsz_y)
-    iRy = int((fc_y+7*sdy-yL)*ibnsz_y)
+    iLy = <int>((fc_y-7*sdy-yL)*ibnsz_y) - 2
+    iRy = <int>((fc_y+7*sdy-yL)*ibnsz_y) + 2
     iLy = iLy if iLy >= 0 else 0
     iRy = iRy if iRy <= Nupy else Nupy
 
@@ -486,7 +512,6 @@ cdef double pdfNRM(int cmpnt, double fc_x, double fc_y, double q2_x, double q2_y
 @cython.cdivision(True)
 def l0_spatial(long M, double dt, double[::1] v_fxd_fc_x, double[::1] v_fxd_fc_y, double[::1] v_fxd_q2_x, double[::1] v_fxd_q2_y, double[::1] v_l0_exp_hist):
     #  Value of pdf @ fc.  
-    #  fxd_IIQ2    1./q2_c
     #  Mc          - spiking + prior  mean
     #  Sigma2c     - spiking + prior  variance
     #  p_riemann_x - points at which integral discretized
@@ -522,22 +547,25 @@ def l0_spatial(long M, double dt, double[::1] v_fxd_fc_x, double[::1] v_fxd_fc_y
         sd_x = sqrt(q2c_x)
         sd_y = sqrt(q2c_y)
 
-        iLx = int((fc_x-7*sd_x-x_Lo)*ibnsz_x)
-        iRx = int((fc_x+7*sd_x-x_Lo)*ibnsz_x)
+        #################################
+        iLx = int((fc_x-7*sd_x-x_Lo)*ibnsz_x) -2
+        iRx = int((fc_x+7*sd_x-x_Lo)*ibnsz_x) + 2
         iLx = iLx if iLx >= 0 else 0
         iRx = iRx if iRx <= Nupx else Nupx
-        iLy = int((fc_y-7*sd_y-y_Lo)*ibnsz_y)
-        iRy = int((fc_y+7*sd_y-y_Lo)*ibnsz_y)
+        #################################
+        iLy = int((fc_y-7*sd_y-y_Lo)*ibnsz_y) - 2
+        iRy = int((fc_y+7*sd_y-y_Lo)*ibnsz_y) + 2
         iLy = iLy if iLy >= 0 else 0
         iRy = iRy if iRy <= Nupy else Nupy
 
         # printf("%f  %f\n", ibnsz_x, ibnsz_y)
 
-        #printf("iStart_xy  %ld   iStart_x  %ld   iStart_y  %ld\n", iStart_xy, iStart_x, iStart_y)
-        # printf("iLx %d   iLy %d\n", iLx, iLy)
-        # printf("iRx %d   iRy %d\n", iRx, iRy)
-        # printf("fc  %.3f  %.3f\n", fc_x, fc_y)
-        # printf("sd  %.3f  %.3f\n", sd_x, sd_y)
+        # if m == 0:
+        #     printf("iStart_xy  %ld   iStart_x  %ld   iStart_y  %ld\n", iStart_xy, iStart_x, iStart_y)
+        #     printf("iLx %d   iLy %d\n", iLx, iLy)
+        #     printf("iRx %d   iRy %d\n", iRx, iRy)
+        #     printf("fc  %.3f  %.3f\n", fc_x, fc_y)
+        #     printf("sd  %.3f  %.3f\n", sd_x, sd_y)
 
         for iLx <= nx < iRx:    #  integrate
             nxY = nx * Nupy
@@ -549,6 +577,9 @@ def l0_spatial(long M, double dt, double[::1] v_fxd_fc_x, double[::1] v_fxd_fc_y
                     ddy = fc_y-p_riemann_ys[iStart_y + ny]
                     #sptlIntgrl += exp(ddx2 + ddy*ddy*hlfIIQ2_y)*p_hist_all[iStart+nxY + ny]
                     sptlIntgrl += exp(ddx2 + ddy*ddy*hlfIIQ2_y)*p_hist_all[iStart_xy+nxY + ny]
+
+        #sptlIntgrl *= (dt/sqrt(twpi*q2c_x*q2c_y))
+
         sptlIntgrl *= (dt/sqrt(fourpi2*q2c_x*q2c_y))
 
         p_l0_exp_hist[m] = sptlIntgrl
@@ -621,6 +652,8 @@ def adtv_support_pdf(int cmpnt, double[::1] gx, double[::1] cond_pstr,
 
     cdef int imax   = -1
     cdef int gimax  = -1
+    cdef double pdfAtSpkML
+    cdef double posSpkML
 
     ####  
     ####  params conditioned on
@@ -655,11 +688,18 @@ def adtv_support_pdf(int cmpnt, double[::1] gx, double[::1] cond_pstr,
     #initial point, set pmax, gmax
     if dist == __NRM:   ################## __NRM
         getOccHist(q2_smp_cmp, q2_cnd_on, &Nupx, &Nupy, &iStart_xy, &iStart_x, &iStart_y, &ibnsz_x, &ibnsz_y)
+
+        #   pdf @ f_{xy} = Mc
+
+        posSpkML = Mc
         if cmpnt == 0:
-            p_cond_pstr[0] = pdfNRM(cmpnt, p_gx[0], f_cnd_on, q2_smp_cmp, q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+            #pdfAtSpkML = pdfNRM(cmpnt,          Mc, f_cnd_on, q2_smp_cmp, q2_cnd_on, Mc, Sigma2c, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+            p_cond_pstr[0] = pdfNRM(cmpnt, p_gx[0], f_cnd_on, q2_smp_cmp, q2_cnd_on, Mc, Sigma2c, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
         else:  #  cmpnt == 1
-            p_cond_pstr[0] = pdfNRM(cmpnt, f_cnd_on, p_gx[0], q2_cnd_on, q2_smp_cmp, iq2_cnd_on, Mc, Sigma2c, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+            pdfAtSpkML     = pdfNRM(cmpnt, f_cnd_on, Mc,      q2_cnd_on, q2_smp_cmp, Mc, Sigma2c, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+            p_cond_pstr[0] = pdfNRM(cmpnt, f_cnd_on, p_gx[0], q2_cnd_on, q2_smp_cmp, Mc, Sigma2c, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
     if dist == __IG:   ################## __IG
+        posSpkML = B/(a+1)
         getOccHist(p_gx[0], q2_cnd_on, &Nupx, &Nupy, &iStart_xy, &iStart_x, &iStart_y, &ibnsz_x, &ibnsz_y)
         #printf("p_gx %.3e   cn %.3f   %ld  %ld\n", p_gx[0], q2_cnd_on, Nupx, Nupy)
         #printf("p_gx %.3e   cn %.3f   %ld  %ld\n", p_gx[1], q2_cnd_on, Nupx, Nupy)
@@ -667,9 +707,11 @@ def adtv_support_pdf(int cmpnt, double[::1] gx, double[::1] cond_pstr,
 
         if cmpnt == 0:
             #p_cond_pstr[0] = pdfIG(cmpnt, f_smp_cmp, f_cnd_on, p_gx[0], q2_cnd_on, a, B, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+            pdfAtSpkML     = pdfIG(cmpnt, f_smp_cmp, f_cnd_on, B/(a+1), q2_cnd_on, a, B, iStart_x, iStart_y, iStart_xy, Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
             p_cond_pstr[0] = pdfIG(cmpnt, f_smp_cmp, f_cnd_on, p_gx[0], q2_cnd_on, a, B, iStart_x, iStart_y, iStart_xy, Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
         else:  #  cmpnt == 1
             #p_cond_pstr[0] = pdfIG(cmpnt, f_cnd_on, f_smp_cmp, q2_cnd_on, p_gx[0], a, B, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+            pdfAtSpkML     = pdfIG(cmpnt, f_cnd_on, f_smp_cmp, q2_cnd_on, B/(a+1), a, B, iStart_x, iStart_y, iStart_xy, Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
             p_cond_pstr[0] = pdfIG(cmpnt, f_cnd_on, f_smp_cmp, q2_cnd_on, p_gx[0], a, B, iStart_x, iStart_y, iStart_xy, Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
 
     # elif dist == __IG:
@@ -678,7 +720,7 @@ def adtv_support_pdf(int cmpnt, double[::1] gx, double[::1] cond_pstr,
     pmax = p_cond_pstr[0]
     gmax = pmax
     imax = 0
-    
+
     while (cldz > -1) and (bDone == 0):
         if lvl == 0:  # 1st 2 passes skip sizes are the same
             strt = 0   #  first point will have been done already
@@ -711,9 +753,9 @@ def adtv_support_pdf(int cmpnt, double[::1] gx, double[::1] cond_pstr,
             getOccHist(q2_smp_cmp, q2_cnd_on, &Nupx, &Nupy, &iStart_xy, &iStart_x, &iStart_y, &ibnsz_x, &ibnsz_y)
             for strt <= ix < stop+1 by skp:
                 if cmpnt == 0:
-                    p_cond_pstr[ix] = pdfNRM(cmpnt, p_gx[ix], f_cnd_on, q2_smp_cmp, q2_cnd_on, iq2_cnd_on, Mc, Sigma2c, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+                    p_cond_pstr[ix] = pdfNRM(cmpnt, p_gx[ix], f_cnd_on, q2_smp_cmp, q2_cnd_on, Mc, Sigma2c, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
                 else:
-                    p_cond_pstr[ix] = pdfNRM(cmpnt, f_cnd_on, p_gx[ix], q2_cnd_on, q2_smp_cmp, iq2_cnd_on, Mc, Sigma2c, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
+                    p_cond_pstr[ix] = pdfNRM(cmpnt, f_cnd_on, p_gx[ix], q2_cnd_on, q2_smp_cmp, Mc, Sigma2c, &p_riemann_xs[iStart_x], &p_riemann_ys[iStart_y], &p_hist_all[iStart_xy], Nupx, Nupy, ibnsz_x, ibnsz_y, dt, l0, x_Lo, x_Hi, y_Lo, y_Hi)
 
                 if p_cond_pstr[ix] > pmax:
                     pmax = p_cond_pstr[ix]   # pmax updated each time grid made finer
@@ -803,6 +845,15 @@ def adtv_support_pdf(int cmpnt, double[::1] gx, double[::1] cond_pstr,
         nSmpd += (iBdR - iBdL) / skp + 1
 
         bDone = 1 if (nSmpd > minSmps) else 0
+
+
+    # if (gpmax < 0) or (pdfAtSpkML < 0):
+    #    printf("gpmax %.3e    pdfAtSpkML %.3e\n", gpmax, pdfAtSpkML)
+        
+    # if pdfAtSpkML > gpmax:
+    #     printf("      %d  A) %.3e   B) %.3e     C) %.3e   D) %.3e\n", dist, p_gx[gimax], posSpkML, gpmax, pdfAtSpkML)
+    # else:
+    #     printf("regul %d A) %.3e   B) %.3e     C) %.3e   D) %.3e\n", dist, p_gx[gimax], posSpkML, gpmax, pdfAtSpkML)
 
     #  reconstruct lstFM
     narr_FM     = _N.empty(nSmpd, dtype=_N.int)
@@ -1005,12 +1056,6 @@ def init_occ_resolutions(_x_Lo, _x_Hi, _y_Lo, _y_Hi, v_q2_thr, v_Nupxs, v_Nupys)
         totx += py_Nupxs[i]
         toty += py_Nupys[i]
     print "init_occ_res 4"
-
-
-
-
-
-
 
 
 def clean_occ_resolutions():

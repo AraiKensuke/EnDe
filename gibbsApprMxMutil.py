@@ -60,7 +60,8 @@ def initClusters(oo, M_max, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=
             labH, labS, clstrs = emMKPOS_sep1A(None, _x[hashsp], TR=1, K=K)
         else:
             print "---------  doSepH==False"   #  doSepHash == False
-            labH, labS, clstrs = emMKPOS_sep1A(_x[unonhash], None, TR=1, K=K, spcdim=spcdim)
+            spNClstrs=[[1, 2], [1, 7]] if spcdim==1 else [[1, 2], [1, 4]]
+            labH, labS, clstrs = emMKPOS_sep1A(_x[unonhash], None, TR=1, K=K, spcdim=spcdim, spNClstrs=spNClstrs)
             #  labs, labh are at this point both starting from 0
         if doSepHash:
             contiguous_pack2(labH, startAt=0)
@@ -97,8 +98,9 @@ def initClusters(oo, M_max, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=
         print flatlabels
 
         MS     = int(clstrs[1]) 
-        #MS = MS + 5
-        M_use      = clstrs[0] + MS
+        #MS = MS + 9
+        M_use      = int(clstrs[1]) + 5
+        #M_use       = 7
         print "------------"
         print "hash clusters %d" % clstrs[0]
         print "signal clusters %d" % MS

@@ -18,7 +18,8 @@ twpi = 2*_N.pi
 fourpi2 = 4*_N.pi*_N.pi
 wdSpc = 1
 
-def stochasticAssignment2d(oo, epc, it, M, K, l0, fx, fy, q2x, q2y, u, Sg, iSg, _fx_u, _fy_u, _u_u, _fx_q2, _fy_q2, _u_Sg, Asts, t0, mAS, xAS, yAS, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, cmp2Existing, diag_cov, clstsz):
+hKlog2pi = 3.6757541328186907
+def stochasticAssignment2d(oo, epc, it, M, K, l0, fx, fy, q2x, q2y, u, Sg, iSg, _fx_u, _fy_u, _fx_q2, _fy_q2, _u_u, _u_Sg, Asts, t0, mAS, xAS, yAS, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, cmp2Existing, diag_cov, clstsz):
     #  Msc   Msc signal clusters
     #  M     all clusters, including nz clstr.  M == Msc when not using nzclstr
     #  Gibbs sampling
@@ -38,14 +39,16 @@ def stochasticAssignment2d(oo, epc, it, M, K, l0, fx, fy, q2x, q2y, u, Sg, iSg, 
 
     pkFR       = _N.log(l0) - 0.5*_N.log(fourpi2*q2x*q2y)   #  M
 
-    mkNrms = _N.log(1/_N.sqrt(twpi*_N.linalg.det(Sg)))
+    #mkNrms = _N.log(1/_N.sqrt(twpi*_N.linalg.det(Sg)))
+    #mkNrms = _N.log(1/_N.sqrt(twpi*_N.linalg.det(Sg)))
+    mkNrms = -hKlog2pi - 0.5*_N.log(_N.linalg.det(Sg))
     mkNrms = mkNrms.reshape((M, 1))   #  M x 1
 
     #if epc == 1:
     #    print pkFR
     #ttt2       = _tm.time()
     rnds       = _N.random.rand(nSpks)
-    #ttt3       = _tm.time()
+    #ttt3       = _tm.time()nnnnnn n
     #pkFR      = pkFR.reshape((M, 1))
     #dmu        = (mASr - ur)     # mASr 1 x N x K,     ur  is M x 1 x K
     N          = mAS.shape[0]

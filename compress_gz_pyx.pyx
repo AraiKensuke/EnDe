@@ -36,6 +36,6 @@ def cgz2gz(unsigned char[:, ::1] cgz, long M):
             for 0 <= n < nSpks:
                 p_gz[it_nSpks_M + n*M + p_cgz[it_nSpks + n]] = 1
 
-    return _N.array(gz, dtype=_N.bool)
+    return gz
 
     

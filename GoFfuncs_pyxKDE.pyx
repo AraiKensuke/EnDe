@@ -277,6 +277,7 @@ class GoFfuncs:
         i2pidcovs = _N.array((_N.sqrt(2*_N.pi)**(oo.mdim+1))*_N.sqrt(_N.linalg.det(prms[6])))
 
         l0dt_i2pidcovs = l0dt/i2pidcovs
+        print l0dt_i2pidcovs
 
         cdef char use_kde = 1 if (kde == True) else 0
         mk = _N.empty(oo.mdim)

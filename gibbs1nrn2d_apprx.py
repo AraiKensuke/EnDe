@@ -17,7 +17,6 @@ import gibbsApprMxMutil as gAMxMu
 import stochasticAssignment as _sA
 import anocc2 as _aoc2
 #import cdf_smp_tbl as _cdfs
-import cdf_smp_2d as _cdfs2d
 import cdf_smp_2d_apprx as _cdfs2dA
 import ig_from_cdf_pkg as _ifcp
 import fastnum as _fm
@@ -173,8 +172,7 @@ class MarkAndRF:
         tau_q2 = oo.t_hlf_q2/_N.log(2)
 
         #  we'll say q2_L and q2_H 
-        _cdfs2d.init(oo.dt, oo.f_L, oo.f_H, oo.q2_L, oo.q2_H, f_STEPS, q2_STEPS, f_SMALL, q2_SMALL, f_cldz, q2_cldz, minSmps)
-        _cdfs2d.init_occ_resolutions(oo.xLo, oo.xHi, oo.yLo, oo.yHi, oo.q2_lvls, oo.Nupx_lvls, oo.Nupy_lvls)
+        _cdfs2dA.init(oo.dt, oo.f_L, oo.f_H, oo.q2_L, oo.q2_H, f_STEPS, q2_STEPS, f_SMALL, q2_SMALL, f_cldz, q2_cldz, minSmps)
 
         M_max    = 1
         M_use    = 1
@@ -204,7 +202,6 @@ class MarkAndRF:
             ap_sd2s_y = _N.array(ap_sd2s[1])
 
             Asts    = _N.where(oo.dat[t0:t1, s01col] == 1)[0]   #  based at 0
-            _cdfs2d.change_occ_hist(xt0t1, yt0t1, oo.xLo, oo.xHi, oo.yLo, oo.yHi)
 
             #######   containers for GIBBS samples iterations
             smp_sp_prms = _N.zeros((5, ITERS, M_use))  
@@ -311,12 +308,24 @@ class MarkAndRF:
                     m_rnds_y = _N.random.rand(M_use)
 
                     t1  = _tm.time()
-                    _cdfs2d.smp_f(itr, 0, M_use, clstsz, cls_str_ind, v_sts, xt0t1, yt0t1, t0, fx, fy, q2x, q2y, l0, _fx_u, _fx_q2, _fy_u, _fy_q2, m_rnds_x)
-                    smp_sp_prms[oo.ky_p_fx, itr] = fx
+                    _cdfs2dA.smp_f(itr, M_use, xt0t1, clstsz, cls_str_ind, 
+                                        v_sts, t0, l0, 
+                                        totalpcs, ap_mn_x, 
+                                        diff2_y, nrm_y, inv_sum_sd2s_y,
+                                        diff2_x, nrm_x, inv_sum_sd2s_x,
+                                        _fx_u, _fx_q2, m_rnds_x, fx, q2x)
+                    _cdfs2dA.diff2_xy(totalpcs, M_use, diff2_x, fx, ap_mn_x)
+                    smp_sp_prms[oo.ky_p_fx, itr]   = fx
 
-                    _cdfs2d.smp_f(itr, 1, M_use, clstsz, cls_str_ind, v_sts, xt0t1, yt0t1, t0, fx, fy, q2x, q2y, l0, _fx_u, _fx_q2, _fy_u, _fy_q2, m_rnds_y)
-                    smp_sp_prms[oo.ky_p_fy, itr] = fy
-
+                    _cdfs2dA.smp_f(itr, M_use, yt0t1, clstsz, cls_str_ind, 
+                                        v_sts, t0, l0, 
+                                        totalpcs, ap_mn_y, 
+                                        diff2_x, nrm_x, inv_sum_sd2s_x,
+                                        diff2_y, nrm_y, inv_sum_sd2s_y,
+                                        _fy_u, _fy_q2, m_rnds_y, fy, q2y)
+                    smp_sp_prms[oo.ky_p_fy, itr]   = fy
+                    #print "%(1).4f   %(2).4f" % {"1" : fx[0], "2" : fy[0]}
+                    _cdfs2dA.diff2_xy(totalpcs, M_use, diff2_y, fy, ap_mn_y)
                     t2  = _tm.time()
 
                     ##############
@@ -332,7 +341,15 @@ class MarkAndRF:
                     _Dq2_B = _q2x_B
 
                     t1  = _tm.time()
-                    _cdfs2d.smp_q2(itr, 0, M_use, clstsz, cls_str_ind, v_sts, xt0t1, yt0t1, t0, fx, fy, q2x, q2y, l0, _Dq2_a, _Dq2_B, m_rnds_x)
+                    _cdfs2dA.smp_q2(itr, M_use, xt0t1, clstsz, cls_str_ind, 
+                                    v_sts, t0, l0, 
+                                    totalpcs, ap_sd2s_x,
+                                    diff2_y, nrm_y, inv_sum_sd2s_y,
+                                    diff2_x, nrm_x, inv_sum_sd2s_x,
+                                    _Dq2_a, _Dq2_B, m_rnds_x, fx, q2x)
+
+                    _cdfs2dA.nrm_xy(totalpcs, M_use, inv_sum_sd2s_x, nrm_x, q2x, ap_sd2s_x)
+
                     #print "-------   sampled q2x is %.4e" % q2x[0]
 
                     smp_sp_prms[oo.ky_p_q2x, itr]   = q2x
@@ -340,7 +357,13 @@ class MarkAndRF:
                     _Dq2_a = _q2y_a
                     _Dq2_B = _q2y_B
 
-                    _cdfs2d.smp_q2(itr, 1, M_use, clstsz, cls_str_ind, v_sts, xt0t1, yt0t1, t0, fx, fy, q2x, q2y, l0, _Dq2_a, _Dq2_B, m_rnds_y)
+                    _cdfs2dA.smp_q2(itr, M_use, yt0t1, clstsz, cls_str_ind, 
+                                    v_sts, t0, l0, 
+                                    totalpcs, ap_sd2s_y,
+                                    diff2_x, nrm_x, inv_sum_sd2s_x,
+                                    diff2_y, nrm_y, inv_sum_sd2s_y,
+                                    _Dq2_a, _Dq2_B, m_rnds_y, fy, q2y)
+                    _cdfs2dA.nrm_xy(totalpcs, M_use, inv_sum_sd2s_y, nrm_y, q2y, ap_sd2s_y)
                     smp_sp_prms[oo.ky_p_q2y, itr]   = q2y
                     t2  = _tm.time()
                     #print "-------   sampled q2y is %.4e" % q2y[0]
@@ -349,9 +372,9 @@ class MarkAndRF:
                     ###############  CONDITIONAL l0
                     ###############
                     # _ss.gamma.rvs.  uses k, theta  k is 1/B (B is our thing)
-                    _cdfs2d.l0_spatial(M_use, oo.dt, fx, fy, q2x, q2y, l0_exp_px)
+                    _cdfs2dA.l0_spatial(M_use, totalpcs, oo.dt, ap_Ns, nrm_x, nrm_y, diff2_x, diff2_y, inv_sum_sd2s_x, inv_sum_sd2s_y, l0_exp_px_apprx)
 
-                    BL  = l0_exp_px    #  dim M
+                    BL  = l0_exp_px_apprx    #  dim M
 
                     _Dl0_a = _l0_a
                     _Dl0_B = _l0_B
@@ -363,6 +386,18 @@ class MarkAndRF:
                     l0 = _ss.gamma.rvs(l0_a_, scale=(1/l0_B_), size=M_use)  #  check
                     smp_sp_prms[oo.ky_p_l0, itr] = l0
 
+                    # ap_Ns_r = ap_Ns.reshape((1, totalpcs))
+                    # fx_r  = fx.reshape((M_max, 1))
+                    # fy_r  = fy.reshape((M_max, 1))
+                    # q2x_r = q2x.reshape((M_max, 1))
+                    # q2y_r = q2y.reshape((M_max, 1))
+                    # ap_mn_x_r = ap_mn_x.reshape((1, totalpcs))
+                    # ap_mn_y_r = ap_mn_y.reshape((1, totalpcs))
+                    # ap_sd2s_x_r = ap_sd2s_x.reshape((1, totalpcs))
+                    # ap_sd2s_y_r = ap_sd2s_y.reshape((1, totalpcs))
+
+
+                    
                     """
                     print "----------------------"
                     print nrm_x

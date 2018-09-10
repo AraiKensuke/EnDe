@@ -21,6 +21,7 @@ cdef int __IG  = 1
 cdef int __SUM_SILENCE = 0
 cdef int __CNVLV_SILENCE = 1    #  use convolusion
 
+cdef double fourpi2 = 39.47841760435743
 cdef double twpi = 6.283185307
 
 cdef double[::1] v_cpf2
@@ -364,7 +365,8 @@ def l0_spatial(long M, double[::1] cmp_xt0t1, double[::1] cmp_yt0t1, double cmpr
         #for n in xrange(Nupx):
         for 0 <= n < cmp_Nt0t1:
             sptlIntgrl += exp(((p_cmp_xt0t1[n]-fc_x)*(p_cmp_xt0t1[n]-fc_x))*hlfIIQ2_x + ((p_cmp_yt0t1[n]-fc_y)*(p_cmp_yt0t1[n]-fc_y))*hlfIIQ2_y) 
-        sptlIntgrl *= (dt/sqrt(twpi*q2c_x*q2c_y))
+        #sptlIntgrl *= (dt/sqrt(twpi*q2c_x*q2c_y))
+        sptlIntgrl *= (dt/sqrt(fourpi2*q2c_x*q2c_y))
         p_l0_exp_px[m] = sptlIntgrl*cmprs
 
 

@@ -26,7 +26,11 @@ class ExperimentalMarkContainer2d:
     def save(self):
         oo   = self
         
-        print _edd.resFN("alltetmarks2d.pkl", dir="%(a)s0%(d)d0%(e)d" % {"a" : oo.anim, "d" : oo.day, "e" : oo.ep})
-        dmp = open(_edd.resFN("alltetmarks2d.pkl", dir="%(a)s0%(d)d0%(e)d" % {"a" : oo.anim, "d" : oo.day, "e" : oo.ep}, create=True), "wb")
+        if oo.day < 10:
+            print _edd.resFN("alltetmarks2d.pkl", dir="%(a)s0%(d)d0%(e)d" % {"a" : oo.anim, "d" : oo.day, "e" : oo.ep})
+            dmp = open(_edd.resFN("alltetmarks2d.pkl", dir="%(a)s0%(d)d0%(e)d" % {"a" : oo.anim, "d" : oo.day, "e" : oo.ep}, create=True), "wb")
+        else:
+            print _edd.resFN("alltetmarks2d.pkl", dir="%(a)s%(d)d0%(e)d" % {"a" : oo.anim, "d" : oo.day, "e" : oo.ep})
+            dmp = open(_edd.resFN("alltetmarks2d.pkl", dir="%(a)s%(d)d0%(e)d" % {"a" : oo.anim, "d" : oo.day, "e" : oo.ep}, create=True), "wb")
         _pkl.dump(oo, dmp, -1)
         dmp.close()

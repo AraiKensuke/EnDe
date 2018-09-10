@@ -160,7 +160,7 @@ def adtv_smp_cdf_interp(double[::1] x, double[::1] log_p, int N, int m, double[:
 @cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def smp_f(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts, 
+def smp_f(int itr, int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts, 
 #          double[::1] fx, double[::1] pxO_full, 
           double[::1] xt0t1, int t0, 
           double[::1] f, double[::1] q2, double[::1] l0, 
@@ -206,6 +206,13 @@ def smp_f(int M, long[::1] clstsz, long[::1] cls_strt_inds, long[::1] sts,
         adtvInds, N = adtv_support_pdf(fx2, cpf2, f_STEPS, f_cldz, f_SMALL, dt, l0[m], _NRM, adtv_pdf_params, )
 
         p_f[m] = adtv_smp_cdf_interp(fx2[adtvInds], cpf2[adtvInds], N, m, m_rands)
+        # if (itr % 1000 == 0):
+        #     printf("iter %d   m %d---   clstsz %d  fs %.3f   U %.3f\n", itr, m, p_clstsz[m], fs, U)
+        #     dat = _N.empty((len(adtvInds), 2))
+        #     dat[:, 0] = fx2[adtvInds]
+        #     dat[:, 1] = cpf2[adtvInds]
+        #     _N.savetxt("f_%(i)d_%(m)d.txt" % {"i" : itr, "m" : m}, dat, fmt="%.4f %.4f")
+
 
 ########################################################################
 #@cython.cdivision(True)

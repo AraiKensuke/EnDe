@@ -15,8 +15,9 @@ import posteriorUtil as _pU
 from filter import gauKer
 import gibbsApprMxMutil as gAMxMu
 import stochasticAssignment2d as _sA
+import anocc2 as _aoc2
 #import cdf_smp_tbl as _cdfs
-import cdf_smp_sumx_2d as _cdfs2d
+import cdf_smp_2d_apprx_dbg as _cdfs2dA
 import ig_from_cdf_pkg as _ifcp
 import fastnum as _fm
 import clrs 
@@ -54,6 +55,7 @@ class MarkAndRF:
     
     intvs = None    #  
     dat   = None
+    fkpth_prms = None
 
     resetClus = True
 
@@ -82,7 +84,6 @@ class MarkAndRF:
 
     #  px and spatial integration limits.  Don't make larger accessible space
     xLo      = -6;    xHi      = 6   
-    yLo      = -6;    yHi      = 6   
 
     #  limits of conditional probability sampling of f and q2
     f_L   = -12;     f_H = 12   
@@ -95,36 +96,11 @@ class MarkAndRF:
 
     priors     = None
 
-    def setup_spatial_sum_params(self, q2x=None, fx=None, n_q2_lvls=12, q_mlt_steps=2, q_min=0.01, bins_per_sd=5): 
-        """
-        *q_mlt_steps=2  means spatial bins [0.01, 0.02, 0.04, 0.08]...
-        *if my q2 is bigger than max level, i'll just end up using more bins than neccessary. no prob
-        *bins_per_sd=5   heuristically, this is a good setting.
-        *q2x, fx     grid 
-        """
-        oo = self
-        oo.q2_lvls = _N.empty(n_q2_lvls)
-        oo.Nupx_lvls = _N.empty(n_q2_lvls, dtype=_N.int)
-        oo.q2_lvls[0] = q_min**2
-        q2_mlt_steps = q_mlt_steps**2
-        oo.Nupx_lvls[0] = int(_N.ceil(((oo.xHi-oo.xLo)/_N.sqrt(oo.q2_lvls[0]))*bins_per_sd))
-
-        for i in xrange(1, n_q2_lvls):
-            oo.q2_lvls[i] = q2_mlt_steps*oo.q2_lvls[i-1]
-            oo.Nupx_lvls[i] = int(_N.ceil(((oo.xHi-oo.xLo)/_N.sqrt(oo.q2_lvls[i]))*bins_per_sd))
-            #  Nupx_lvls should not be too small.  how finely 
-            oo.Nupx_lvls[i] = 40 if oo.Nupx_lvls[i] < 40 else oo.Nupx_lvls[i]
-
-        oo.binszs     = float(oo.xHi-oo.xLo)/oo.Nupx_lvls
-        oo.q2_L, oo.q2_H = q2x
-        oo.f_L,  oo.f_H  = fx
-    
-    def __init__(self, outdir, fn, intvfn, xLo=0, xHi=3, yLo=0, yHi=3, seed=1041, adapt=True, t_hlf_l0_mins=None, t_hlf_q2_mins=None, oneCluster=False, rotate=False, ):
+    def __init__(self, outdir, fn, intvfn, xLo=0, xHi=3, yLo=0, yHi=3, seed=1041, adapt=True, t_hlf_l0_mins=None, t_hlf_q2_mins=None, oneCluster=False, rotate=False, fkpth_prm_fn=None, fkpth_wgt=1):
         oo     = self
         oo.oneCluster = oneCluster
         oo.adapt = adapt
-        if seed is not None:
-            _N.random.seed(seed)
+        _N.random.seed(seed)
 
         ######################################  DATA input, define intervals
         # bFN = fn[0:-4]
@@ -157,6 +133,11 @@ class MarkAndRF:
         #     os.mkdir(bFN)
 
         _dat    = _N.loadtxt("%s.dat" % datFN(fn, create=False))
+        #oo.fkpth_dat    = _N.loadtxt("/Users/arai/usb/nctc/Workspace/EnDe/DATA/bond_md2d1004_fkpth.dat")
+        if fkpth_prm_fn is not None:
+            oo.fkpth_prms    = _N.loadtxt("%s.prms" % datFN(fkpth_prm_fn, create=False))
+            oo.fkpth_wgt     = fkpth_wgt
+            print "loaded fake path prms"
         oo.rotate = rotate
         if not rotate:
             oo.dat  = _dat
@@ -181,6 +162,35 @@ class MarkAndRF:
         oo.xHi = xHi   #  this limit used for spatial path sum
         oo.yLo = yLo   #  this limit used for spatial path sum
         oo.yHi = yHi   #  this limit used for spatial path sum
+
+    def setup_spatial_sum_params(self, q2x=None, fx=None, n_q2_lvls=12, q_mlt_steps=2, q_min=0.01, bins_per_sd=5): 
+        """
+        *q_mlt_steps=2  means spatial bins [0.01, 0.02, 0.04, 0.08]...
+        *if my q2 is bigger than max level, i'll just end up using more bins than neccessary. no prob
+        *bins_per_sd=5   heuristically, this is a good setting.
+        *q2x, fx     grid 
+        """
+        oo = self
+        oo.q2_lvls = _N.empty(n_q2_lvls)
+        oo.Nupx_lvls = _N.empty(n_q2_lvls, dtype=_N.int)
+        oo.Nupy_lvls = _N.empty(n_q2_lvls, dtype=_N.int)
+        oo.q2_lvls[0] = q_min**2
+        q2_mlt_steps = q_mlt_steps**2
+        oo.Nupx_lvls[0] = int(_N.ceil(((oo.xHi-oo.xLo)/_N.sqrt(oo.q2_lvls[0]))*bins_per_sd))
+        oo.Nupy_lvls[0] = int(_N.ceil(((oo.yHi-oo.yLo)/_N.sqrt(oo.q2_lvls[0]))*bins_per_sd))
+
+        for i in xrange(1, n_q2_lvls):
+            oo.q2_lvls[i] = q2_mlt_steps*oo.q2_lvls[i-1]
+            oo.Nupx_lvls[i] = int(_N.ceil(((oo.xHi-oo.xLo)/_N.sqrt(oo.q2_lvls[i]))*bins_per_sd))
+            oo.Nupy_lvls[i] = int(_N.ceil(((oo.yHi-oo.yLo)/_N.sqrt(oo.q2_lvls[i]))*bins_per_sd))
+            #  Nupx_lvls should not be too small.  how finely 
+            oo.Nupx_lvls[i] = 40 if oo.Nupx_lvls[i] < 40 else oo.Nupx_lvls[i]
+            oo.Nupy_lvls[i] = 40 if oo.Nupy_lvls[i] < 40 else oo.Nupy_lvls[i]
+
+        oo.binszs_x     = float(oo.xHi-oo.xLo)/oo.Nupx_lvls
+        oo.binszs_y     = float(oo.yHi-oo.yLo)/oo.Nupy_lvls
+        oo.q2_L, oo.q2_H = q2x   #  grid lims for calc of conditional posterior
+        oo.f_L,  oo.f_H  = fx
 
     def gibbs(self, ITERS, K, priors, ep1=0, ep2=None, saveSamps=True, saveOcc=True, doSepHash=True, nz_pth=0., smth_pth_ker=0, f_STEPS=13, q2_STEPS=13, f_SMALL=10, q2_SMALL=10, f_cldz=10, q2_cldz=10, minSmps=20, diag_cov=False, earliest=20000, cmprs=1):
         """
@@ -219,7 +229,7 @@ class MarkAndRF:
         #     oo.dat[:, 0] = xf + nz_pth*_N.random.randn(len(oo.dat[:, 0]))
         # else:
         #     oo.dat[:, 0] += nz_pth*_N.random.randn(len(oo.dat[:, 0]))
-        xy      = oo.dat[:, 0:2]
+        xy      = oo.dat[:, 0:2] + 0.01*_N.random.randn(oo.dat.shape[0], 2)
 
         if oo.rotate:
             init_mks    = _N.array(oo.dat[:, 3:3+K])  #  init using non-rot
@@ -236,7 +246,9 @@ class MarkAndRF:
         tau_l0 = oo.t_hlf_l0/_N.log(2)
         tau_q2 = oo.t_hlf_q2/_N.log(2)
 
-        _cdfs2d.init(oo.dt, oo.f_L, oo.f_H, oo.q2_L, oo.q2_H, f_STEPS, q2_STEPS, f_SMALL, q2_SMALL, f_cldz, q2_cldz, minSmps)
+        _cdfs2dA.init(oo.dt, oo.f_L, oo.f_H, oo.q2_L, oo.q2_H, f_STEPS, q2_STEPS, f_SMALL, q2_SMALL, f_cldz, q2_cldz, minSmps)
+
+        print "done occ_resolu"
 
         M_max   = 50   #  100 clusters, max
         M_use    = 0     #  number of non-free + 5 free clusters
@@ -261,13 +273,35 @@ class MarkAndRF:
             # gtR = _N.where(smthd_pos > oo.xHi)[0]
             # smthd_pos[gtR] += 2*(oo.xHi - smthd_pos[gtR])
 
-
-            print "!!!!!!!!!!!!!!!!!!cmprs    %d" % cmprs
             xt0t1 = _N.array(xy[t0:t1, 0])#smthd_pos
             yt0t1 = _N.array(xy[t0:t1, 1])#smthd_pos
-            cmp_xt0t1 = _N.array(xt0t1[t0:t1:cmprs])#smthd_pos
-            cmp_yt0t1 = _N.array(yt0t1[t0:t1:cmprs])#smthd_pos
-            cmp_Nt0t1 = (t1-t0) / cmprs  
+
+            blur = True
+            totalpcs, _ap_Ns, ap_mns, ap_sd2s, ap_isd2s = _aoc2.approx_Wmaze(blur, xt0t1, yt0t1, smth_krnl_x=500, smth_krnl_y=500)
+            if oo.fkpth_prms is not None:
+                ap_mn_x   = _N.array(ap_mns[0].tolist() + oo.fkpth_prms[:, 0].tolist())
+                print ap_mn_x
+                ap_mn_y   = _N.array(ap_mns[1].tolist() + oo.fkpth_prms[:, 1].tolist())
+                ap_sd2s_x = _N.array(ap_sd2s[0].tolist() + (oo.fkpth_prms[:, 2]**2).tolist())
+                ap_sd2s_y = _N.array(ap_sd2s[1].tolist() + (oo.fkpth_prms[:, 3]**2).tolist())
+                
+                wgts = ((oo.fkpth_wgt*(t1-t0))/oo.fkpth_prms.shape[0])
+                fkL = _N.ones(oo.fkpth_prms.shape[0])*wgts
+
+                ap_Ns     = (_N.array(_ap_Ns.tolist() + fkL.tolist()))
+                print ap_mn_x
+                print ap_mn_y
+                print ap_sd2s_x
+                print ap_sd2s_y
+                print ap_Ns
+                totalpcs += oo.fkpth_prms.shape[0]
+            else:
+                ap_mn_x   = ap_mns[0]
+                ap_mn_y   = ap_mns[1]
+                ap_sd2s_x = ap_sd2s[0]
+                ap_sd2s_y = ap_sd2s[1]
+                ap_Ns     = _ap_Ns
+
 
             Asts    = _N.where(oo.dat[t0:t1, 2] == 1)[0]   #  based at 0
 
@@ -326,8 +360,12 @@ class MarkAndRF:
 
                 gAMxMu.init_params_hyps_2d(oo, M_use, K, l0, fx, fy, q2x, q2y, u, Sg, _l0_a, _l0_B, _fx_u, _fy_u, _fx_q2, _fy_q2, _q2x_a, _q2y_a, _q2x_B, _q2y_B, _u_u, _u_Sg, _Sg_nu, \
                                         _Sg_PSI, Asts, t0, xy, fit_mks, flatlabels, nHSclusters)
+                ##   hard code
+                #_q2x_u[0:(3*M)/4] = 
 
                 U   = _N.empty(M_use)
+
+                l0_exp_px_apprx = _N.empty(M_use)
 
                 ######  the hyperparameters for f, q2, u, Sg, l0 during Gibbs
                 #  f_u_, f_q2_, q2_a_, q2_B_, u_u_, u_Sg_, Sg_nu, Sg_PSI_, l0_a_, l0_B_
@@ -356,6 +394,7 @@ class MarkAndRF:
                 _l0_a, _l0_B, _f_u, _f_q2, _q2_a, _q2_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI        = gAMxMu.copy_slice_hyp_params(M_use, _l0_a_M, _l0_B_M, _f_u_M, _f_q2_M, _q2_a_M, _q2_B_M, _u_u_M, _u_Sg_M, _Sg_nu_M, _Sg_PSI_M)
 
                 l0_exp_hist = _N.array(l0_exp_hist_M[0:M_use], copy=True)
+                l0_exp_px_apprx = _N.empty(M_use)
 
                 #  hyperparams of posterior. Not needed for all params
                 u_u_  = _N.empty((M_use, K))
@@ -363,7 +402,7 @@ class MarkAndRF:
                 Sg_nu_ = _N.empty(M_use)
                 Sg_PSI_ = _N.empty((M_use, K, K))
 
-                smp_sp_prms = _N.zeros((3, ITERS, M_use))  
+                smp_sp_prms = _N.zeros((5, ITERS, M_use))  
                 smp_mk_prms = [_N.zeros((K, ITERS, M_use)), 
                                _N.zeros((K, K, ITERS, M_use))]
                 smp_mk_hyps = [_N.zeros((K, ITERS, M_use)),   
@@ -376,18 +415,16 @@ class MarkAndRF:
                 oo.smp_mk_hyps = smp_mk_hyps
 
                 #####  MODES  - find from the sampling
-                oo.sp_prmPstMd = _N.zeros(3*M_use)   # mode params
+                oo.sp_prmPstMd = _N.zeros(5*M_use)   # mode params
                 oo.mk_prmPstMd = [_N.zeros((M_use, K)),
                                   _N.zeros((M_use, K, K))]
 
             NSexp   = t1-t0    #  length of position data  #  # of no spike positions to sum
 
-            xt0t1 = _N.array(xy[t0:t1, 0])#smthd_pos
-            yt0t1 = _N.array(xy[t0:t1, 1])#smthd_pos
-            cmp_xt0t1 = xt0t1#smthd_pos
-            cmp_yt0t1 = yt0t1#smthd_pos
+            #xt0t1 = _N.array(xy[t0:t1, 0])#smthd_pos
+            #yt0t1 = _N.array(xy[t0:t1, 1])#smthd_pos
 
-            Nt0t1 = t1-t0
+            l0_exp_px = _N.empty(M_use)
 
             nSpks    = len(Asts)
             v_sts = _N.empty(len(Asts), dtype=_N.int)
@@ -441,26 +478,41 @@ class MarkAndRF:
             outs1 = _N.empty((M_use, K))
             outs2 = _N.empty((M_use, K))
 
-            BLK        = 3000
+            BLK        = 200
             iterBLOCKs = ITERS/BLK
 
-            q2x[:] = _N.random.rand(M_use)
-            q2y[:] = _N.random.rand(M_use)
-            fy[:]   = _N.random.randn(M_use)
-            fx[:]   = _N.random.randn(M_use)
+            q2x = _N.array([0.02]*M_use)
+            q2y = _N.array([0.02]*M_use)
+
+            inv_sum_sd2s_x = _N.empty((M_use, totalpcs))
+            inv_sum_sd2s_y = _N.empty((M_use, totalpcs))
+
+            nrm_x          = _N.empty((M_use, totalpcs))
+            nrm_y          = _N.empty((M_use, totalpcs))
+            diff2_x        = _N.empty((M_use, totalpcs))
+            diff2_y        = _N.empty((M_use, totalpcs))
+            
+            
+            _cdfs2dA.nrm_xy(totalpcs, M_use, inv_sum_sd2s_x, nrm_x, q2x, ap_sd2s_x)
+            _cdfs2dA.nrm_xy(totalpcs, M_use, inv_sum_sd2s_y, nrm_y, q2y, ap_sd2s_y)
+            _cdfs2dA.diff2_xy(totalpcs, M_use, diff2_x, fx, ap_mn_x)
+            _cdfs2dA.diff2_xy(totalpcs, M_use, diff2_y, fy, ap_mn_y)
 
             ###########  BEGIN GIBBS SAMPLING ##############################
             #for itr in xrange(ITERS):
             for itrB in xrange(iterBLOCKs):
+                print "printing priors._fy_u"
+                print priors._fy_u
+
                 for itr in xrange(itrB*BLK, (itrB+1)*BLK):
                     #ttsw1 = _tm.time()
                     iSg = _N.linalg.inv(Sg)
                     #ttsw2 = _tm.time()
-                    if (itr % 5) == 0:    
+                    if (itr % 100) == 0:    
                         print "-------itr  %(i)d" % {"i" : itr}
 
                     if M_use > 1:
-                        _sA.stochasticAssignment2d(oo, epc, itr, M_use, K, l0, fx, fy, q2x, q2y, u, Sg, iSg, _fx_u, _fy_u, _u_u, _fx_q2, _fy_q2, _u_Sg, Asts, t0, mAS, xAS, yAS, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, ((epc > 0) and (itr == 0)), diag_cov, clstsz)
+                        _sA.stochasticAssignment2d(oo, epc, itr, M_use, K, l0, fx, fy, q2x, q2y, u, Sg, iSg, _fx_u, _fy_u, _fx_q2, _fy_q2, _u_u, _u_Sg, Asts, t0, mAS, xAS, yAS, rat, econt, gz, qdrMKS, freeClstr, hashthresh, m1stSignalClstr, ((epc > 0) and (itr == 0)), diag_cov, clstsz)
                         _fm.cluster_bounds2(clstsz, Asts, cls_str_ind, v_sts, gz[itr], t0, M_use, nSpks)    # _fm.cluser_bounds provides no improvement
                     #ttsw3 = _tm.time()
 
@@ -508,25 +560,28 @@ class MarkAndRF:
                     else:
                         q2xpr = _fx_q2
                         q2ypr = _fy_q2
-                    mx_rnds = _N.random.rand(M_use)
-                    my_rnds = _N.random.rand(M_use)
 
-                    #  q2y and fy are fixed, size M_use
-                    q2yr = q2y.reshape(M_use, 1)
-                    fyr  = fy.reshape(M_use, 1)
 
-                    cmp_wgt_y  = (1./_N.sqrt(twpi*q2yr))*_N.exp(-0.5*(cmp_yt0t1-fyr)*(cmp_yt0t1-fyr)/q2yr)
 
-                    _cdfs2d.smp_f_2d(M_use, clstsz, cls_str_ind, v_sts, xt0t1, cmp_xt0t1, cmprs, t0, fx, q2x, l0, cmp_wgt_y, _fx_u, _fx_q2, mx_rnds)
+                    m_rnds_x = _N.random.rand(M_use)
+                    m_rnds_y = _N.random.rand(M_use)
+
+                    _cdfs2dA.smp_f(itr, M_use, xt0t1, clstsz, cls_str_ind, 
+                                        v_sts, t0, l0, 
+                                        totalpcs, ap_mn_x, 
+                                        diff2_y, nrm_y, inv_sum_sd2s_y,
+                                        diff2_x, nrm_x, inv_sum_sd2s_x,
+                                        _fx_u, _fx_q2, m_rnds_x, fx, q2x)
                     smp_sp_prms[oo.ky_p_fx, itr] = fx
-                    #  q2y and fy are fixed, size M_use
-                    q2xr = q2x.reshape(M_use, 1)
-                    fxr  = fx.reshape(M_use, 1)
 
-                    cmp_wgt_x  = (1./_N.sqrt(twpi*q2xr))*_N.exp(-0.5*(cmp_xt0t1-fxr)*(cmp_xt0t1-fxr)/q2xr)
-
-                    _cdfs2d.smp_f_2d(M_use, clstsz, cls_str_ind, v_sts, yt0t1, cmp_yt0t1, cmprs, t0, fy, q2y, l0, cmp_wgt_x, _fy_u, _fy_q2, my_rnds)
-                    smp_sp_prms[oo.ky_p_fy, itr] = fy
+                    _cdfs2dA.smp_f(itr, M_use, yt0t1, clstsz, cls_str_ind, 
+                                        v_sts, t0, l0, 
+                                        totalpcs, ap_mn_y, 
+                                        diff2_x, nrm_x, inv_sum_sd2s_x,
+                                        diff2_y, nrm_y, inv_sum_sd2s_y,
+                                        _fy_u, _fy_q2, m_rnds_y, fy, q2y)
+                    _cdfs2dA.diff2_xy(totalpcs, M_use, diff2_y, fy, ap_mn_y)
+                    smp_sp_prms[oo.ky_p_fy, itr]   = fy
 
                     #ttsw7 = _tm.time()
                     ##############
@@ -600,17 +655,31 @@ class MarkAndRF:
 
                     #ttsw9 = _tm.time()
 
+                    m_rnds_x = _N.random.rand(M_use)
+                    m_rnds_y = _N.random.rand(M_use)
 
-                    q2yr = q2y.reshape(M_use, 1)
-                    fyr  = fy.reshape(M_use, 1)
-                    cmp_wgt_y  = (1./_N.sqrt(twpi*q2yr))*_N.exp(-0.5*(cmp_yt0t1-fyr)*(cmp_yt0t1-fyr)/q2yr)
-                    _cdfs2d.smp_q2_2d(M_use, clstsz, cls_str_ind, v_sts, xt0t1, cmp_xt0t1, cmprs, t0, fx, q2x, l0, cmp_wgt_y, _Dq2_a, _Dq2_B, mx_rnds)
+                    #  B' = MODE * (a' - 1)
+
+                    _cdfs2dA.smp_q2(itr, M_use, xt0t1, clstsz, cls_str_ind, 
+                                    v_sts, t0, l0, 
+                                    totalpcs, ap_sd2s_x,
+                                    diff2_y, nrm_y, inv_sum_sd2s_y,
+                                    diff2_x, nrm_x, inv_sum_sd2s_x,
+                                    _Dq2_a, _Dq2_B, m_rnds_x, fx, q2x)
+
+                    _cdfs2dA.nrm_xy(totalpcs, M_use, inv_sum_sd2s_x, nrm_x, q2x, ap_sd2s_x)
                     smp_sp_prms[oo.ky_p_q2x, itr]   = q2x
 
-                    q2xr = q2x.reshape(M_use, 1)
-                    fxr  = fx.reshape(M_use, 1)
-                    cmp_wgt_x  = (1./_N.sqrt(twpi*q2xr))*_N.exp(-0.5*(cmp_xt0t1-fxr)*(cmp_xt0t1-fxr)/q2xr)
-                    _cdfs2d.smp_q2_2d(M_use, clstsz, cls_str_ind, v_sts, yt0t1, cmp_yt0t1, cmprs, t0, fy, q2y, l0, cmp_wgt_x, _Dq2_a, _Dq2_B, my_rnds)
+                    _Dq2_a = _q2y_a
+                    _Dq2_B = _q2y_B
+
+                    _cdfs2dA.smp_q2(itr, M_use, yt0t1, clstsz, cls_str_ind, 
+                                    v_sts, t0, l0, 
+                                    totalpcs, ap_sd2s_y,
+                                    diff2_x, nrm_x, inv_sum_sd2s_x,
+                                    diff2_y, nrm_y, inv_sum_sd2s_y,
+                                    _Dq2_a, _Dq2_B, m_rnds_y, fy, q2y)
+                    _cdfs2dA.nrm_xy(totalpcs, M_use, inv_sum_sd2s_y, nrm_y, q2y, ap_sd2s_y)
                     smp_sp_prms[oo.ky_p_q2y, itr]   = q2y
 
                     #ttsw10 = _tm.time()
@@ -619,8 +688,10 @@ class MarkAndRF:
                     ###############  CONDITIONAL l0
                     ###############
                     #  _ss.gamma.rvs.  uses k, theta  k is 1/B (B is our thing)
-                    _cdfs2d.l0_spatial(M_use, cmp_xt0t1, cmp_yt0t1, cmprs, oo.dt, fx, q2x, fy, q2y, l0_exp_hist)
-                    BL  = l0_exp_hist    #  dim M
+
+                    _cdfs2dA.l0_spatial(M_use, totalpcs, oo.dt, ap_Ns, nrm_x, nrm_y, diff2_x, diff2_y, inv_sum_sd2s_x, inv_sum_sd2s_y, l0_exp_px_apprx)
+                    
+                    BL  = l0_exp_px_apprx    #  dim M
 
                     if (epc > 0) and oo.adapt:
                         _mn_nd= _l0_a / _l0_B
@@ -665,12 +736,13 @@ class MarkAndRF:
                     # print "t11t10+=%.4e" % (#ttsw11-#ttsw10)
                     # print "#timing end  %.5f" % (#ttsw10-#ttsw1)
 
-                frms = _pU.find_good_clstrs_and_stationary_from(M_use, smp_sp_prms[:, 0:itr+1], spcdim=2)
-                if (itr >= oo.earliest) and (len(_N.where(frms - 4000 < 0)[0]) == M_use):
-                    break
+                #frms = _pU.find_good_clstrs_and_stationary_from(M_use, smp_sp_prms[:, 0:itr+1])
+                #if (itr >= oo.earliest) and (len(_N.where(frms - 4000 < 0)[0]) == M_use):
+                #    break
 
             ttB = _tm.time()
             print (ttB-ttA)
+
 
             print "itr is %d" % itr
             gAMxMu.finish_epoch2_2d(oo, nSpks, epc, itr+1, gz, l0, fx, fy, q2x, q2y, u, Sg, _fx_u, _fy_u, _fx_q2, _fy_q2, _q2x_a, _q2y_a, _q2x_B, _q2y_B, _l0_a, _l0_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_prms, smp_mk_prms, smp_mk_hyps, freeClstr, M_use, K, priors, m1stSignalClstr)
@@ -679,7 +751,7 @@ class MarkAndRF:
             gAMxMu.contiguous_inuse_2d(M_use, M_max, K, freeClstr, l0, fx, fy, q2x, q2y, u, Sg, _l0_a, _l0_B, _fx_u, _fy_u, _fx_q2, _fy_q2, _q2x_a, _q2y_a, _q2x_B, _q2y_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, smp_sp_prms, smp_mk_prms, oo.sp_prmPstMd, oo.mk_prmPstMd, gz, priors)
             gAMxMu.copy_back_params_2d(M_use, l0, fx, fy, q2x, q2y, u, Sg, M_max, l0_M, fx_M, fy_M, q2x_M, q2y_M, u_M, Sg_M)
             gAMxMu.copy_back_hyp_params_2d(M_use, _l0_a, _l0_B, _fx_u, _fy_u, _fx_q2, _fy_q2, _q2x_a, _q2y_a, _q2x_B, _q2y_B, _u_u, _u_Sg, _Sg_nu, _Sg_PSI, M_max, _l0_a_M, _l0_B_M, _fx_u_M, _fy_u_M, _fx_q2_M, _fy_q2_M, _q2x_a_M, _q2y_a_M, _q2x_B_M, _q2y_B_M, _u_u_M, _u_Sg_M, _Sg_nu_M, _Sg_PSI_M)
-
+            
             #  MAP of nzclstr
             if saveSamps:
                 pcklme["smp_sp_prms"] = smp_sp_prms[:, 0:itr+1]
@@ -687,13 +759,13 @@ class MarkAndRF:
             pcklme["sp_prmPstMd"] = oo.sp_prmPstMd
             pcklme["mk_prmPstMd"] = oo.mk_prmPstMd
             pcklme["intvs"]       = oo.intvs
-            #pcklme["smp_l0_exp"]       = oo.smp_l0_exp
             if saveOcc:
                 pcklme["occ"]         = c_gz.gz2cgz(gz[0:itr+1])
                 pcklme["freeClstr"]           = freeClstr  #  next time
             pcklme["nz_pth"]         = nz_pth
             pcklme["M"]           = M_use
             pcklme["rotate"]      = oo.rotate
+
                 
             dmp = open(resFN("posteriors_%d.dmp" % epc, dir=oo.outdir), "wb")
             pickle.dump(pcklme, dmp, -1)

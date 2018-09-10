@@ -108,7 +108,7 @@ def stationary_from_Z_bckwd(smps, blksz=200):
     return frms+blksz
 """
 
-def stationary_from_Z_bckwd(smps, blksz=200):
+def stationary_from_Z_bckwd(smps, blksz=200, spcdim=1):
     #  Detect when stationarity reached in Gibbs sampling
     #  Also, detect whether cluster is switching between local extremas
     #
@@ -133,12 +133,12 @@ def stationary_from_Z_bckwd(smps, blksz=200):
 
         rshpd     = reparam.reshape((3, wins, blksz, M))
 
-    mrshpd    = _n.median(rshpd, axis=2)   #  2 x wins_m1+1 x m
-    sdrshpd   = _n.std(rshpd, axis=2)
+    mrshpd    = _N.median(rshpd, axis=2)   #  2 x wins_m1+1 x m
+    sdrshpd   = _N.std(rshpd, axis=2)
 
-    mlst                =         mrshpd[:, wins_m1].reshape(2, 1, M)
-    sdlst               =         sdrshpd[:, wins_m1].reshape(2, 1, M)
-    sdnlst               =         sdrshpd[:, 0:-1].reshape(2, wins_m1, M)
+    mLst                =         mrshpd[:, wins_m1].reshape(2, 1, M)
+    sdLst               =         sdrshpd[:, wins_m1].reshape(2, 1, M)
+    sdNLst               =         sdrshpd[:, 0:-1].reshape(2, wins_m1, M)
 
     zL                =         (mrshpd[:, 0:-1] - mLst)/sdLst
     zNL               =         (mrshpd[:, 0:-1] - mLst)/sdNLst
