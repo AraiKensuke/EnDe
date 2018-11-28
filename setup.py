@@ -11,6 +11,7 @@ from Cython.Distutils import build_ext   # Extension for a c-file, build_ext for
 #modules = ["raw_random_access"]
 #modules = ["hc_bcast", "GoFfuncs_pyx", "GoF_util"]
 modules = ["hc_bcast"]
+modules = ["fastnum"]
 #modules  = ["GoFfuncs_pyxKDE"]
 #modules  = ["GoF_util", "GoF_util_2", "GoF_util_4"]
 #modules  = ["cdf_smp_sumx_2d"]

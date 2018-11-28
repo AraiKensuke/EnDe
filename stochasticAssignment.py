@@ -56,6 +56,7 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     #_fm.multi_qdrtcs_par_func_sym(dmu, iSg, qdrMKS, M, N, K, nthrds=1)
     exp_arg = _N.empty((M, N))    
     #ttt5       = _tm.time()
+
     if diag_cov:
        _fm.full_qdrtcs_K4_diag(pkFRr, mkNrms, exp_arg, fr, xASr, iq2r, \
                                qdrSPC, mAS, u, iSg, qdrMKS, M, N, K)
@@ -308,17 +309,18 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     exp_arg       -= mx_exp_argr     #  M x N
     #ttt7       = _tm.time()
     _fm.exp_on_arr(exp_arg, econt, M, N)   # _N.exp(cont, out=econt)  
+    #_fm.exp_on_arr(exp_arg, econt, rat, rnds, M, N)   # _N.exp(cont, out=econt)  
     #ttt8       = _tm.time()
     for m in xrange(M):  #  rat is (M x N)
         rat[m+1] = rat[m] + econt[m]
 
     rnds *= rat[M]   #  used to be     #rat /= rat[M] (more # of computations)
-    # if (epc == 1) and (it > 2):
-    #     qdr = qdrSPC + qdrMKS
-    #     for n in xrange(rat.shape[1]):
-    #         print qdr[:, n]
+    # # if (epc == 1) and (it > 2):
+    # #     qdr = qdrSPC + qdrMKS
+    # #     for n in xrange(rat.shape[1]):
+    # #         print qdr[:, n]
         
-    #  want to see rat[:, 158]
+    # #  want to see rat[:, 158]
 
     """
     # print f
@@ -365,6 +367,7 @@ def stochasticAssignment(oo, epc, it, M, K, l0, f, q2, u, Sg, iSg, _f_u, _u_u, _
     # print "it6t5+=%.4e" % (#ttt6-#ttt5)
     # print "it7t6+=%.4e" % (#ttt7-#ttt6)  
     # print "it8t7+=%.4e" % (#ttt8-#ttt7)  
+    # #print "it9t7+=%.4e" % (#ttt9-#ttt7)  
     # print "it9t8+=%.4e" % (#ttt9-#ttt8)  # slow 0.02
     # print "it10t9+=%.4e" % (#ttt10-#ttt9)  # slow 0.08
     # print "#st timing end"

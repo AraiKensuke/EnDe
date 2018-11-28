@@ -737,10 +737,15 @@ def multi_qdrtcs_par_func2(double[:, :, ::1] v, double[:, :, ::1] iSg, double[:,
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def exp_on_arr(double[:, ::1] inp, double[:, ::1] out, long M, long N):
+#def exp_on_arr(double[:, ::1] inp, double[:, ::1] out, double[:, ::1] rat, double[::1] rnds, long M, long N):
     #  exp(- qdrspc - qdrmk - nrm - offset)   - get occupation ratios.
     #  offset so that most likely cluster has ratio == 1
     cdef double *p_inp  = &inp[0, 0]
     cdef double *p_out  =  &out[0, 0]
+
+    #cdef double *p_rat  = &rat[0, 0]
+    #cdef double *p_rnds  =  &rnds[0]
+    
     cdef long m, n, mN = 0
 
     with nogil:
@@ -752,6 +757,17 @@ def exp_on_arr(double[:, ::1] inp, double[:, ::1] out, long M, long N):
                 #  instead of wasting time evaluating this, just set these
                 #  ones to 0.  assignment ratio is << exp(0), practically 0.
                 #p_out[mN+n] = 0 if (p_inp[mN+n] < -10) else exp(p_inp[mN + n])
+        for 0 <= n < N:
+            for 0 <= m < M:
+                p_rat[(m+1)*N+n] = p_rat[m*N + n] + p_out[m*N + n]
+
+        p_rnds[n] *= p_rat[Np_rat[M*n]  #  last bit doesn't work.
+
+    # for m in xrange(M):  #  rat is (M x N)
+    #     rat[m+1] = rat[m] + econt[m]
+
+    # rnds *= rat[M]   #  used to be     #rat /= rat[M] (more # of computations)
+
 
 
 @cython.boundscheck(False)

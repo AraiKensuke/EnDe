@@ -267,13 +267,13 @@ class MarkAndRF:
             # smthd_pos[gtR] += 2*(oo.xHi - smthd_pos[gtR])
             
             xt0t1 = x[t0:t1]#smthd_pos
-            areaUnder, mnps, sd2ps, isd2ps = _ano.approx_path_w_gau(xt0t1, pcs=pcs)
+
+            pcs, areaUnder, mnps, sd2ps = _ano.approx_path_w_gau(xt0t1, pcs=pcs)
             
             mnps_r = mnps.reshape(1, pcs)  #  mean pos of segments
             sd2ps_r = sd2ps.reshape(1, pcs)  # var pos of segments
             isd2ps_r = isd2ps.reshape(1, pcs)
 
-            _cdfs.change_occ_hist(xt0t1, oo.xLo, oo.xHi)
             Asts    = _N.where(oo.dat[t0:t1, 1] == 1)[0]   #  based at 0
 
             if epc == ep1:   ###  initialize

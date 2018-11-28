@@ -1,48 +1,51 @@
 import numpy as _N
-cimport numpy as _N
-cimport cython
-from libc.math cimport exp, sqrt, log
-from libc.stdlib cimport malloc, free
-from libc.stdio cimport printf
 
-cdef double twpi = 6.283185307
 
-std_gau_x = None
-cdef double[::1] mv_std_gau_x
-cdef double *p_std_gau_x
-cdef long N_gau_x
-f_x = None
-cdef double[::1] mv_f_x
-cdef double *p_f_x
-cpf_f = None
-cdef double[::1] mv_cpf_f
-cdef double *p_cpf_f
+def approx_occhist_w_gau(xp, fN):
+    """
+    approximate occupational histogram with gaussians.  
+    fN bins of xp.  then smooth histogram, and find its peaks.
+    fit peaks with Gaussian, and return
+    """
+    N   = xp.shape[0]
 
-cdef double dt
+    x0 = _N.min(xp)
+    x1 = _N.max(xp)
 
-def init(_dt):
-    global std_gau_x, f_x, cpf_f
-    global mv_std_gau_x, mv_f_x, mv_cpf_f
-    global p_std_gau_x, p_f_x, p_cpf_f
-    global dt, N_gau_x
+    fN  = 401   #  # of bin boundary points. # of bins is fN-1
 
-    #_x          = _N.cumsum(0.125*_N.linspace(0, 18, 19))
-    _x          = _N.array([0, 0.2, 0.4, 0.6, 0.8, 1., 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3., 3.2, 3.4, 3.6, 3.8, 4., 4.5, 5., 5.5, 6., 7., 8., 9., 12., 15., 18., 24., 30.])
-    L               = _x.shape[0]
-    std_gau_x       = _N.empty(L+L - 1)
-    f_x             = _N.empty(L+L - 1)
-    cpf_f           = _N.empty(L+L - 1)
-    std_gau_x[0:L-1] = -_x[L:0:-1]
-    std_gau_x[L-1:]  = _x
-    mv_std_gau_x    = std_gau_x
-    mv_f_x      = f_x
-    mv_cpf_f    = cpf_f
-    p_std_gau_x     = &mv_std_gau_x[0]
-    p_cpf_f     = &mv_cpf_f[0]
-    N_gau_x     = L+L-1
-    p_f_x       = &mv_f_x[0]
-    p_cpf_f       = &mv_cpf_f[0]
-    dt          = _dt
+    #  spatial histogram
+    fs  = _N.linspace(-6, 6, fN, endpoint=True)  # bin edges
+    cnts, bins = _N.histogram(xp, bins=fs)   #  give bins= the bin boundaries
+    dx = _N.diff(bins)[0]             # bin widths
+    x = 0.5*(bins[1:] + bins[0:-1])   # bin centers
+
+    #  smooth the spatial histogram
+    smth_krnl = 2
+    gk        = gauKer(smth_krnl) 
+    gk        /= _N.sum(gk)
+    fcnts = _N.convolve(cnts, gk, mode="same")
+    dfcnts= _N.diff(fcnts)
+
+    xp_inn = _N.where((dfcnts[0:-1] <= 0) & (dfcnts[1:] > 0))[0]
+
+    pcs    = xp_inn.shape[0] + 1
+    xp_bds = _N.zeros(pcs+1, dtype=_N.int)
+    xp_bds[1:pcs] = xp_inn
+    xp_bds[pcs]   = fN-1
+
+    mns = _N.empty(pcs)
+    sds = _N.empty(pcs)
+
+    for t in xrange(pcs):
+        mns[t] = _N.dot(cnts[xp_bds[t]:xp_bds[t+1]], x[xp_bds[t]:xp_bds[t+1]]) / _N.sum(cnts[xp_bds[t]:xp_bds[t+1]])
+
+        p      = cnts[xp_bds[t]:xp_bds[t+1]] / float(_N.sum(cnts[xp_bds[t]:xp_bds[t+1]]))
+        sds[t] = _N.dot(p, (x[xp_bds[t]:xp_bds[t+1]]-mns[t])*(x[xp_bds[t]:xp_bds[t+1]]-mns[t]))
+
+    return pcs, mns, sds
+
+
 
 @cython.cdivision(True)
 def approx_path_w_gau(xp, pcs=100):

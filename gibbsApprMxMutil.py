@@ -60,7 +60,7 @@ def initClusters(oo, M_max, K, x, mks, t0, t1, Asts, doSepHash=True, xLo=0, xHi=
             labH, labS, clstrs = emMKPOS_sep1A(None, _x[hashsp], TR=1, K=K)
         else:
             print "---------  doSepH==False"   #  doSepHash == False
-            spNClstrs=[[1, 2], [1, 7]] if spcdim==1 else [[1, 2], [1, 4]]
+            spNClstrs=[[1, 2], [1, 4]] if spcdim==1 else [[1, 2], [1, 4]]
             labH, labS, clstrs = emMKPOS_sep1A(_x[unonhash], None, TR=1, K=K, spcdim=spcdim, spNClstrs=spNClstrs)
             #  labs, labh are at this point both starting from 0
         if doSepHash:
@@ -408,7 +408,12 @@ def finish_epoch2(oo, nSpks, epc, ITERS, gz, l0, f, q2, u, Sg, _f_u, _f_q2, _q2_
         oo.mk_prmPstMd[oo.ky_p_u][m] = u[m]
         oo.mk_prmPstMd[oo.ky_p_Sg][m]= Sg[m]
         _u_u[m]    = _N.median(smp_mk_hyps[oo.ky_h_u_u][:, frm:ITERS, m], axis=1)
-        _u_Sg[m]   = _N.median(smp_mk_hyps[oo.ky_h_u_Sg][:, :, frm:ITERS, m], axis=2)
+        #_u_Sg[m]   = _N.median(smp_mk_hyps[oo.ky_h_u_Sg][:, :, frm:ITERS, m], axis=2)
+        _u_Sg[m]   = _N.mean(smp_mk_hyps[oo.ky_h_u_Sg][:, :, frm:ITERS, m], axis=2)   #  the mean may be more stable
+        # print "look at my diagonals"
+        # print _N.diagonal(_N.linalg.inv(_u_Sg[m]))
+        # print "the mean"
+        # print _N.diagonal(_N.linalg.inv(_N.mean(smp_mk_hyps[oo.ky_h_u_Sg][:, :, frm:ITERS, m], axis=2)))
 
         _Sg_nu[m]  = _N.median(smp_mk_hyps[oo.ky_h_Sg_nu][frm:ITERS, m], axis=0)
         _Sg_PSI[m] = _N.median(smp_mk_hyps[oo.ky_h_Sg_PSI][:, :, frm:ITERS, m], axis=2)
